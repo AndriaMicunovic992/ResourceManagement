@@ -1,0 +1,18 @@
+import { z } from 'zod';
+
+export const createNeedSchema = z.object({
+  projectId: z.string().min(1),
+  domain: z.enum(['Data', 'Web', 'General']),
+  role: z.string().min(1),
+  seniority: z.enum(['Junior', 'Medior', 'Senior', 'Senior Principal']),
+  label: z.string().optional().nullable(),
+  startMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+  endMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+  ftePerMonth: z.number().min(0.1).max(2.0),
+  status: z.enum(['realised', 'potential']).default('realised'),
+});
+
+export const updateNeedSchema = createNeedSchema.partial().omit({ projectId: true });
+
+export type CreateNeedInput = z.infer<typeof createNeedSchema>;
+export type UpdateNeedInput = z.infer<typeof updateNeedSchema>;

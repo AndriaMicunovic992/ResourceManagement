@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-5 py-2 bg-primary text-white rounded-full font-bold text-xs cursor-pointer shadow-card hover:opacity-90 transition;
+  }
+  .btn-secondary {
+    @apply px-5 py-2 bg-white text-text-mid border border-border rounded-full font-semibold text-xs cursor-pointer hover:bg-primary-bg transition;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D8E8EF; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #A0BCC9; }
