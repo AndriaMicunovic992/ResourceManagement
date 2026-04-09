@@ -18,4 +18,4 @@ RUN npx prisma generate
 COPY --from=frontend-build /app/client/dist ./public
 
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy && node --import tsx src/index.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy; npx tsx src/index.ts"]
