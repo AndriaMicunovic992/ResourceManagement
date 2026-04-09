@@ -1,0 +1,26 @@
+import { useMemo } from 'react';
+import HoverButtons from '../../../../components/ui/HoverButtons';
+import StatusBadge from '../../../../components/ui/StatusBadge';
+import { isCustomerOk } from '../../../../lib/gridUtils';
+import { ACCENT_COLORS } from '../../../../lib/constants';
+import { useData } from '../../../../contexts/DataContext';
+
+export default function CustomerLabel({ customer, index, onEdit, onDelete, canEdit }) {
+  const { projects, needs, assignments } = useData();
+
+  const ok = useMemo(() => isCustomerOk(customer, projects, needs, assignments), [customer, projects, needs, assignments]);
+  const accent = ACCENT_COLORS[index % ACCENT_COLORS.length];
+  const borderColor = ok ? '#5BC68A' : customer.status === 'potential' ? '#F5A623' : accent;
+  const bg = ok ? '#EAFAF0' : customer.status === 'potential' ? '#FFF6E8' : accent + '10';
+  const projCount = projects.filter((p) => p.customerId === customer.id).length;
+
+  return (
+    <div className="group flex items-center gap-2 px-3.5 h-10" style={{ borderLeft: `4px solid ${borderColor}`, background: bg }}>
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: borderColor }} />
+      <span className="text-sm font-bold text-text truncate flex-1">{customer.name}</span>
+      <StatusBadge status={customer.status} />
+      <span className="text-[10px] text-text-light font-mono">{projCount}p</span>
+      {canEdit && <HoverButtons onEdit={onEdit} onDelete={onDelete} size="small" />}
+    </div>
+  );
+}

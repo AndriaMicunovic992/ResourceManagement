@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members     OrgMember[]
+  customers   Customer[]
+  projects    Project[]
+  resources   Resource[]
+  needs       Need[]
+  assignments Assignment[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  avatar    String?
+  createdAt DateTime @default(now())
+
+  memberships OrgMember[]
+}
+
+model OrgMember {
+  id   String @id @default(cuid())
+  role String @default("member")
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  status    String   @default("realised")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  projects Project[]
+
+  @@index([orgId])
+}
+
+model Project {
+  id         String   @id @default(cuid())
+  name       String
+  startMonth String
+  endMonth   String
+  status     String   @default("realised")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  needs Need[]
+
+  @@index([orgId])
+  @@index([customerId])
+}
+
+model Resource {
+  id        String   @id @default(cuid())
+  name      String
+  capacity  Float    @default(1.0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  roles       ResourceRole[]
+  assignments Assignment[]
+
+  @@index([orgId])
+}
+
+model ResourceRole {
+  id        String @id @default(cuid())
+  domain    String
+  role      String
+  seniority String
+
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId])
+}
+
+model Need {
+  id               String   @id @default(cuid())
+  domain           String   @default("Web")
+  role             String   @default("FE")
+  seniority        String   @default("Medior")
+  label            String?
+  startMonth       String?
+  endMonth         String?
+  status           String   @default("realised")
+  monthAllocations Json     @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  assignments Assignment[]
+
+  @@index([orgId])
+  @@index([projectId])
+}
+
+model Assignment {
+  id               String   @id @default(cuid())
+  monthAllocations Json     @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  needId String
+  need   Need @relation(fields: [needId], references: [id], onDelete: Cascade)
+
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([needId, resourceId])
+  @@index([orgId])
+  @@index([needId])
+  @@index([resourceId])
+}
