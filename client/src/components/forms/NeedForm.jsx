@@ -76,10 +76,15 @@ export default function NeedForm({ initial, project, onSave, onClose }) {
               className="px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary" />
           </Field>
         </div>
-        <Field label={`FTE per month: ${ftePerMonth}`}>
-          <input type="range" min="0.1" max="2.0" step="0.1" value={ftePerMonth}
-            onChange={(e) => setFtePerMonth(e.target.value)}
-            className="w-full" />
+        <Field label="FTE per month">
+          <div className="flex items-center gap-3">
+            <input type="range" min="0.1" max="2.0" step="0.1" value={ftePerMonth}
+              onChange={(e) => setFtePerMonth(e.target.value)}
+              className="flex-1" />
+            <input type="number" min="0.01" max="2.0" step="0.01" value={ftePerMonth}
+              onChange={(e) => setFtePerMonth(e.target.value)}
+              className="w-16 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary text-center" />
+          </div>
         </Field>
         <Field label="Status">
           <StatusPicker value={status} onChange={setStatus} />

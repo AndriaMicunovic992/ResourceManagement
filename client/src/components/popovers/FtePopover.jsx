@@ -26,7 +26,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, onSave, o
       <div className="flex gap-2 items-center">
         <input
           ref={inputRef}
-          type="number" step="0.1" min="0" max={maxFte}
+          type="number" step="0.01" min="0" max={maxFte}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
