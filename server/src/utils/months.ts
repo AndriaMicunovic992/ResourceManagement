@@ -1,11 +1,14 @@
+// Pure arithmetic month range — no Date objects, no timezone issues
 export function monthRange(start: string, end: string): string[] {
   if (!start || !end) return [];
+  const [sy, sm] = start.split('-').map(Number);
+  const [ey, em] = end.split('-').map(Number);
   const out: string[] = [];
-  const cur = new Date(start + '-01');
-  const endDate = new Date(end + '-01');
-  while (cur <= endDate) {
-    out.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`);
-    cur.setMonth(cur.getMonth() + 1);
+  let y = sy, m = sm;
+  while (y < ey || (y === ey && m <= em)) {
+    out.push(`${y}-${String(m).padStart(2, '0')}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
   }
   return out;
 }

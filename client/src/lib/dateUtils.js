@@ -1,13 +1,16 @@
 import { MONTHS } from './constants';
 
+// Pure arithmetic month range — no Date objects, no timezone issues
 export function monthRange(start, end) {
   if (!start || !end) return [];
+  const [sy, sm] = start.split('-').map(Number);
+  const [ey, em] = end.split('-').map(Number);
   const out = [];
-  const cur = new Date(start + '-01');
-  const endDate = new Date(end + '-01');
-  while (cur <= endDate) {
-    out.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`);
-    cur.setMonth(cur.getMonth() + 1);
+  let y = sy, m = sm;
+  while (y < ey || (y === ey && m <= em)) {
+    out.push(`${y}-${String(m).padStart(2, '0')}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
   }
   return out;
 }
@@ -24,9 +27,11 @@ export function currentMonth() {
 }
 
 export function addMonths(m, n) {
-  const d = new Date(m + '-01');
-  d.setMonth(d.getMonth() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const [y, mo] = m.split('-').map(Number);
+  const total = (y * 12 + (mo - 1)) + n;
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
+  return `${ny}-${String(nm).padStart(2, '0')}`;
 }
 
 export function monthToInput(m) {
