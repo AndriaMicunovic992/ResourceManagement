@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
+import fastifyStatic from '@fastify/static';
 import corsPlugin from './plugins/cors.js';
 import jwtPlugin from './plugins/jwt.js';
 import authPlugin from './plugins/auth.js';
@@ -21,25 +23,22 @@ async function start() {
   // Register API routes under /api prefix
   await app.register(routes, { prefix: '/api' });
 
-  // Serve static files in production
+  // Serve static files in production (if public/ dir exists)
   const publicDir = path.join(__dirname, '..', 'public');
-  try {
-    const fastifyStatic = await import('@fastify/static');
-    await app.register(fastifyStatic.default, {
+  if (fs.existsSync(publicDir)) {
+    await app.register(fastifyStatic, {
       root: publicDir,
       prefix: '/',
       wildcard: false,
     });
 
-    // SPA fallback
+    // SPA fallback — serve index.html for non-API routes
     app.setNotFoundHandler(async (request, reply) => {
       if (request.url.startsWith('/api/')) {
         return reply.status(404).send({ error: 'Not found' });
       }
       return reply.sendFile('index.html');
     });
-  } catch {
-    // Static files not available in dev mode
   }
 
   const port = parseInt(process.env.PORT || '3000', 10);
