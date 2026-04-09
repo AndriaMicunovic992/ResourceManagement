@@ -30,6 +30,12 @@ export const api = {
   createOrg: (name) => apiFetch('/orgs', { method: 'POST', body: JSON.stringify({ name }) }),
   switchOrg: (orgId) => apiFetch('/orgs/switch', { method: 'POST', body: JSON.stringify({ orgId }) }),
 
+  // Org Members
+  getMembers: () => apiFetch('/org/members'),
+  addMember: (email, role) => apiFetch('/org/members', { method: 'POST', body: JSON.stringify({ email, role }) }),
+  updateMemberRole: (id, role) => apiFetch('/org/members/' + id, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  removeMember: (id) => apiFetch('/org/members/' + id, { method: 'DELETE' }),
+
   // Customers
   getCustomers: () => apiFetch('/customers'),
   createCustomer: (data) => apiFetch('/customers', { method: 'POST', body: JSON.stringify(data) }),
