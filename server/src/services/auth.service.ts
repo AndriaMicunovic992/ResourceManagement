@@ -11,16 +11,20 @@ export const authService = {
     const hashed = await hashPassword(input.password);
     const slug = input.orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    const user = await prisma.user.create({
-      data: { email: input.email, password: hashed, name: input.name },
-    });
+    const { user, org } = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { email: input.email, password: hashed, name: input.name },
+      });
 
-    const org = await prisma.organization.create({
-      data: { name: input.orgName, slug: slug + '-' + user.id.slice(0, 6) },
-    });
+      const org = await tx.organization.create({
+        data: { name: input.orgName, slug: slug + '-' + user.id.slice(0, 6) },
+      });
 
-    await prisma.orgMember.create({
-      data: { userId: user.id, orgId: org.id, role: 'owner' },
+      await tx.orgMember.create({
+        data: { userId: user.id, orgId: org.id, role: 'owner' },
+      });
+
+      return { user, org };
     });
 
     return { user: { id: user.id, email: user.email, name: user.name }, org };
