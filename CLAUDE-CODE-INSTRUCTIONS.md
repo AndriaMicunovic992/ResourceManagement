@@ -264,118 +264,446 @@ npx prisma generate
 
 ---
 
-## 3. Backend API
+## 3. Backend Architecture
 
-### Key principles:
-- **Every query filters by `orgId`** — this is the multi-tenant isolation boundary
-- **Auth middleware** extracts `userId` and `orgId` from JWT, injects into request
-- **No cross-tenant data leakage** — never trust client-provided orgId, always use the one from the JWT
+### ⚠️ Same Rules as Frontend
 
-### API Routes:
+- ❌ **Do NOT** put all routes in one `index.ts` file
+- ❌ **Do NOT** let any single file exceed ~150 lines
+- ❌ **Do NOT** put business logic inside route handlers — extract to services
+- ❌ **Do NOT** trust any `orgId` coming from the client (body, query, or params)
+- ✅ **DO** decompose into the folder structure below
+- ✅ **DO** keep routes thin (parse → call service → return)
+- ✅ **DO** put business logic in services, data access in repositories
+- ✅ **DO** apply auth middleware globally so every route is protected by default
+- ✅ **DO** derive `orgId` ONLY from the JWT, never from the request body
+
+### Target Folder Structure
 
 ```
-# Auth
-POST   /api/auth/signup          # Create user + org
-POST   /api/auth/login           # Get JWT
-POST   /api/auth/invite          # Invite member to org
-
-# Customers (scoped to org)
-GET    /api/customers             # List all for org
-POST   /api/customers             # Create
-PUT    /api/customers/:id         # Update
-DELETE /api/customers/:id         # Delete (cascades)
-
-# Projects
-GET    /api/projects              # List all for org
-POST   /api/projects              # Create
-PUT    /api/projects/:id          # Update
-DELETE /api/projects/:id          # Delete (cascades)
-
-# Resources
-GET    /api/resources             # List all for org
-POST   /api/resources             # Create (with roles)
-PUT    /api/resources/:id         # Update (with roles)
-DELETE /api/resources/:id         # Delete (cascades)
-
-# Needs
-GET    /api/needs                 # List all for org
-GET    /api/needs?projectId=X     # Filter by project
-POST   /api/needs                 # Create
-PUT    /api/needs/:id             # Update
-DELETE /api/needs/:id             # Delete (cascades)
-
-# Assignments
-GET    /api/assignments           # List all for org
-POST   /api/assignments           # Create or update (upsert by needId+resourceId)
-PUT    /api/assignments/:id       # Update monthAllocations
-DELETE /api/assignments/:id       # Delete
-
-# Dashboard
-GET    /api/dashboard/stats       # Aggregated stats for org
-GET    /api/dashboard/heatmap     # Resource utilization data
+server/
+├── src/
+│   ├── index.ts                     # Entry point: app setup, plugin registration, listen (~60 lines)
+│   ├── app.ts                       # Build Fastify instance, register plugins/routes (~80 lines)
+│   ├── config.ts                    # Load env vars, validate with zod (~40 lines)
+│   │
+│   ├── db/
+│   │   ├── prisma.ts                # Prisma client singleton (~15 lines)
+│   │   └── seed.ts                  # Dev seed script (~100 lines)
+│   │
+│   ├── plugins/                     # Fastify plugins (registered in app.ts)
+│   │   ├── cors.ts                  # CORS config (~20 lines)
+│   │   ├── jwt.ts                   # JWT plugin setup (~20 lines)
+│   │   ├── auth.ts                  # decorateRequest with userId, orgId (~50 lines)
+│   │   ├── errorHandler.ts          # Centralized error formatting (~40 lines)
+│   │   └── staticFiles.ts           # Serve React build in production (~25 lines)
+│   │
+│   ├── middleware/
+│   │   ├── requireAuth.ts           # Reject if no valid JWT (~30 lines)
+│   │   ├── requireRole.ts           # Reject if user lacks role (owner/admin) (~25 lines)
+│   │   └── validateBody.ts          # zod schema validation helper (~20 lines)
+│   │
+│   ├── routes/                      # Thin HTTP handlers, one file per resource
+│   │   ├── index.ts                 # Combine all route modules (~30 lines)
+│   │   ├── auth.routes.ts           # signup, login, me, logout (~80 lines)
+│   │   ├── org.routes.ts            # create org, list user's orgs, switch org (~70 lines)
+│   │   ├── member.routes.ts         # list, invite, update role, remove (~90 lines)
+│   │   ├── invite.routes.ts         # accept invite, list pending invites (~60 lines)
+│   │   ├── customer.routes.ts       # GET/POST/PUT/DELETE /customers (~80 lines)
+│   │   ├── project.routes.ts        # GET/POST/PUT/DELETE /projects (~80 lines)
+│   │   ├── resource.routes.ts       # GET/POST/PUT/DELETE /resources (with roles) (~100 lines)
+│   │   ├── need.routes.ts           # GET/POST/PUT/DELETE /needs (~90 lines)
+│   │   ├── assignment.routes.ts     # GET/POST (upsert)/PUT/DELETE /assignments (~100 lines)
+│   │   └── dashboard.routes.ts      # GET /stats, GET /heatmap (~60 lines)
+│   │
+│   ├── services/                    # Business logic, database operations
+│   │   ├── auth.service.ts          # hashPassword, verifyPassword, createSession (~80 lines)
+│   │   ├── org.service.ts           # createOrg, listUserOrgs, getUserRoleInOrg (~70 lines)
+│   │   ├── member.service.ts        # invite, accept, updateRole, remove (~100 lines)
+│   │   ├── customer.service.ts      # CRUD with tenant isolation (~80 lines)
+│   │   ├── project.service.ts       # CRUD with tenant isolation (~80 lines)
+│   │   ├── resource.service.ts      # CRUD including nested ResourceRole records (~120 lines)
+│   │   ├── need.service.ts          # CRUD + monthAllocations merge logic (~100 lines)
+│   │   ├── assignment.service.ts    # Upsert logic, per-month FTE updates (~120 lines)
+│   │   └── dashboard.service.ts     # Aggregations for stats + heatmap (~100 lines)
+│   │
+│   ├── schemas/                     # Zod schemas for request validation
+│   │   ├── auth.schema.ts           # SignupInput, LoginInput (~30 lines)
+│   │   ├── org.schema.ts            # CreateOrgInput, UpdateOrgInput (~25 lines)
+│   │   ├── member.schema.ts         # InviteMemberInput, UpdateRoleInput (~30 lines)
+│   │   ├── customer.schema.ts       # CreateCustomerInput, UpdateCustomerInput (~25 lines)
+│   │   ├── project.schema.ts        # (~30 lines)
+│   │   ├── resource.schema.ts       # with nested roles array (~40 lines)
+│   │   ├── need.schema.ts           # with monthAllocations object (~35 lines)
+│   │   └── assignment.schema.ts     # single-month upsert payload (~30 lines)
+│   │
+│   ├── types/
+│   │   ├── fastify.d.ts             # Type augmentation: request.userId, request.orgId, request.role
+│   │   └── index.ts                 # Shared types (Role, MonthAllocations, etc.)
+│   │
+│   ├── utils/
+│   │   ├── password.ts              # bcrypt wrapper (~20 lines)
+│   │   ├── jwt.ts                   # sign/verify helpers (~30 lines)
+│   │   ├── errors.ts                # Custom error classes (NotFoundError, ForbiddenError, etc.) (~40 lines)
+│   │   └── logger.ts                # pino wrapper (~20 lines)
+│   │
+│   └── __tests__/                   # Vitest tests
+│       ├── auth.test.ts
+│       ├── tenant-isolation.test.ts # CRITICAL: verify no cross-tenant leaks
+│       ├── customer.test.ts
+│       ├── assignment.test.ts
+│       └── dashboard.test.ts
+│
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/
+│
+├── .env.example
+├── tsconfig.json
+├── package.json
+└── Dockerfile (or at repo root)
 ```
 
-### Example route (server/src/routes/customers.ts):
+### Layered Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│  HTTP Layer — routes/                                 │
+│  • Parse request, call service, return response      │
+│  • Thin, no business logic                            │
+└────────────────┬─────────────────────────────────────┘
+                 │
+┌────────────────▼─────────────────────────────────────┐
+│  Validation Layer — schemas/                          │
+│  • Zod schemas validate request bodies                │
+│  • Reject malformed input before it reaches services  │
+└────────────────┬─────────────────────────────────────┘
+                 │
+┌────────────────▼─────────────────────────────────────┐
+│  Service Layer — services/                            │
+│  • Business logic, orchestration, permission checks   │
+│  • Enforces tenant isolation (always takes orgId)     │
+│  • Calls Prisma directly (no separate repository)     │
+└────────────────┬─────────────────────────────────────┘
+                 │
+┌────────────────▼─────────────────────────────────────┐
+│  Data Layer — Prisma                                  │
+│  • Schema defines cascade deletes                     │
+│  • Every query includes orgId in WHERE clause         │
+└──────────────────────────────────────────────────────┘
+```
+
+### Multi-Tenant Isolation: The Golden Rule
+
+**Every database query must filter by `orgId`, and that `orgId` must come from the authenticated JWT — never from the request body, URL params, or query string.**
+
+The pattern:
 
 ```typescript
-import { FastifyInstance } from 'fastify';
-import { prisma } from '../db';
-
-export async function customerRoutes(app: FastifyInstance) {
-  // All routes require auth middleware that sets request.orgId
-  
-  app.get('/api/customers', async (request) => {
+// services/customer.service.ts
+export const customerService = {
+  async list(orgId: string) {
     return prisma.customer.findMany({
-      where: { orgId: request.orgId },
-      include: { projects: true },
+      where: { orgId },  // ✅ tenant isolation
       orderBy: { createdAt: 'asc' },
     });
-  });
+  },
 
-  app.post('/api/customers', async (request) => {
-    const { name, status } = request.body as any;
-    return prisma.customer.create({
-      data: { name, status: status || 'realised', orgId: request.orgId },
+  async getById(orgId: string, id: string) {
+    const customer = await prisma.customer.findFirst({
+      where: { id, orgId },  // ✅ must match BOTH id AND orgId
     });
-  });
+    if (!customer) throw new NotFoundError('Customer not found');
+    return customer;
+  },
 
-  app.put('/api/customers/:id', async (request) => {
-    const { id } = request.params as any;
-    const { name, status } = request.body as any;
-    // Verify ownership
-    const existing = await prisma.customer.findFirst({ where: { id, orgId: request.orgId } });
-    if (!existing) throw { statusCode: 404, message: 'Not found' };
-    return prisma.customer.update({ where: { id }, data: { name, status } });
-  });
+  async create(orgId: string, data: CreateCustomerInput) {
+    return prisma.customer.create({
+      data: { ...data, orgId },  // ✅ orgId from JWT, not from data
+    });
+  },
 
-  app.delete('/api/customers/:id', async (request) => {
-    const { id } = request.params as any;
-    const existing = await prisma.customer.findFirst({ where: { id, orgId: request.orgId } });
-    if (!existing) throw { statusCode: 404, message: 'Not found' };
+  async update(orgId: string, id: string, data: UpdateCustomerInput) {
+    // Verify ownership first
+    await this.getById(orgId, id);  // throws 404 if not owned
+    return prisma.customer.update({ where: { id }, data });
+  },
+
+  async delete(orgId: string, id: string) {
+    await this.getById(orgId, id);
     return prisma.customer.delete({ where: { id } });
-    // Cascade deletes projects, needs, assignments via Prisma schema
-  });
-}
+  },
+};
 ```
 
-### Auth middleware (server/src/middleware/auth.ts):
+And the corresponding thin route handler:
 
 ```typescript
+// routes/customer.routes.ts
+import { FastifyPluginAsync } from 'fastify';
+import { customerService } from '../services/customer.service';
+import { createCustomerSchema, updateCustomerSchema } from '../schemas/customer.schema';
+
+export const customerRoutes: FastifyPluginAsync = async (app) => {
+  app.get('/customers', async (req) => {
+    return customerService.list(req.orgId);  // orgId from JWT via auth plugin
+  });
+
+  app.post('/customers', async (req) => {
+    const data = createCustomerSchema.parse(req.body);
+    return customerService.create(req.orgId, data);
+  });
+
+  app.put<{ Params: { id: string } }>('/customers/:id', async (req) => {
+    const data = updateCustomerSchema.parse(req.body);
+    return customerService.update(req.orgId, req.params.id, data);
+  });
+
+  app.delete<{ Params: { id: string } }>('/customers/:id', async (req, reply) => {
+    await customerService.delete(req.orgId, req.params.id);
+    return reply.status(204).send();
+  });
+};
+```
+
+### Auth Plugin (the critical middleware)
+
+```typescript
+// plugins/auth.ts
+import fp from 'fastify-plugin';
+import { prisma } from '../db/prisma';
+
+export default fp(async (app) => {
+  // Make request.userId and request.orgId available everywhere
+  app.decorateRequest('userId', '');
+  app.decorateRequest('orgId', '');
+  app.decorateRequest('role', '');
+
+  app.addHook('onRequest', async (req, reply) => {
+    // Skip auth for public routes
+    if (req.url.startsWith('/api/auth/login') ||
+        req.url.startsWith('/api/auth/signup') ||
+        !req.url.startsWith('/api/')) return;
+
+    try {
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+
+      const decoded = app.jwt.verify<{ userId: string; orgId: string }>(token);
+
+      // Verify the user still belongs to this org (important for revocation)
+      const membership = await prisma.orgMember.findUnique({
+        where: { userId_orgId: { userId: decoded.userId, orgId: decoded.orgId } },
+      });
+      if (!membership) return reply.status(403).send({ error: 'No access to this org' });
+
+      req.userId = decoded.userId;
+      req.orgId = decoded.orgId;
+      req.role = membership.role;
+    } catch {
+      return reply.status(401).send({ error: 'Invalid token' });
+    }
+  });
+});
+```
+
+The auth check runs on every `/api/*` request automatically. Individual route handlers don't need to remember to add it.
+
+### Role-Based Access Control
+
+Add a `requireRole` middleware for routes that need elevated permissions:
+
+```typescript
+// middleware/requireRole.ts
 import { FastifyRequest, FastifyReply } from 'fastify';
 
-export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  try {
-    const token = request.headers.authorization?.replace('Bearer ', '');
-    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-    
-    const decoded = request.server.jwt.verify(token) as { userId: string; orgId: string };
-    request.userId = decoded.userId;
-    request.orgId = decoded.orgId;
-  } catch {
-    return reply.status(401).send({ error: 'Invalid token' });
-  }
+type Role = 'owner' | 'admin' | 'member' | 'viewer';
+const ROLE_LEVEL: Record<Role, number> = { viewer: 1, member: 2, admin: 3, owner: 4 };
+
+export function requireRole(minRole: Role) {
+  return async (req: FastifyRequest, reply: FastifyReply) => {
+    const userLevel = ROLE_LEVEL[req.role as Role] ?? 0;
+    const requiredLevel = ROLE_LEVEL[minRole];
+    if (userLevel < requiredLevel) {
+      return reply.status(403).send({ error: 'Insufficient permissions' });
+    }
+  };
 }
 ```
+
+Use it on specific routes:
+
+```typescript
+// routes/member.routes.ts
+app.post('/members/invite',
+  { preHandler: requireRole('admin') },
+  async (req) => memberService.invite(req.orgId, req.body)
+);
+
+app.delete('/org',
+  { preHandler: requireRole('owner') },
+  async (req) => orgService.delete(req.orgId)
+);
+```
+
+Mutation routes (`POST`, `PUT`, `DELETE`) on customers/projects/resources/needs/assignments should require at least `member`. `GET` routes are available to `viewer` and above.
+
+### Validation with Zod
+
+```typescript
+// schemas/customer.schema.ts
+import { z } from 'zod';
+
+export const createCustomerSchema = z.object({
+  name: z.string().min(1).max(100),
+  status: z.enum(['realised', 'potential']).default('realised'),
+});
+
+export const updateCustomerSchema = createCustomerSchema.partial();
+
+export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
+export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
+```
+
+Routes call `.parse()` which throws on invalid input; the central error handler catches ZodErrors and returns `400 Bad Request` with field-level messages.
+
+### Central Error Handler
+
+```typescript
+// plugins/errorHandler.ts
+import fp from 'fastify-plugin';
+import { ZodError } from 'zod';
+import { NotFoundError, ForbiddenError, UnauthorizedError } from '../utils/errors';
+
+export default fp(async (app) => {
+  app.setErrorHandler((error, req, reply) => {
+    if (error instanceof ZodError) {
+      return reply.status(400).send({ error: 'Validation failed', issues: error.issues });
+    }
+    if (error instanceof NotFoundError) return reply.status(404).send({ error: error.message });
+    if (error instanceof ForbiddenError) return reply.status(403).send({ error: error.message });
+    if (error instanceof UnauthorizedError) return reply.status(401).send({ error: error.message });
+
+    req.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error' });
+  });
+});
+```
+
+### The Assignment Upsert (tricky part)
+
+The assignment endpoint is the one place where the business logic is non-trivial. Placing a resource on a need where they're already assigned should **update** the existing assignment's `monthAllocations`, not create a duplicate row. The `@@unique([needId, resourceId])` constraint enforces this at the DB level, but the service must handle both create and update paths and merge monthAllocations correctly.
+
+```typescript
+// services/assignment.service.ts
+export const assignmentService = {
+  async upsertMonth(orgId: string, input: { needId: string; resourceId: string; month: string; fte: number }) {
+    // Verify need and resource belong to this org
+    const need = await prisma.need.findFirst({ where: { id: input.needId, orgId } });
+    const resource = await prisma.resource.findFirst({ where: { id: input.resourceId, orgId } });
+    if (!need || !resource) throw new NotFoundError('Need or resource not found');
+
+    const existing = await prisma.assignment.findUnique({
+      where: { needId_resourceId: { needId: input.needId, resourceId: input.resourceId } },
+    });
+
+    if (existing) {
+      // Merge: update single month in existing monthAllocations JSON
+      const merged = { ...(existing.monthAllocations as Record<string, number>), [input.month]: input.fte };
+      return prisma.assignment.update({
+        where: { id: existing.id },
+        data: { monthAllocations: merged },
+      });
+    }
+
+    // Create new assignment with all months zeroed except the one being set
+    const need2 = await prisma.need.findUnique({ where: { id: input.needId }, include: { project: true } });
+    const months = monthRange(need.startMonth ?? need2!.project.startMonth, need.endMonth ?? need2!.project.endMonth);
+    const monthAllocations: Record<string, number> = {};
+    months.forEach(m => { monthAllocations[m] = 0; });
+    monthAllocations[input.month] = input.fte;
+
+    return prisma.assignment.create({
+      data: {
+        needId: input.needId,
+        resourceId: input.resourceId,
+        orgId,
+        monthAllocations,
+      },
+    });
+  },
+};
+```
+
+### API Route Summary
+
+```
+# Auth (public)
+POST   /api/auth/signup              # Create user + first org (returns JWT)
+POST   /api/auth/login               # Returns JWT
+GET    /api/auth/me                  # Current user + org + role (requires JWT)
+
+# Orgs
+GET    /api/orgs                     # List user's orgs (requires JWT)
+POST   /api/orgs                     # Create new org (user becomes owner)
+POST   /api/orgs/switch              # Switch active org → returns new JWT
+PATCH  /api/org                      # Update current org (admin+)
+DELETE /api/org                      # Delete current org (owner only)
+
+# Members
+GET    /api/members                  # List members of current org
+POST   /api/members/invite           # Invite by email (admin+)
+PATCH  /api/members/:id              # Update role (admin+)
+DELETE /api/members/:id              # Remove from org (admin+)
+
+# Invites
+GET    /api/invites                  # List pending invites for current user
+POST   /api/invites/:token/accept    # Accept invite
+
+# Entities (all scoped to current org, all require member+)
+GET    /api/customers
+POST   /api/customers
+PATCH  /api/customers/:id
+DELETE /api/customers/:id
+
+GET    /api/projects
+GET    /api/projects?customerId=X
+POST   /api/projects
+PATCH  /api/projects/:id
+DELETE /api/projects/:id
+
+GET    /api/resources
+POST   /api/resources                # Includes roles array
+PATCH  /api/resources/:id
+DELETE /api/resources/:id
+
+GET    /api/needs
+GET    /api/needs?projectId=X
+POST   /api/needs
+PATCH  /api/needs/:id
+DELETE /api/needs/:id
+
+GET    /api/assignments
+POST   /api/assignments               # Upsert: { needId, resourceId, month, fte }
+DELETE /api/assignments/:id
+
+# Dashboard
+GET    /api/dashboard/stats           # Aggregated KPIs for current org
+GET    /api/dashboard/heatmap         # Per-resource utilization by month
+```
+
+### Tenant Isolation Tests (Critical)
+
+Write dedicated tests in `__tests__/tenant-isolation.test.ts` that verify:
+
+1. User A in Org 1 cannot see Org 2's customers (even with Org 2's customer ID)
+2. User A in Org 1 cannot update Org 2's customer (should 404)
+3. User A in Org 1 cannot delete Org 2's customer (should 404)
+4. Creating a customer with an `orgId` in the body is **ignored** — always uses JWT orgId
+5. Switching orgs returns a new JWT and the old one still only accesses the old org
+6. A removed member can no longer access the org (auth plugin checks membership on every request)
+
+These tests are the security boundary. They must pass before deploy.
 
 ---
 
