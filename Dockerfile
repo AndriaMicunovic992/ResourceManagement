@@ -20,4 +20,14 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma gene
 COPY --from=frontend-build /app/client/dist ./public
 
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx src/index.ts"]
+CMD ["sh", "-c", "\
+  if [ -z \"$DATABASE_URL\" ]; then \
+    export DATABASE_URL=\"${DATABASE_PRIVATE_URL:-${RAILWAY_DATABASE_URL:-}}\"; \
+  fi; \
+  if [ -z \"$DATABASE_URL\" ]; then \
+    echo 'FATAL: DATABASE_URL is not set. Add a Postgres database in Railway and link it to this service.'; \
+    echo 'Available env vars:'; env | grep -i 'database\\|postgres\\|pg' | sed 's/=.*/=***/' || true; \
+    exit 1; \
+  fi; \
+  echo \"DATABASE_URL is set (${#DATABASE_URL} chars)\"; \
+  npx prisma migrate deploy && npx tsx src/index.ts"]
