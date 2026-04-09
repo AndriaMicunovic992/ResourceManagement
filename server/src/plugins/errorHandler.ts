@@ -13,6 +13,9 @@ export default fp(async (app) => {
     if (error instanceof ConflictError) return reply.status(409).send({ error: error.message });
 
     req.log.error(error);
-    return reply.status(500).send({ error: 'Internal server error' });
+    const message = error.message?.includes('DATABASE_URL')
+      ? 'Database not configured. Set DATABASE_URL in Railway environment variables.'
+      : error.message || 'Internal server error';
+    return reply.status(500).send({ error: message });
   });
 });
