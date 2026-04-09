@@ -1,5 +1,5 @@
 # Build frontend
-FROM node:20-alpine AS frontend-build
+FROM node:20-slim AS frontend-build
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
@@ -7,8 +7,10 @@ COPY client/ .
 RUN npm run build
 
 # Production
-FROM node:20-alpine
+FROM node:20-slim
 WORKDIR /app
+
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY server/package*.json ./
 RUN npm ci --omit=dev
