@@ -8,7 +8,7 @@ export const createNeedSchema = z.object({
   label: z.string().optional().nullable(),
   startMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
   endMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
-  ftePerMonth: z.number().min(0.1).max(2.0),
+  ftePerMonth: z.number().min(0.01).max(2.0),
   status: z.enum(['realised', 'potential']).default('realised'),
 });
 

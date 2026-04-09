@@ -1,8 +1,10 @@
-import { DOMAINS } from './constants';
+import { DOMAINS, SENIORITIES } from './constants';
 
+// Higher seniority can cover lower positions (Senior can fill a Medior need, etc.)
 export function resourceMatchesNeed(resource, need) {
+  const needLevel = SENIORITIES.indexOf(need.seniority);
   return resource.roles?.some(
-    (r) => r.domain === need.domain && r.role === need.role && r.seniority === need.seniority
+    (r) => r.domain === need.domain && r.role === need.role && SENIORITIES.indexOf(r.seniority) >= needLevel
   );
 }
 

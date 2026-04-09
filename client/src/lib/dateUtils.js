@@ -38,3 +38,25 @@ export function inputToMonth(val) {
   const d = new Date(val + '-01');
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
+// Group months into periods based on aggregation mode (M/Q/Y)
+export function computePeriods(months, aggregation) {
+  if (!months.length) return [];
+  if (aggregation === 'M') {
+    return months.map((m) => ({ label: formatMonth(m), months: [m] }));
+  }
+  const groups = {};
+  for (const m of months) {
+    const [y, mo] = m.split('-').map(Number);
+    let key;
+    if (aggregation === 'Q') {
+      const q = Math.ceil(mo / 3);
+      key = `Q${q} '${String(y).slice(2)}`;
+    } else {
+      key = String(y);
+    }
+    if (!groups[key]) groups[key] = { label: key, months: [] };
+    groups[key].months.push(m);
+  }
+  return Object.values(groups);
+}

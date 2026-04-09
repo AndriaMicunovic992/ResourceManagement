@@ -4,13 +4,12 @@ import AssignmentBar from '../bars/AssignmentBar';
 import { computeNeedFulfillment } from '../../../../lib/gridUtils';
 import { resourceMatchesNeed } from '../../../../lib/resourceUtils';
 import { monthRange } from '../../../../lib/dateUtils';
-import { BH } from '../../../../lib/constants';
+import { BH, CW } from '../../../../lib/constants';
 import { useData } from '../../../../contexts/DataContext';
 
-export default function NeedGridRow({ need, project, months, heldResource, onCellClick, onBarClick, onHeightChange }) {
+export default function NeedGridRow({ need, project, months, periods, heldResource, onCellClick, onBarClick }) {
   const { assignments, resources } = useData();
   const nf = useMemo(() => computeNeedFulfillment(need, assignments), [need, assignments]);
-  const projMonths = useMemo(() => monthRange(project.startMonth, project.endMonth), [project]);
   const needMonths = useMemo(() => {
     const s = need.startMonth || project.startMonth;
     const e = need.endMonth || project.endMonth;
@@ -29,22 +28,26 @@ export default function NeedGridRow({ need, project, months, heldResource, onCel
 
   return (
     <div className="flex relative" style={{ minHeight: rowHeight }}>
-      {months.map((m) => {
-        const inRange = needMonths.includes(m);
-        const inProject = projMonths.includes(m);
-        const info = nf[m] || { needed: 0, filled: 0 };
+      {periods.map((p) => {
+        const periodInRange = p.months.some((m) => needMonths.includes(m));
+        // Aggregate needed/filled for the period
+        const needed = p.months.reduce((sum, m) => sum + (nf[m]?.needed || 0), 0) / p.months.length;
+        const filled = p.months.reduce((sum, m) => sum + (nf[m]?.filled || 0), 0) / p.months.length;
+        // For placement, use the first in-range month in this period
+        const firstInRangeMonth = p.months.find((m) => needMonths.includes(m));
 
         return (
           <NeedCell
-            key={m} month={m}
-            needed={info.needed} filled={info.filled}
-            inRange={inRange || inProject}
-            canPlace={canHeldPlace && inRange ? true : canHeldPlace === false ? false : undefined}
-            onClick={(e) => onCellClick(need, m, e)}
+            key={p.label}
+            width={p.months.length * CW}
+            needed={needed} filled={filled}
+            inRange={periodInRange}
+            canPlace={canHeldPlace && periodInRange ? true : canHeldPlace === false ? false : undefined}
+            onClick={(e) => firstInRangeMonth && onCellClick(need, firstInRangeMonth, e)}
           />
         );
       })}
-      {/* Assignment bars overlay */}
+      {/* Assignment bars overlay — always positioned by raw month index */}
       {needAssignments.map((a, idx) => {
         const resource = resources.find((r) => r.id === a.resourceId);
         if (!resource) return null;

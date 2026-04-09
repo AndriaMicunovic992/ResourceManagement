@@ -1,8 +1,10 @@
 import { CW } from '../../../../lib/constants';
 
-export default function NeedCell({ month, needed, filled, inRange, canPlace, onClick }) {
+export default function NeedCell({ width, needed, filled, inRange, canPlace, onClick }) {
+  const cellWidth = width || CW;
+
   if (!inRange) {
-    return <div className="shrink-0" style={{ width: CW }} />;
+    return <div className="shrink-0" style={{ width: cellWidth }} />;
   }
 
   const ok = needed > 0 && filled >= needed;
@@ -12,8 +14,8 @@ export default function NeedCell({ month, needed, filled, inRange, canPlace, onC
   return (
     <div
       className="shrink-0 border-r border-border-light relative flex items-end justify-center pb-0.5"
-      style={{ width: CW, minHeight: 42, background: bg, cursor, opacity: canPlace === false ? 0.4 : 1 }}
-      onClick={canPlace ? onClick : undefined}
+      style={{ width: cellWidth, minHeight: 42, background: bg, cursor, opacity: canPlace === false ? 0.4 : 1 }}
+      onClick={canPlace ? (e) => { e.stopPropagation(); onClick(e); } : undefined}
     >
       {needed > 0 && (
         <span className={`text-[9px] font-mono px-1 rounded border ${ok ? 'bg-success-bg text-success border-success-border' : 'bg-white text-text-mid border-border'}`}>
