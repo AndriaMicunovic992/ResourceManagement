@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { prisma } from '../db/prisma.js';
 import { authRoutes } from './auth.routes.js';
 import { orgRoutes } from './org.routes.js';
 import { customerRoutes } from './customer.routes.js';
@@ -16,5 +17,8 @@ export const routes: FastifyPluginAsync = async (app) => {
   await app.register(needRoutes);
   await app.register(assignmentRoutes);
 
-  app.get('/health', async () => ({ status: 'ok' }));
+  app.get('/health', async () => {
+    await prisma.$queryRaw`SELECT 1`;
+    return { status: 'ok' };
+  });
 };
