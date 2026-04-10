@@ -75,6 +75,9 @@ model Project {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
+  responsiblePersonId String?
+  responsiblePerson   Resource? @relation("ProjectResponsible", fields: [responsiblePersonId], references: [id], onDelete: SetNull)
+
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -96,6 +99,7 @@ model Resource {
 
   roles       ResourceRole[]
   assignments Assignment[]
+  responsibleProjects Project[] @relation("ProjectResponsible")
 
   @@index([orgId])
 }

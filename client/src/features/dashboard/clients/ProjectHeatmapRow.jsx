@@ -7,9 +7,10 @@ import { useData } from '../../../contexts/DataContext';
 import { useMemo } from 'react';
 
 export default function ProjectHeatmapRow({ project, customer, months, includePotential }) {
-  const { needs, assignments } = useData();
+  const { needs, assignments, resources } = useData();
   const ok = useMemo(() => isProjectOk(project, needs, assignments), [project, needs, assignments]);
   const isPotentialProject = customer.status === 'potential' || project.status === 'potential';
+  const responsible = project.responsiblePersonId ? resources.find((r) => r.id === project.responsiblePersonId) : null;
   const projMonths = useMemo(() => monthRange(project.startMonth, project.endMonth), [project]);
 
   const staffingByMonth = useMemo(() => {
@@ -47,6 +48,7 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
         <div className="flex items-center gap-1">
           {ok && <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />}
           <span className="text-xs font-bold text-text-mid truncate">{project.name}</span>
+          {responsible && <span className="text-[9px] text-text-light ml-1">({responsible.name})</span>}
           <StatusBadge status={project.status} small />
         </div>
         <div className="text-[9px] font-mono text-text-light mt-0.5">

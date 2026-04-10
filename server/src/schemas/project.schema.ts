@@ -6,6 +6,7 @@ export const createProjectSchema = z.object({
   startMonth: z.string().regex(/^\d{4}-\d{2}$/),
   endMonth: z.string().regex(/^\d{4}-\d{2}$/),
   status: z.enum(['realised', 'potential']).default('realised'),
+  responsiblePersonId: z.string().nullable().optional(),
 });
 
 export const updateProjectSchema = createProjectSchema.partial().omit({ customerId: true });
