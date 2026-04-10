@@ -163,7 +163,7 @@ export default function AssignmentBar({ assignment, need, resource, months, onCl
             barHeight={BAR_H}
             isFirst={i === 0} isLast={i === segments.length - 1}
             totalSegments={segments.length}
-            onClick={(e) => { e.stopPropagation(); onClickSegment(seg, e); }}
+            onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}
           />
         ))
       )}
