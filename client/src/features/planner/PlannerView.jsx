@@ -25,26 +25,9 @@ export default function PlannerView() {
       const needMonths = Object.keys(needAllocs).sort();
       if (needMonths.length === 0) return;
 
+      // Already assigned — use resize handles to adjust
       const existing = assignments.find((a) => a.needId === need.id && a.resourceId === heldResource.id);
-
-      if (existing) {
-        // Already assigned — open popover to edit THIS month's FTE
-        const rect = e.currentTarget.getBoundingClientRect();
-        const currentMonthFte = (existing.monthAllocations || {})[month] || 0;
-        const needed = needAllocs[month] || 1;
-        const otherFilled = assignments
-          .filter((a) => a.needId === need.id && a.id !== existing.id)
-          .reduce((s, a) => s + ((a.monthAllocations || {})[month] || 0), 0);
-        setPopover({
-          x: rect.left, y: rect.bottom + 4,
-          needId: need.id, resourceId: heldResource.id,
-          month, months: periodMonths,
-          currentFte: currentMonthFte,
-          maxFte: Math.max(0.01, needed - otherFilled),
-          type: 'edit',
-        });
-        return;
-      }
+      if (existing) return;
 
       // New assignment: compute per-month FTE to handle variable need
       const needAssigns = assignments.filter((a) => a.needId === need.id);
