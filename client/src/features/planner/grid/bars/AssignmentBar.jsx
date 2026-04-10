@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import AssignmentSegment from './AssignmentSegment';
 import ResizeHandle from './ResizeHandle';
 import { buildSegments } from '../../../../lib/gridUtils';
@@ -9,95 +9,174 @@ import { useData } from '../../../../contexts/DataContext';
 const BAR_H = 24;
 
 export default function AssignmentBar({ assignment, need, resource, months, onClickSegment }) {
-  const { deleteAssignment, upsertAssignment } = useData();
+  const { assignments, deleteAssignment, upsertAssignment } = useData();
   const segments = useMemo(() => buildSegments(assignment), [assignment]);
   const color = domainColor(need.domain);
+
+  // Live resize preview: { side, delta } tracks how many months to add/remove
+  const [resizePreview, setResizePreview] = useState(null);
+
+  // Compute how far we can extend/shrink in each direction
+  const resizeLimits = useMemo(() => {
+    const allocs = assignment.monthAllocations || {};
+    const allMonths = Object.keys(allocs).sort();
+    const activeMonths = allMonths.filter((m) => allocs[m] > 0);
+    if (activeMonths.length === 0) return { maxExtendRight: 0, maxExtendLeft: 0, maxShrinkLeft: 0, maxShrinkRight: 0 };
+
+    const needAllocs = need.monthAllocations || {};
+    const otherAssigns = assignments.filter((a) => a.needId === need.id && a.id !== assignment.id);
+
+    // Max extend right: only into months with remaining capacity
+    const lastActive = activeMonths[activeMonths.length - 1];
+    const lastFte = allocs[lastActive];
+    const lastIdx = allMonths.indexOf(lastActive);
+    let maxExtendRight = 0;
+    for (let i = lastIdx + 1; i < allMonths.length; i++) {
+      const m = allMonths[i];
+      const needed = needAllocs[m] || 0;
+      const otherFilled = otherAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+      if (otherFilled + lastFte <= needed) maxExtendRight++;
+      else break;
+    }
+
+    // Max extend left: only into months with remaining capacity
+    const firstActive = activeMonths[0];
+    const firstFte = allocs[firstActive];
+    const firstIdx = allMonths.indexOf(firstActive);
+    let maxExtendLeft = 0;
+    for (let i = firstIdx - 1; i >= 0; i--) {
+      const m = allMonths[i];
+      const needed = needAllocs[m] || 0;
+      const otherFilled = otherAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+      if (otherFilled + firstFte <= needed) maxExtendLeft++;
+      else break;
+    }
+
+    return {
+      maxExtendRight,
+      maxExtendLeft,
+      maxShrinkLeft: activeMonths.length - 1,
+      maxShrinkRight: activeMonths.length - 1,
+    };
+  }, [assignment, need, assignments]);
 
   const handleResize = useCallback((side) => (e) => {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
-    const allocs = assignment.monthAllocations || {};
-    const allMonths = Object.keys(allocs).sort();
-    const activeMonths = allMonths.filter((m) => allocs[m] > 0);
-    if (activeMonths.length === 0) return;
+
+    const clamp = (delta) => {
+      if (side === 'right') {
+        return Math.max(-resizeLimits.maxShrinkRight, Math.min(delta, resizeLimits.maxExtendRight));
+      }
+      return Math.max(-resizeLimits.maxExtendLeft, Math.min(delta, resizeLimits.maxShrinkLeft));
+    };
+
+    const onMove = (moveE) => {
+      setResizePreview({ side, delta: clamp(Math.round((moveE.clientX - startX) / CW)) });
+    };
 
     const onUp = (upE) => {
+      document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      const deltaX = upE.clientX - startX;
-      const delta = Math.round(deltaX / CW);
+      setResizePreview(null);
+
+      const delta = clamp(Math.round((upE.clientX - startX) / CW));
       if (delta === 0) return;
 
+      const allocs = assignment.monthAllocations || {};
+      const allMonths = Object.keys(allocs).sort();
+      const activeMonths = allMonths.filter((m) => allocs[m] > 0);
       const newAllocs = { ...allocs };
+
       if (side === 'right') {
         if (delta < 0) {
-          // Shrink from right: remove last |delta| active months
-          const toRemove = activeMonths.slice(Math.max(1, activeMonths.length + delta));
-          toRemove.forEach((m) => { newAllocs[m] = 0; });
+          activeMonths.slice(Math.max(1, activeMonths.length + delta)).forEach((m) => { newAllocs[m] = 0; });
         } else {
-          // Extend right: add months after last active
-          const lastActive = activeMonths[activeMonths.length - 1];
-          const lastFte = allocs[lastActive];
-          const idx = allMonths.indexOf(lastActive);
-          for (let i = 1; i <= delta && idx + i < allMonths.length; i++) {
-            newAllocs[allMonths[idx + i]] = lastFte;
-          }
+          const last = activeMonths[activeMonths.length - 1];
+          const idx = allMonths.indexOf(last);
+          for (let i = 1; i <= delta && idx + i < allMonths.length; i++) newAllocs[allMonths[idx + i]] = allocs[last];
         }
       } else {
         if (delta > 0) {
-          // Shrink from left: remove first |delta| active months
-          const toRemove = activeMonths.slice(0, Math.min(delta, activeMonths.length - 1));
-          toRemove.forEach((m) => { newAllocs[m] = 0; });
+          activeMonths.slice(0, Math.min(delta, activeMonths.length - 1)).forEach((m) => { newAllocs[m] = 0; });
         } else {
-          // Extend left: add months before first active
-          const firstActive = activeMonths[0];
-          const firstFte = allocs[firstActive];
-          const idx = allMonths.indexOf(firstActive);
-          for (let i = 1; i <= Math.abs(delta) && idx - i >= 0; i++) {
-            newAllocs[allMonths[idx - i]] = firstFte;
-          }
+          const first = activeMonths[0];
+          const idx = allMonths.indexOf(first);
+          for (let i = 1; i <= Math.abs(delta) && idx - i >= 0; i++) newAllocs[allMonths[idx - i]] = allocs[first];
         }
       }
 
-      upsertAssignment({
-        needId: assignment.needId,
-        resourceId: assignment.resourceId,
-        monthAllocations: newAllocs,
-      });
+      upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: newAllocs });
     };
 
+    document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  }, [assignment, upsertAssignment]);
+  }, [assignment, upsertAssignment, resizeLimits]);
 
   if (segments.length === 0) return null;
 
   const firstMonth = segments[0].start;
-  const startIdx = months.indexOf(firstMonth);
-  if (startIdx < 0) return null;
+  const baseStartIdx = months.indexOf(firstMonth);
+  if (baseStartIdx < 0) return null;
 
-  const allBarMonths = segments.flatMap((s) => s.months);
-  const totalWidth = allBarMonths.length * CW;
+  const baseMonthCount = segments.flatMap((s) => s.months).length;
+
+  // Apply live resize preview offsets
+  let displayStartIdx = baseStartIdx;
+  let displayMonthCount = baseMonthCount;
+  if (resizePreview) {
+    if (resizePreview.side === 'left') {
+      displayStartIdx = baseStartIdx + resizePreview.delta;
+      displayMonthCount = baseMonthCount - resizePreview.delta;
+    } else {
+      displayMonthCount = baseMonthCount + resizePreview.delta;
+    }
+  }
 
   return (
-    <div className="absolute flex items-center group/bar" style={{ left: startIdx * CW, top: 0, height: BAR_H, width: totalWidth }}>
+    <div
+      className="absolute flex items-center group/bar"
+      style={{
+        left: displayStartIdx * CW,
+        top: 0,
+        height: BAR_H,
+        width: displayMonthCount * CW,
+        transition: resizePreview ? 'none' : 'left 0.15s, width 0.15s',
+      }}
+    >
       <ResizeHandle side="left" onMouseDown={handleResize('left')} />
-      {segments.map((seg, i) => (
-        <AssignmentSegment
-          key={i} segment={seg} resource={resource} domainColor={color}
-          barHeight={BAR_H}
-          isFirst={i === 0} isLast={i === segments.length - 1}
-          totalSegments={segments.length}
-          onClick={(e) => { e.stopPropagation(); onClickSegment(seg, e); }}
-        />
-      ))}
+      {resizePreview ? (
+        <div
+          className="flex items-center gap-1 px-1 w-full"
+          style={{ height: BAR_H, backgroundColor: color + '25', border: `1.5px solid ${color}50`, borderRadius: 12 }}
+        >
+          <span className="text-[9px] font-semibold truncate" style={{ color }}>{resource.name}</span>
+          <div className="flex-1" />
+          <span className="text-[8px] font-mono px-0.5 rounded shrink-0"
+            style={{ backgroundColor: color + '15', color }}>{displayMonthCount}mo</span>
+        </div>
+      ) : (
+        segments.map((seg, i) => (
+          <AssignmentSegment
+            key={i} segment={seg} resource={resource} domainColor={color}
+            barHeight={BAR_H}
+            isFirst={i === 0} isLast={i === segments.length - 1}
+            totalSegments={segments.length}
+            onClick={(e) => { e.stopPropagation(); onClickSegment(seg, e); }}
+          />
+        ))
+      )}
       <ResizeHandle side="right" onMouseDown={handleResize('right')} />
-      <button
-        onClick={(e) => { e.stopPropagation(); deleteAssignment(assignment.id); }}
-        className="opacity-0 group-hover/bar:opacity-100 absolute -right-4 top-0 w-4 flex items-center justify-center text-[8px] text-danger bg-white/80 border-0 cursor-pointer rounded hover:bg-danger-bg transition-opacity"
-        style={{ height: BAR_H }}
-      >
-        ✕
-      </button>
+      {!resizePreview && (
+        <button
+          onClick={(e) => { e.stopPropagation(); deleteAssignment(assignment.id); }}
+          className="opacity-0 group-hover/bar:opacity-100 absolute -right-4 top-0 w-4 flex items-center justify-center text-[8px] text-danger bg-white/80 border-0 cursor-pointer rounded hover:bg-danger-bg transition-opacity"
+          style={{ height: BAR_H }}
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }
