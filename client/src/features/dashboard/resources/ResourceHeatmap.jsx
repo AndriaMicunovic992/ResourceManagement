@@ -2,7 +2,7 @@ import ResourceHeatmapRow from './ResourceHeatmapRow';
 import { formatMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 
-export default function ResourceHeatmap({ months, onResourceClick }) {
+export default function ResourceHeatmap({ months, onResourceClick, includePotential }) {
   const { resources } = useData();
 
   return (
@@ -19,7 +19,8 @@ export default function ResourceHeatmap({ months, onResourceClick }) {
         ))}
       </div>
       {resources.map((r) => (
-        <ResourceHeatmapRow key={r.id} resource={r} months={months} onClick={() => onResourceClick(r)} />
+        <ResourceHeatmapRow key={r.id} resource={r} months={months}
+          onClick={() => onResourceClick(r)} includePotential={includePotential} />
       ))}
     </div>
   );

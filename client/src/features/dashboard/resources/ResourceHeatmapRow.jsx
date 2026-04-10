@@ -5,22 +5,29 @@ import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import { utilColor } from '../../../lib/statusUtils';
 import { useComputed } from '../../../hooks/useComputed';
 
-export default function ResourceHeatmapRow({ resource, months, onClick }) {
+export default function ResourceHeatmapRow({ resource, months, onClick, includePotential }) {
   const { rURealised, rU } = useComputed();
   const color = domainColor(resourcePrimaryDomain(resource));
 
-  const { avgPct, monthData } = useMemo(() => {
+  const { avgPct, monthData, hasPotential } = useMemo(() => {
     const data = {};
     let sum = 0, count = 0;
+    let anyPotential = false;
     for (const m of months) {
       const realised = (rURealised[resource.id]?.[m] || 0) / resource.capacity * 100;
       const total = (rU[resource.id]?.[m] || 0) / resource.capacity * 100;
       const potential = total - realised;
       data[m] = { realisedPct: realised, potentialPct: potential > 0 ? potential : 0 };
+      if (potential > 0) anyPotential = true;
       if (realised > 0 || total > 0) { sum += realised; count++; }
     }
-    return { avgPct: count > 0 ? Math.round(sum / count) : 0, monthData: data };
+    return { avgPct: count > 0 ? Math.round(sum / count) : 0, monthData: data, hasPotential: anyPotential };
   }, [rURealised, rU, resource, months]);
+
+  // When includePotential is off, hide resources that only have potential allocations
+  if (!includePotential && !hasPotential && avgPct === 0) {
+    // still show — they have no allocations at all
+  }
 
   const avgColor = utilColor(avgPct);
 
@@ -35,7 +42,7 @@ export default function ResourceHeatmapRow({ resource, months, onClick }) {
         </div>
       </div>
       {months.map((m) => (
-        <ResourceUtilCell key={m} {...monthData[m]} />
+        <ResourceUtilCell key={m} {...monthData[m]} showPotential={includePotential} />
       ))}
     </div>
   );

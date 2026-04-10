@@ -20,7 +20,7 @@ export default function ClientHeatmap({ months, includePotential }) {
       <h3 className="text-base font-bold text-text px-5 pt-4 pb-2">Client Staffing</h3>
       <ClientHeatmapHeader months={months} />
       {filtered.map((c, i) => (
-        <CustomerHeatmapRow key={c.id} customer={c} index={i} months={months} />
+        <CustomerHeatmapRow key={c.id} customer={c} index={i} months={months} includePotential={includePotential} />
       ))}
     </div>
   );

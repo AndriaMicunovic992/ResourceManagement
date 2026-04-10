@@ -1,4 +1,4 @@
-import { domainColor, initials, firstName } from '../../../lib/resourceUtils';
+import { domainColor, firstName } from '../../../lib/resourceUtils';
 import { useData } from '../../../contexts/DataContext';
 
 export default function AssignedTeamChips({ projectId }) {
@@ -20,7 +20,6 @@ export default function AssignedTeamChips({ projectId }) {
         return (
           <span key={r.id} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold"
             style={{ backgroundColor: color + '15', color }}>
-            <span className="font-bold">{initials(r.name).charAt(0)}</span>
             {firstName(r.name)}
           </span>
         );
