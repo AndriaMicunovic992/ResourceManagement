@@ -76,13 +76,12 @@ export default function AssignmentBar({ assignment, need, resource, months, onCl
       setResizePreview({ side, delta: clamp(Math.round((moveE.clientX - startX) / CW)) });
     };
 
-    const onUp = (upE) => {
+    const onUp = async (upE) => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      setResizePreview(null);
 
       const delta = clamp(Math.round((upE.clientX - startX) / CW));
-      if (delta === 0) return;
+      if (delta === 0) { setResizePreview(null); return; }
 
       const allocs = assignment.monthAllocations || {};
       const allMonths = Object.keys(allocs).sort();
@@ -107,7 +106,8 @@ export default function AssignmentBar({ assignment, need, resource, months, onCl
         }
       }
 
-      upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: newAllocs });
+      await upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: newAllocs });
+      setResizePreview(null);
     };
 
     document.addEventListener('mousemove', onMove);
