@@ -5,7 +5,7 @@ export default function HoverButtons({ onEdit, onDelete, size = 'default' }) {
       {onEdit && (
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className={`${sizeClass} rounded flex items-center justify-center cursor-pointer border-0 bg-primary-light text-primary hover:opacity-80`}
+          className={`${sizeClass} rounded flex items-center justify-center cursor-pointer border-0 bg-primary-light text-primary hover:brightness-95 active:scale-90 transition-all duration-100`}
         >
           ✎
         </button>
@@ -13,7 +13,7 @@ export default function HoverButtons({ onEdit, onDelete, size = 'default' }) {
       {onDelete && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className={`${sizeClass} rounded flex items-center justify-center cursor-pointer border-0 bg-danger-bg text-danger hover:opacity-80`}
+          className={`${sizeClass} rounded flex items-center justify-center cursor-pointer border-0 bg-danger-bg text-danger hover:brightness-95 active:scale-90 transition-all duration-100`}
         >
           ✕
         </button>

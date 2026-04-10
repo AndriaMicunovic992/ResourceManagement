@@ -1,9 +1,9 @@
 import { initials } from '../../../../lib/resourceUtils';
 
-export default function BarAvatar({ name, color }) {
+export default function BarAvatar({ name, color, size = 18 }) {
   return (
-    <div className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-white font-bold text-[9px] shrink-0 shadow-sm"
-      style={{ backgroundColor: color }}>
+    <div className="rounded-full flex items-center justify-center text-white font-bold shrink-0 shadow-sm"
+      style={{ width: size, height: size, fontSize: size * 0.42, backgroundColor: color }}>
       {initials(name)}
     </div>
   );

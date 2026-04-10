@@ -21,7 +21,7 @@ export default function HeldResourceBanner({ resource, onDeselect }) {
         ))}
       </div>
       <button onClick={onDeselect}
-        className="w-full py-1 text-[10px] font-semibold text-primary bg-white border border-primary/30 rounded-full cursor-pointer hover:bg-primary-light transition">
+        className="w-full py-1 text-[10px] font-semibold text-primary bg-white border border-primary/30 rounded-full cursor-pointer hover:bg-primary-light active:scale-95 active:brightness-95 transition-all duration-100">
         ✕ Deselect
       </button>
     </div>

@@ -15,22 +15,41 @@ export const assignmentService = {
     const resource = await prisma.resource.findFirst({ where: { id: input.resourceId, orgId } });
     if (!need || !resource) throw new NotFoundError('Need or resource not found');
 
-    const needAllocs = need.monthAllocations as Record<string, number>;
     const needStart = need.startMonth ?? need.project.startMonth;
     const needEnd = need.endMonth ?? need.project.endMonth;
     const allNeedMonths = monthRange(needStart, needEnd);
-
-    // Determine which months to assign
-    const targetMonths = input.months || (input.month ? [input.month] : allNeedMonths);
 
     const existing = await prisma.assignment.findUnique({
       where: { needId_resourceId: { needId: input.needId, resourceId: input.resourceId } },
     });
 
+    // If full monthAllocations provided, use them directly (per-month FTE)
+    if (input.monthAllocations) {
+      if (existing) {
+        const merged = { ...(existing.monthAllocations as Record<string, number>), ...input.monthAllocations };
+        return prisma.assignment.update({
+          where: { id: existing.id },
+          data: { monthAllocations: merged },
+          include: INCLUDE,
+        });
+      }
+      const monthAllocations: Record<string, number> = {};
+      allNeedMonths.forEach((m) => { monthAllocations[m] = 0; });
+      Object.assign(monthAllocations, input.monthAllocations);
+      return prisma.assignment.create({
+        data: { needId: input.needId, resourceId: input.resourceId, orgId, monthAllocations },
+        include: INCLUDE,
+      });
+    }
+
+    // Uniform FTE: determine which months to assign
+    const fte = input.fte ?? 0;
+    const targetMonths = input.months || (input.month ? [input.month] : allNeedMonths);
+
     if (existing) {
       const merged = { ...(existing.monthAllocations as Record<string, number>) };
       for (const m of targetMonths) {
-        merged[m] = input.fte;
+        merged[m] = fte;
       }
       return prisma.assignment.update({
         where: { id: existing.id },
@@ -43,7 +62,7 @@ export const assignmentService = {
     const monthAllocations: Record<string, number> = {};
     allNeedMonths.forEach((m) => { monthAllocations[m] = 0; });
     for (const m of targetMonths) {
-      monthAllocations[m] = input.fte;
+      monthAllocations[m] = fte;
     }
 
     return prisma.assignment.create({

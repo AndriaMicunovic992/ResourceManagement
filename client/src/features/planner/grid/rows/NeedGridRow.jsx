@@ -4,7 +4,7 @@ import AssignmentBar from '../bars/AssignmentBar';
 import { computeNeedFulfillment } from '../../../../lib/gridUtils';
 import { resourceMatchesNeed } from '../../../../lib/resourceUtils';
 import { monthRange } from '../../../../lib/dateUtils';
-import { BH, CW } from '../../../../lib/constants';
+import { CW } from '../../../../lib/constants';
 import { useData } from '../../../../contexts/DataContext';
 
 export default function NeedGridRow({ need, project, months, periods, heldResource, onCellClick, onBarClick }) {
@@ -21,12 +21,14 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
     [assignments, need.id]);
 
   const barCount = visibleAssignments.length;
-  const rowHeight = Math.max(42, barCount * (BH + 4) + 14);
+  const barH = 24;
+  const barGap = 2;
+  const rowHeight = Math.max(42, barCount * (barH + barGap) + 18);
 
   const canHeldPlace = heldResource && resourceMatchesNeed(heldResource, need);
 
   return (
-    <div className="flex relative" style={{ minHeight: rowHeight }}>
+    <div className="flex relative overflow-hidden" style={{ minHeight: rowHeight }}>
       {periods.map((p) => {
         const periodInRange = p.months.some((m) => needMonths.includes(m));
         // Aggregate needed/filled for the period
@@ -52,7 +54,7 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
         const resource = resources.find((r) => r.id === a.resourceId);
         if (!resource) return null;
         return (
-          <div key={a.id} className="absolute left-0 right-0" style={{ top: idx * (BH + 4) + 2 }}>
+          <div key={a.id} className="absolute left-0 right-0" style={{ top: idx * (barH + barGap) + 2 }}>
             <AssignmentBar
               assignment={a} need={need} resource={resource} months={months}
               onClickSegment={(seg, e) => onBarClick(a, seg, e)}

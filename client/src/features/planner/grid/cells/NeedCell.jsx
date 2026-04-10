@@ -10,7 +10,7 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, onC
   const ok = needed > 0 && filled >= needed;
   const isEditable = canPlace === undefined && needed > 0;
   const isClickable = canPlace === true || isEditable;
-  const bg = ok ? '#EAFAF0' : canPlace ? '#E0F4FA40' : 'white';
+  const bg = canPlace ? '#E0F4FA40' : 'white';
   const cursor = canPlace ? 'cell' : isEditable ? 'pointer' : 'default';
 
   return (
