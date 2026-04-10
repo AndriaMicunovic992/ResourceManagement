@@ -102,7 +102,7 @@ export default function NeedForm({ initial, project, onSave, onClose }) {
               className="flex-1" />
             <input type="number" min="0.01" max="2.0" step="0.01" value={ftePerMonth}
               onChange={(e) => handleFteChange(e.target.value)}
-              className="w-16 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary text-center" />
+              className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary text-center" />
             <span className="text-[10px] text-text-light">FTE</span>
           </div>
           <div className="flex items-center gap-2 mt-1.5">

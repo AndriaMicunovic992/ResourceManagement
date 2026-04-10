@@ -21,7 +21,7 @@ export const YEARLY_WORKING_DAYS = 260;
 export const MONTHLY_HOURS_PER_FTE = (YEARLY_WORKING_DAYS / 12) * 8; // ≈173.33
 
 export function fteToHours(fte) {
-  return Math.round(fte * MONTHLY_HOURS_PER_FTE * 100) / 100;
+  return Math.round(fte * MONTHLY_HOURS_PER_FTE);
 }
 
 export function hoursToFte(hours) {
