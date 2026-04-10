@@ -1,13 +1,29 @@
 import { useState, useEffect, useRef } from 'react';
+import { fteToHours, hoursToFte } from '../../lib/constants';
 
 export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, showRemove, onSave, onRemove, onClose }) {
   const [value, setValue] = useState(currentFte || 0.5);
+  const [hours, setHours] = useState(fteToHours(currentFte || 0.5));
   const inputRef = useRef(null);
 
   useEffect(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
   }, []);
+
+  const handleFteChange = (e) => {
+    const v = e.target.value;
+    setValue(v);
+    const n = parseFloat(v);
+    if (!isNaN(n)) setHours(fteToHours(n));
+  };
+
+  const handleHoursChange = (e) => {
+    const v = e.target.value;
+    setHours(v);
+    const n = parseFloat(v);
+    if (!isNaN(n)) setValue(hoursToFte(n));
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') { e.preventDefault(); onSave(parseFloat(value)); }
@@ -24,14 +40,29 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
         {title || `FTE (max ${maxFte.toFixed(1)})`}
       </div>
       <div className="flex gap-2 items-center">
-        <input
-          ref={inputRef}
-          type="number" step="0.01" min="0" max={maxFte}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-16 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
-        />
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1">
+            <input
+              ref={inputRef}
+              type="number" step="0.01" min="0" max={maxFte}
+              value={value}
+              onChange={handleFteChange}
+              onKeyDown={handleKeyDown}
+              className="w-16 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
+            />
+            <span className="text-[10px] text-text-light">FTE</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <input
+              type="number" step="1" min="0"
+              value={hours}
+              onChange={handleHoursChange}
+              onKeyDown={handleKeyDown}
+              className="w-16 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
+            />
+            <span className="text-[10px] text-text-light">h/mo</span>
+          </div>
+        </div>
         <button onClick={() => onSave(parseFloat(value))}
           className="px-3 py-1 bg-primary text-white rounded-lg text-xs font-bold cursor-pointer border-0 hover:opacity-90 active:scale-95 transition">
           Set

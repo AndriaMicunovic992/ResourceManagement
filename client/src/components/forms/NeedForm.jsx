@@ -3,7 +3,7 @@ import Modal from '../ui/Modal';
 import Field from '../ui/Field';
 import Button from '../ui/Button';
 import StatusPicker from '../ui/StatusPicker';
-import { DOMAINS, SENIORITIES } from '../../lib/constants';
+import { DOMAINS, SENIORITIES, fteToHours, hoursToFte } from '../../lib/constants';
 
 export default function NeedForm({ initial, project, onSave, onClose }) {
   const [domain, setDomain] = useState(initial?.domain || 'Web');
@@ -13,7 +13,21 @@ export default function NeedForm({ initial, project, onSave, onClose }) {
   const [startMonth, setStartMonth] = useState(initial?.startMonth || project?.startMonth || '');
   const [endMonth, setEndMonth] = useState(initial?.endMonth || project?.endMonth || '');
   const [ftePerMonth, setFtePerMonth] = useState(initial ? 1.0 : 1.0);
+  const [hoursPerMonth, setHoursPerMonth] = useState(fteToHours(1.0));
   const [status, setStatus] = useState(initial?.status || 'realised');
+
+  const handleFteChange = (v) => {
+    setFtePerMonth(v);
+    const n = parseFloat(v);
+    if (!isNaN(n)) setHoursPerMonth(fteToHours(n));
+  };
+
+  const handleHoursChange = (e) => {
+    const v = e.target.value;
+    setHoursPerMonth(v);
+    const n = parseFloat(v);
+    if (!isNaN(n)) setFtePerMonth(hoursToFte(n));
+  };
 
   const handleDomainChange = (d) => {
     setDomain(d);
@@ -79,11 +93,18 @@ export default function NeedForm({ initial, project, onSave, onClose }) {
         <Field label="FTE per month">
           <div className="flex items-center gap-3">
             <input type="range" min="0.1" max="2.0" step="0.1" value={ftePerMonth}
-              onChange={(e) => setFtePerMonth(e.target.value)}
+              onChange={(e) => handleFteChange(e.target.value)}
               className="flex-1" />
             <input type="number" min="0.01" max="2.0" step="0.01" value={ftePerMonth}
-              onChange={(e) => setFtePerMonth(e.target.value)}
+              onChange={(e) => handleFteChange(e.target.value)}
               className="w-16 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary text-center" />
+            <span className="text-[10px] text-text-light">FTE</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1.5">
+            <input type="number" min="0" step="1" value={hoursPerMonth}
+              onChange={handleHoursChange}
+              className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary text-center" />
+            <span className="text-[10px] text-text-light">hours / month</span>
           </div>
         </Field>
         <Field label="Status">

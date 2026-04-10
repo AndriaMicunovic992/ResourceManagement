@@ -8,7 +8,7 @@ import { ACCENT_COLORS } from '../../../lib/constants';
 import { useData } from '../../../contexts/DataContext';
 
 export default function CustomerHeatmapRow({ customer, index, months }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const { projects, needs, assignments } = useData();
   const ok = useMemo(() => isCustomerOk(customer, projects, needs, assignments), [customer, projects, needs, assignments]);
   const accent = ACCENT_COLORS[index % ACCENT_COLORS.length];

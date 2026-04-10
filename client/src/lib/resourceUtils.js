@@ -28,3 +28,10 @@ export function initials(name) {
 export function firstName(name) {
   return name?.split(' ')[0] || '';
 }
+
+export function shortName(name) {
+  if (!name) return '';
+  const parts = name.split(' ');
+  if (parts.length < 2) return parts[0];
+  return parts[0] + ' ' + parts[parts.length - 1][0] + '.';
+}

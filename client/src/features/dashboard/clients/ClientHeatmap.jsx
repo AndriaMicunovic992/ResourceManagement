@@ -1,13 +1,10 @@
-import { useMemo } from 'react';
 import ClientHeatmapHeader from './ClientHeatmapHeader';
 import CustomerHeatmapRow from './CustomerHeatmapRow';
 import EmptyState from '../../../components/ui/EmptyState';
-import { monthRange, currentMonth, addMonths } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 
-export default function ClientHeatmap() {
+export default function ClientHeatmap({ months }) {
   const { customers } = useData();
-  const months = useMemo(() => monthRange(currentMonth(), addMonths(currentMonth(), 11)), []);
 
   if (customers.length === 0) {
     return <EmptyState icon="🏢" message="No customers yet" />;
