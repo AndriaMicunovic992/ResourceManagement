@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, onSave, onClose }) {
+export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, onSave, onClose }) {
   const [value, setValue] = useState(currentFte || 0.5);
   const inputRef = useRef(null);
 
@@ -21,7 +21,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, onSave, o
       onClick={(e) => e.stopPropagation()}
     >
       <div className="text-[10px] font-semibold text-text-mid mb-2">
-        FTE (max {maxFte.toFixed(1)})
+        {title || `FTE (max ${maxFte.toFixed(1)})`}
       </div>
       <div className="flex gap-2 items-center">
         <input

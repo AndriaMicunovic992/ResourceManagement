@@ -9,9 +9,10 @@ export default function CustomerLabel({ customer, index, onEdit, onDelete, canEd
   const { projects, needs, assignments } = useData();
 
   const ok = useMemo(() => isCustomerOk(customer, projects, needs, assignments), [customer, projects, needs, assignments]);
+  const hasNeeds = needs.some((n) => projects.some((p) => p.customerId === customer.id && p.id === n.projectId));
   const accent = ACCENT_COLORS[index % ACCENT_COLORS.length];
-  const borderColor = ok ? '#5BC68A' : customer.status === 'potential' ? '#F5A623' : accent;
-  const bg = ok ? '#EAFAF0' : customer.status === 'potential' ? '#FFF6E8' : accent + '10';
+  const borderColor = ok ? '#5BC68A' : hasNeeds ? '#F5A623' : customer.status === 'potential' ? '#F5A623' : accent;
+  const bg = ok ? '#EAFAF0' : hasNeeds ? '#FFF6E8' : customer.status === 'potential' ? '#FFF6E8' : accent + '10';
   const projCount = projects.filter((p) => p.customerId === customer.id).length;
 
   return (

@@ -12,7 +12,17 @@ export const createNeedSchema = z.object({
   status: z.enum(['realised', 'potential']).default('realised'),
 });
 
-export const updateNeedSchema = createNeedSchema.partial().omit({ projectId: true });
+export const updateNeedSchema = z.object({
+  domain: z.enum(['Data', 'Web', 'General']).optional(),
+  role: z.string().min(1).optional(),
+  seniority: z.enum(['Junior', 'Medior', 'Senior', 'Senior Principal']).optional(),
+  label: z.string().optional().nullable(),
+  startMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+  endMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+  ftePerMonth: z.number().min(0.01).max(2.0).optional(),
+  status: z.enum(['realised', 'potential']).optional(),
+  monthAllocations: z.record(z.string(), z.number()).optional(),
+});
 
 export type CreateNeedInput = z.infer<typeof createNeedSchema>;
 export type UpdateNeedInput = z.infer<typeof updateNeedSchema>;

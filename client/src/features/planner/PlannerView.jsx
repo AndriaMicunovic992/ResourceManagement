@@ -11,7 +11,7 @@ import { useData } from '../../contexts/DataContext';
 import { currentMonth, addMonths } from '../../lib/dateUtils';
 
 export default function PlannerView() {
-  const { customers, updateCustomer, deleteCustomer, updateProject, deleteProject, addNeed, updateNeed, deleteNeed, upsertAssignment } = useData();
+  const { customers, needs, assignments, updateCustomer, deleteCustomer, updateProject, deleteProject, addNeed, updateNeed, deleteNeed, upsertAssignment } = useData();
 
   const [heldResource, setHeldResource] = useState(null);
   const [popover, setPopover] = useState(null);
@@ -19,37 +19,88 @@ export default function PlannerView() {
   const [aggregation, setAggregation] = useState('M');
   const [editModal, setEditModal] = useState(null);
 
-  const handleCellClick = useCallback((need, month, e) => {
-    if (!heldResource) return;
+  const handleCellClick = useCallback((need, month, periodMonths, e) => {
+    if (heldResource) {
+      // Auto-assign resource to ALL need months with smart default FTE
+      const needAllocs = need.monthAllocations || {};
+      const needMonths = Object.keys(needAllocs).sort();
+      if (needMonths.length === 0) return;
+
+      // Skip if already assigned
+      const existing = assignments.find((a) => a.needId === need.id && a.resourceId === heldResource.id);
+      if (existing) return;
+
+      const needAssigns = assignments.filter((a) => a.needId === need.id);
+      const resourceAssigns = assignments.filter((a) => a.resourceId === heldResource.id);
+
+      // Compute smart default FTE: min across all months of min(gap, resource capacity)
+      let minAvail = Infinity;
+      for (const m of needMonths) {
+        const needed = needAllocs[m] || 0;
+        const filled = needAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+        const gap = needed - filled;
+        const resourceUsed = resourceAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+        const cap = Math.max(0, 1.0 - resourceUsed);
+        minAvail = Math.min(minAvail, gap, cap);
+      }
+
+      const fte = Math.max(0.01, Math.round(Math.min(minAvail, needAllocs[needMonths[0]] || 1) * 100) / 100);
+      if (minAvail <= 0) return;
+
+      upsertAssignment({ needId: need.id, resourceId: heldResource.id, fte });
+      return;
+    }
+
+    // No held resource: edit this need's per-month FTE
     const rect = e.currentTarget.getBoundingClientRect();
+    const needAllocs = need.monthAllocations || {};
     setPopover({
       x: rect.left, y: rect.bottom + 4,
-      needId: need.id, month,
-      maxFte: (need.monthAllocations?.[month] || 1),
-      type: 'place',
+      needId: need.id, month, periodMonths,
+      currentFte: needAllocs[month] || 0,
+      maxFte: 2.0,
+      type: 'editNeed',
     });
-  }, [heldResource]);
+  }, [heldResource, assignments, upsertAssignment]);
 
   const handleBarClick = useCallback((assignment, segment, e) => {
+    const need = needs.find((n) => n.id === assignment.needId);
+    const needAllocs = need?.monthAllocations || {};
+    const month = segment.months[0];
+    const needed = needAllocs[month] || 1;
+
+    // maxFte = need requirement minus other assignments' FTE for this month
+    const otherFilled = assignments
+      .filter((a) => a.needId === assignment.needId && a.id !== assignment.id)
+      .reduce((s, a) => s + ((a.monthAllocations || {})[month] || 0), 0);
+    const maxFte = Math.max(0.01, needed - otherFilled);
+
     const rect = e.currentTarget.getBoundingClientRect();
     setPopover({
       x: rect.left, y: rect.bottom + 4,
       assignmentId: assignment.id,
       needId: assignment.needId,
       resourceId: assignment.resourceId,
-      month: segment.months[0],
+      month,
+      months: segment.months,
       currentFte: segment.fte,
-      maxFte: 2.0,
+      maxFte,
       type: 'edit',
     });
-  }, []);
+  }, [needs, assignments]);
 
   const handleFteSave = async (fte) => {
     if (!popover) return;
-    if (popover.type === 'place' && heldResource) {
-      await upsertAssignment({ needId: popover.needId, resourceId: heldResource.id, month: popover.month, fte });
-    } else if (popover.type === 'edit') {
-      await upsertAssignment({ needId: popover.needId, resourceId: popover.resourceId, month: popover.month, fte });
+    if (popover.type === 'edit') {
+      await upsertAssignment({
+        needId: popover.needId, resourceId: popover.resourceId,
+        months: popover.months, fte,
+      });
+    } else if (popover.type === 'editNeed') {
+      const monthAllocs = {};
+      const months = popover.periodMonths || [popover.month];
+      for (const m of months) monthAllocs[m] = fte;
+      await updateNeed(popover.needId, { monthAllocations: monthAllocs });
     }
     setPopover(null);
   };
@@ -87,6 +138,7 @@ export default function PlannerView() {
         <FtePopover
           x={popover.x} y={popover.y}
           maxFte={popover.maxFte} currentFte={popover.currentFte}
+          title={popover.type === 'editNeed' ? 'Need FTE (max 2.0)' : undefined}
           onSave={handleFteSave} onClose={() => setPopover(null)}
         />
       )}

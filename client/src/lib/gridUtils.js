@@ -43,10 +43,10 @@ export function buildSegments(assignment) {
 }
 
 function isConsecutive(a, b) {
-  const da = new Date(a + '-01');
-  da.setMonth(da.getMonth() + 1);
-  const next = `${da.getFullYear()}-${String(da.getMonth() + 1).padStart(2, '0')}`;
-  return next === b;
+  const [ay, am] = a.split('-').map(Number);
+  let ny = ay, nm = am + 1;
+  if (nm > 12) { nm = 1; ny++; }
+  return `${ny}-${String(nm).padStart(2, '0')}` === b;
 }
 
 export function computeNeedFulfillment(need, assignments) {
