@@ -21,7 +21,7 @@ export const orgService = {
     return org;
   },
 
-  async updateOrg(orgId: string, data: { name?: string }) {
+  async updateOrg(orgId: string, data: { name?: string; minPlanningDate?: string | null; maxPlanningDate?: string | null }) {
     return prisma.organization.update({ where: { id: orgId }, data });
   },
 

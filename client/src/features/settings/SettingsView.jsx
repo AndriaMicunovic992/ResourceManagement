@@ -7,13 +7,39 @@ import Avatar from '../../components/ui/Avatar';
 const ROLES = ['viewer', 'member', 'admin'];
 
 export default function SettingsView() {
-  const { currentOrg, role } = useOrg();
+  const { currentOrg, role, updateOrg } = useOrg();
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState('');
   const [newRole, setNewRole] = useState('member');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const isAdmin = role === 'admin' || role === 'owner';
+
+  const [minDate, setMinDate] = useState(currentOrg?.minPlanningDate || '');
+  const [maxDate, setMaxDate] = useState(currentOrg?.maxPlanningDate || '');
+  const [dateSaving, setDateSaving] = useState(false);
+  const [dateSuccess, setDateSuccess] = useState(false);
+
+  useEffect(() => {
+    setMinDate(currentOrg?.minPlanningDate || '');
+    setMaxDate(currentOrg?.maxPlanningDate || '');
+  }, [currentOrg]);
+
+  const handleSaveDates = async () => {
+    setDateSaving(true);
+    setDateSuccess(false);
+    try {
+      await updateOrg({
+        minPlanningDate: minDate || null,
+        maxPlanningDate: maxDate || null,
+      });
+      setDateSuccess(true);
+      setTimeout(() => setDateSuccess(false), 2000);
+    } catch (err) {
+      setError(err.message || 'Failed to save planning dates');
+    }
+    setDateSaving(false);
+  };
 
   const loadMembers = useCallback(async () => {
     try {
@@ -70,6 +96,36 @@ export default function SettingsView() {
           <p className="mt-1"><strong>Your role:</strong> {role}</p>
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-3">Planning Date Range</h3>
+          <p className="text-[10px] text-text-light mb-3">
+            Set the minimum and maximum months available for planning. Leave empty for no restriction.
+          </p>
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Min Date</label>
+              <input
+                type="month" value={minDate} onChange={(e) => setMinDate(e.target.value)}
+                max={maxDate || undefined}
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Max Date</label>
+              <input
+                type="month" value={maxDate} onChange={(e) => setMaxDate(e.target.value)}
+                min={minDate || undefined}
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+              />
+            </div>
+            <Button onClick={handleSaveDates} disabled={dateSaving}>
+              {dateSaving ? 'Saving...' : dateSuccess ? 'Saved!' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-border shadow-card p-5">
         <h3 className="text-sm font-bold text-text mb-4">Members</h3>

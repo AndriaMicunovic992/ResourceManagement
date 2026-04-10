@@ -9,7 +9,7 @@ import { useOrg } from '../../../contexts/OrgContext';
 
 export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange, showUnassignedOnly, onToggleUnassigned }) {
   const { customers, addCustomer, addProject } = useData();
-  const { canEdit } = useOrg();
+  const { canEdit, currentOrg } = useOrg();
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
 
@@ -35,7 +35,8 @@ export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregati
         <span className={`w-2 h-2 rounded-full ${showUnassignedOnly ? 'bg-warning' : 'bg-border'}`} />
         Unassigned
       </button>
-      <TimeRangePicker timeRange={timeRange} onChange={onTimeRangeChange} />
+      <TimeRangePicker timeRange={timeRange} onChange={onTimeRangeChange}
+        minDate={currentOrg?.minPlanningDate} maxDate={currentOrg?.maxPlanningDate} />
       <AggregationToggle value={aggregation} onChange={onAggregationChange} />
 
       {showCustomerForm && (
