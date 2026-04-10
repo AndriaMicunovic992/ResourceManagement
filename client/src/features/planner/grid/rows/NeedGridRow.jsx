@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import NeedCell from '../cells/NeedCell';
 import AssignmentBar from '../bars/AssignmentBar';
-import { computeNeedFulfillment } from '../../../../lib/gridUtils';
+import { computeNeedFulfillment, isNeedOk } from '../../../../lib/gridUtils';
 import { resourceMatchesNeed } from '../../../../lib/resourceUtils';
 import { monthRange } from '../../../../lib/dateUtils';
 import { CW } from '../../../../lib/constants';
@@ -20,12 +20,14 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
     assignments.filter((a) => a.needId === need.id && Object.values(a.monthAllocations || {}).some((v) => v > 0)),
     [assignments, need.id]);
 
+  const canHeldPlace = heldResource && resourceMatchesNeed(heldResource, need);
+  const needsMore = !isNeedOk(need, assignments);
   const barCount = visibleAssignments.length;
   const barH = 24;
   const barGap = 2;
-  const rowHeight = Math.max(42, barCount * (barH + barGap) + 18);
-
-  const canHeldPlace = heldResource && resourceMatchesNeed(heldResource, need);
+  // Add extra click space when a matching resource is held and the need isn't fully covered
+  const clickPad = canHeldPlace && needsMore ? barH + 8 : 0;
+  const rowHeight = Math.max(42, barCount * (barH + barGap) + 18 + clickPad);
 
   return (
     <div className="flex relative overflow-hidden" style={{ minHeight: rowHeight }}>
