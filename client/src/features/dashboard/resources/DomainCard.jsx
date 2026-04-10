@@ -3,26 +3,36 @@ import { DOMAINS } from '../../../lib/constants';
 import { utilColor } from '../../../lib/statusUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
-import { currentMonth } from '../../../lib/dateUtils';
 
-export default function DomainCard({ domain }) {
+export default function DomainCard({ domain, months, includePotential }) {
   const { resources } = useData();
-  const { rURealised } = useComputed();
+  const { rURealised, rU } = useComputed();
   const d = DOMAINS[domain];
-  const cm = currentMonth();
 
   const { count, utilPct, usedFte, totalFte } = useMemo(() => {
     const domResources = resources.filter((r) => r.roles?.some((rl) => rl.domain === domain));
     const count = domResources.length;
+    const rUsed = includePotential ? rU : rURealised;
     let used = 0, total = 0;
     for (const r of domResources) {
-      total += r.capacity;
-      used += rURealised[r.id]?.[cm] || 0;
+      for (const m of months) {
+        total += r.capacity;
+        used += rUsed[r.id]?.[m] || 0;
+      }
     }
-    return { count, utilPct: total > 0 ? Math.round((used / total) * 100) : 0, usedFte: used, totalFte: total };
-  }, [resources, rURealised, domain, cm]);
+    // Average per month
+    const avgUsed = months.length > 0 ? used / months.length : 0;
+    const avgTotal = months.length > 0 ? total / months.length : 0;
+    return {
+      count,
+      utilPct: avgTotal > 0 ? Math.round((avgUsed / avgTotal) * 100) : 0,
+      usedFte: avgUsed,
+      totalFte: avgTotal,
+    };
+  }, [resources, rURealised, rU, domain, months, includePotential]);
 
   const color = utilColor(utilPct);
+  const label = includePotential ? 'all' : 'realised';
 
   return (
     <div className="bg-white rounded-xl border border-border shadow-card p-4">
@@ -37,7 +47,7 @@ export default function DomainCard({ domain }) {
         <div className="h-full rounded-full" style={{ width: `${Math.min(utilPct, 100)}%`, backgroundColor: color }} />
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-mono text-text-light">{usedFte.toFixed(1)} / {totalFte.toFixed(1)} FTE (realised)</span>
+        <span className="text-[9px] font-mono text-text-light">{usedFte.toFixed(1)} / {totalFte.toFixed(1)} FTE ({label})</span>
         <span className="text-xs font-bold font-mono" style={{ color }}>{utilPct}%</span>
       </div>
     </div>
