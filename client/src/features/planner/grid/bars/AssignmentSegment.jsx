@@ -1,5 +1,5 @@
 import BarAvatar from './BarAvatar';
-import { shortName } from '../../../../lib/resourceUtils';
+import { shortName, initials } from '../../../../lib/resourceUtils';
 import { CW } from '../../../../lib/constants';
 
 export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, onClick }) {
@@ -24,7 +24,7 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
         <>
           <BarAvatar name={resource.name} color={domainColor} size={18} />
           <span className="text-[9px] font-semibold truncate" style={{ color: domainColor }}>
-            {shortName(resource.name)}
+            {segment.months.length === 1 ? initials(resource.name) : shortName(resource.name)}
           </span>
         </>
       )}

@@ -3,6 +3,7 @@ import StatsCards from './stats/StatsCards';
 import DashboardTabs from './tabs/DashboardTabs';
 import ClientHeatmap from './clients/ClientHeatmap';
 import ResourceCapacity from './resources/ResourceCapacity';
+import FreeCapacity from './capacity/FreeCapacity';
 import ResourceProfile from './profile/ResourceProfile';
 import TimeRangePicker from '../planner/toolbar/TimeRangePicker';
 import { currentMonth, addMonths, monthRange } from '../../lib/dateUtils';
@@ -23,11 +24,9 @@ export default function DashboardView() {
         <TimeRangePicker timeRange={timeRange} onChange={setTimeRange}
           minDate={currentOrg?.minPlanningDate} maxDate={currentOrg?.maxPlanningDate} />
       </div>
-      {activeTab === 'clients' ? (
-        <ClientHeatmap months={months} />
-      ) : (
-        <ResourceCapacity months={months} onResourceClick={setProfileResource} />
-      )}
+      {activeTab === 'clients' && <ClientHeatmap months={months} />}
+      {activeTab === 'resources' && <ResourceCapacity months={months} onResourceClick={setProfileResource} />}
+      {activeTab === 'free' && <FreeCapacity months={months} />}
       {profileResource && (
         <ResourceProfile resource={profileResource} onClose={() => setProfileResource(null)} />
       )}
