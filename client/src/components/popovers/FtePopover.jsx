@@ -58,7 +58,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
               value={hours}
               onChange={handleHoursChange}
               onKeyDown={handleKeyDown}
-              className="w-16 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
+              className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
             />
             <span className="text-[10px] text-text-light">h/mo</span>
           </div>

@@ -12,8 +12,13 @@ export default function NeedForm({ initial, project, onSave, onClose }) {
   const [label, setLabel] = useState(initial?.label || '');
   const [startMonth, setStartMonth] = useState(initial?.startMonth || project?.startMonth || '');
   const [endMonth, setEndMonth] = useState(initial?.endMonth || project?.endMonth || '');
-  const [ftePerMonth, setFtePerMonth] = useState(initial ? 1.0 : 1.0);
-  const [hoursPerMonth, setHoursPerMonth] = useState(fteToHours(1.0));
+  const initialFte = (() => {
+    if (!initial?.monthAllocations) return 1.0;
+    const vals = Object.values(initial.monthAllocations).filter((v) => v > 0);
+    return vals.length > 0 ? vals[0] : 1.0;
+  })();
+  const [ftePerMonth, setFtePerMonth] = useState(initialFte);
+  const [hoursPerMonth, setHoursPerMonth] = useState(fteToHours(initialFte));
   const [status, setStatus] = useState(initial?.status || 'realised');
 
   const handleFteChange = (v) => {
@@ -103,7 +108,7 @@ export default function NeedForm({ initial, project, onSave, onClose }) {
           <div className="flex items-center gap-2 mt-1.5">
             <input type="number" min="0" step="1" value={hoursPerMonth}
               onChange={handleHoursChange}
-              className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary text-center" />
+              className="w-24 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary text-center" />
             <span className="text-[10px] text-text-light">hours / month</span>
           </div>
         </Field>
