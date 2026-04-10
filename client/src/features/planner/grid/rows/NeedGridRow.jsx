@@ -16,12 +16,11 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
     return monthRange(s, e);
   }, [need, project]);
 
-  const needAssignments = useMemo(() =>
-    assignments.filter((a) => a.needId === need.id), [assignments, need.id]);
+  const visibleAssignments = useMemo(() =>
+    assignments.filter((a) => a.needId === need.id && Object.values(a.monthAllocations || {}).some((v) => v > 0)),
+    [assignments, need.id]);
 
-  const barCount = needAssignments.filter((a) =>
-    Object.values(a.monthAllocations || {}).some((v) => v > 0)
-  ).length;
+  const barCount = visibleAssignments.length;
   const rowHeight = Math.max(42, barCount * (BH + 4) + 14);
 
   const canHeldPlace = heldResource && resourceMatchesNeed(heldResource, need);
@@ -36,19 +35,20 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
         // For placement, use the first in-range month in this period
         const firstInRangeMonth = p.months.find((m) => needMonths.includes(m));
 
+        const inRangeMonths = p.months.filter((m) => needMonths.includes(m));
         return (
           <NeedCell
             key={p.label}
             width={p.months.length * CW}
             needed={needed} filled={filled}
             inRange={periodInRange}
-            canPlace={canHeldPlace && periodInRange ? true : canHeldPlace === false ? false : undefined}
-            onClick={(e) => firstInRangeMonth && onCellClick(need, firstInRangeMonth, e)}
+            canPlace={!heldResource ? undefined : canHeldPlace && periodInRange ? true : false}
+            onClick={(e) => firstInRangeMonth && onCellClick(need, firstInRangeMonth, inRangeMonths, e)}
           />
         );
       })}
       {/* Assignment bars overlay — always positioned by raw month index */}
-      {needAssignments.map((a, idx) => {
+      {visibleAssignments.map((a, idx) => {
         const resource = resources.find((r) => r.id === a.resourceId);
         if (!resource) return null;
         return (

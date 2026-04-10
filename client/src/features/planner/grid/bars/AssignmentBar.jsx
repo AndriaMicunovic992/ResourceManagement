@@ -23,7 +23,7 @@ export default function AssignmentBar({ assignment, need, resource, months, onCl
   if (startIdx < 0) return null;
 
   return (
-    <div className="absolute flex items-center" style={{ left: startIdx * CW, top: 2, height: BH }}>
+    <div className="absolute flex items-center" style={{ left: startIdx * CW, top: 0, height: BH }}>
       {segments.map((seg, i) => (
         <AssignmentSegment
           key={i} segment={seg} resource={resource} domainColor={color}

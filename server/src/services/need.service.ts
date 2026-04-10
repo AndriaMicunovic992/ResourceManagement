@@ -42,7 +42,7 @@ export const needService = {
 
   async update(orgId: string, id: string, data: UpdateNeedInput) {
     const existing = await this.getById(orgId, id);
-    const { ftePerMonth, ...rest } = data;
+    const { ftePerMonth, monthAllocations: inputMonthAllocs, ...rest } = data;
 
     let monthAllocations = existing.monthAllocations as Record<string, number>;
     if (ftePerMonth !== undefined) {
@@ -51,6 +51,8 @@ export const needService = {
       const months = monthRange(start, end);
       monthAllocations = {};
       months.forEach((m) => { monthAllocations[m] = ftePerMonth; });
+    } else if (inputMonthAllocs) {
+      monthAllocations = { ...monthAllocations, ...inputMonthAllocs };
     }
 
     return prisma.need.update({
