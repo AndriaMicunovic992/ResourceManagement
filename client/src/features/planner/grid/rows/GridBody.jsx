@@ -2,7 +2,7 @@ import CustomerGridRow from './CustomerGridRow';
 import ProjectGridRow from './ProjectGridRow';
 import NeedGridRow from './NeedGridRow';
 
-export default function GridBody({ rows, months, periods, heldResource, onCellClick, onBarClick }) {
+export default function GridBody({ rows, months, periods, heldResource, needHeights, onCellClick, onBarClick }) {
   return (
     <div>
       {rows.map((row, i) => {
@@ -16,6 +16,7 @@ export default function GridBody({ rows, months, periods, heldResource, onCellCl
           return (
             <NeedGridRow key={`n-${row.data.id}`} need={row.data} project={row.project}
               months={months} periods={periods} heldResource={heldResource}
+              rowHeight={needHeights?.[row.data.id]}
               onCellClick={onCellClick} onBarClick={onBarClick} />
           );
         }
