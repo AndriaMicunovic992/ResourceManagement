@@ -12,7 +12,7 @@ import { useOrg } from '../../contexts/OrgContext';
 import { currentMonth, addMonths } from '../../lib/dateUtils';
 
 export default function PlannerView() {
-  const { customers, needs, assignments, updateCustomer, deleteCustomer, updateProject, deleteProject, addNeed, updateNeed, deleteNeed, upsertAssignment } = useData();
+  const { customers, needs, assignments, updateCustomer, deleteCustomer, addProject, updateProject, deleteProject, addNeed, updateNeed, deleteNeed, upsertAssignment } = useData();
   const { currentOrg } = useOrg();
 
   const [heldResource, setHeldResource] = useState(null);
@@ -123,6 +123,7 @@ export default function PlannerView() {
 
   const handleEditCustomer = (customer) => setEditModal({ type: 'customer', data: customer });
   const handleDeleteCustomer = async (id) => { if (confirm('Delete this customer?')) await deleteCustomer(id); };
+  const handleAddProject = (customer) => setEditModal({ type: 'project', customer });
   const handleEditProject = (project) => setEditModal({ type: 'project', data: project });
   const handleDeleteProject = async (id) => { if (confirm('Delete this project?')) await deleteProject(id); };
   const handleAddNeed = (project) => setEditModal({ type: 'need', project });
@@ -149,7 +150,7 @@ export default function PlannerView() {
             showUnassignedOnly={showUnassignedOnly} customerSort={customerSort} filterIds={filterIds}
             onCellClick={handleCellClick} onBarClick={handleBarClick}
             onEditCustomer={handleEditCustomer} onDeleteCustomer={handleDeleteCustomer}
-            onEditProject={handleEditProject} onDeleteProject={handleDeleteProject}
+            onAddProject={handleAddProject} onEditProject={handleEditProject} onDeleteProject={handleDeleteProject}
             onAddNeed={handleAddNeed} onEditNeed={handleEditNeed} onDeleteNeed={handleDeleteNeed}
           />
         )}
@@ -171,8 +172,12 @@ export default function PlannerView() {
           onClose={() => setEditModal(null)} />
       )}
       {editModal?.type === 'project' && (
-        <ProjectForm initial={editModal.data}
-          onSave={async (data) => { await updateProject(editModal.data.id, data); setEditModal(null); }}
+        <ProjectForm initial={editModal.data || (editModal.customer ? { customerId: editModal.customer.id } : undefined)}
+          onSave={async (data) => {
+            if (editModal.data?.id) await updateProject(editModal.data.id, data);
+            else await addProject(data);
+            setEditModal(null);
+          }}
           onClose={() => setEditModal(null)} />
       )}
       {editModal?.type === 'need' && (

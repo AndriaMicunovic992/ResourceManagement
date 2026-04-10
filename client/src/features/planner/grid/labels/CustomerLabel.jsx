@@ -5,7 +5,7 @@ import { isCustomerOk } from '../../../../lib/gridUtils';
 import { ACCENT_COLORS } from '../../../../lib/constants';
 import { useData } from '../../../../contexts/DataContext';
 
-export default function CustomerLabel({ customer, index, onEdit, onDelete, canEdit }) {
+export default function CustomerLabel({ customer, index, onEdit, onDelete, onAddProject, canEdit }) {
   const { projects, needs, assignments } = useData();
 
   const ok = useMemo(() => isCustomerOk(customer, projects, needs, assignments), [customer, projects, needs, assignments]);
@@ -22,7 +22,13 @@ export default function CustomerLabel({ customer, index, onEdit, onDelete, canEd
       <span className="text-sm font-bold text-text truncate flex-1">{customer.name}</span>
       <StatusBadge status={customer.status} />
       <span className="text-[10px] text-text-light font-mono">{projCount}p</span>
-      {canEdit && <HoverButtons onEdit={onEdit} onDelete={onDelete} size="small" />}
+      {canEdit && (
+        <>
+          <button onClick={onAddProject}
+            className="opacity-0 group-hover:opacity-100 text-[10px] text-primary bg-primary-light border-0 rounded px-1 cursor-pointer hover:opacity-80">+</button>
+          <HoverButtons onEdit={onEdit} onDelete={onDelete} size="small" />
+        </>
+      )}
     </div>
   );
 }
