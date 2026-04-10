@@ -5,7 +5,7 @@ export default function ResourceCapacity({ months, includePotential, onResourceC
   return (
     <div>
       <DomainCards months={months} includePotential={includePotential} />
-      <ResourceHeatmap months={months} onResourceClick={onResourceClick} />
+      <ResourceHeatmap months={months} onResourceClick={onResourceClick} includePotential={includePotential} />
     </div>
   );
 }

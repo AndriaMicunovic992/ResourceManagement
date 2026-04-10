@@ -5,10 +5,10 @@ import { useComputed } from '../../../hooks/useComputed';
 import { DOMAINS, SENIORITY_SHORT } from '../../../lib/constants';
 
 export default function FreeCapacity({ months, includePotential }) {
-  const { resources } = useData();
-  const { rU, rURealised } = useComputed();
-  const [expanded, setExpanded] = useState({});     // domain → true
-  const [expandedRoles, setExpandedRoles] = useState({}); // "domain|role" → true
+  const { resources, needs, projects, customers } = useData();
+  const { rURealised } = useComputed();
+  const [expanded, setExpanded] = useState({});
+  const [expandedRoles, setExpandedRoles] = useState({});
 
   const toggleDomain = (d) => setExpanded((s) => ({ ...s, [d]: !s[d] }));
   const toggleRole = (key) => setExpandedRoles((s) => ({ ...s, [key]: !s[key] }));
@@ -46,9 +46,42 @@ export default function FreeCapacity({ months, includePotential }) {
       }));
   }, [resources]);
 
-  // Compute free FTE for a set of resource IDs per month
+  // Potential need demand per domain/role/seniority per month
+  const potentialDemand = useMemo(() => {
+    if (!includePotential) return {};
+    const demand = {};
+    for (const n of needs) {
+      const proj = projects.find((p) => p.id === n.projectId);
+      if (!proj) continue;
+      const cust = customers.find((c) => c.id === proj.customerId);
+      if (!cust) continue;
+      const isPotential = n.status === 'potential' || proj.status === 'potential' || cust.status === 'potential';
+      if (!isPotential) continue;
+      const allocs = n.monthAllocations || {};
+      const dk = n.domain;
+      const rk = n.role;
+      const sk = n.seniority;
+      for (const [m, fte] of Object.entries(allocs)) {
+        if (fte <= 0) continue;
+        // domain level
+        const dKey = dk;
+        if (!demand[dKey]) demand[dKey] = {};
+        demand[dKey][m] = (demand[dKey][m] || 0) + fte;
+        // role level
+        const rKey = `${dk}|${rk}`;
+        if (!demand[rKey]) demand[rKey] = {};
+        demand[rKey][m] = (demand[rKey][m] || 0) + fte;
+        // seniority level
+        const sKey = `${dk}|${rk}|${sk}`;
+        if (!demand[sKey]) demand[sKey] = {};
+        demand[sKey][m] = (demand[sKey][m] || 0) + fte;
+      }
+    }
+    return demand;
+  }, [needs, projects, customers, includePotential]);
+
+  // Compute free FTE for a set of resource IDs per month (realised usage only)
   const computeFree = (resourceIds, month) => {
-    const rUsed = includePotential ? rU : rURealised;
     let free = 0;
     const seen = new Set();
     for (const id of resourceIds) {
@@ -56,7 +89,7 @@ export default function FreeCapacity({ months, includePotential }) {
       seen.add(id);
       const r = resources.find((x) => x.id === id);
       if (!r) continue;
-      const used = rUsed[r.id]?.[month] || 0;
+      const used = rURealised[r.id]?.[month] || 0;
       free += Math.max(0, r.capacity - used);
     }
     return Math.round(free * 100) / 100;
@@ -73,7 +106,6 @@ export default function FreeCapacity({ months, includePotential }) {
   return (
     <div className="bg-white rounded-xl border border-border shadow-card overflow-auto">
       <h3 className="text-base font-bold text-text px-5 pt-4 pb-2">Free Capacity (FTE)</h3>
-      {/* Header */}
       <div className="flex items-center border-b-2 border-border sticky top-0 bg-white z-10">
         <div className="w-[270px] shrink-0 px-3 py-2">
           <span className="text-xs font-semibold text-text-mid">Domain / Role / Seniority</span>
@@ -84,13 +116,12 @@ export default function FreeCapacity({ months, includePotential }) {
           </div>
         ))}
       </div>
-      {/* Rows */}
       {tree.map((d) => {
         const color = DOMAINS[d.domain]?.color || '#6B8A9E';
         const domainExpanded = !!expanded[d.domain];
+        const dKey = d.domain;
         return (
           <div key={d.domain}>
-            {/* Domain row */}
             <div
               className="flex items-center border-b border-border cursor-pointer hover:bg-primary-bg/30"
               style={{ background: color + '08' }}
@@ -102,11 +133,12 @@ export default function FreeCapacity({ months, includePotential }) {
                 <span className="text-xs font-bold text-text">{d.domain}</span>
                 <span className="text-[10px] text-text-light ml-auto">({d.resources.length})</span>
               </div>
-              {months.map((m) => (
-                <FreeCell key={m} value={computeFree(d.resources, m)} />
-              ))}
+              {months.map((m) => {
+                const free = computeFree(d.resources, m);
+                const pDemand = potentialDemand[dKey]?.[m] || 0;
+                return <FreeCell key={m} value={includePotential ? Math.max(0, free - pDemand) : free} hasPotential={pDemand > 0 && includePotential} />;
+              })}
             </div>
-            {/* Role rows */}
             {domainExpanded && d.roles.map((r) => {
               const roleKey = `${d.domain}|${r.role}`;
               const roleExpanded = !!expandedRoles[roleKey];
@@ -121,25 +153,31 @@ export default function FreeCapacity({ months, includePotential }) {
                       <span className="text-xs font-semibold text-text-mid">{r.role}</span>
                       <span className="text-[10px] text-text-light ml-auto">({r.resources.length})</span>
                     </div>
-                    {months.map((m) => (
-                      <FreeCell key={m} value={computeFree(r.resources, m)} />
-                    ))}
+                    {months.map((m) => {
+                      const free = computeFree(r.resources, m);
+                      const pDemand = potentialDemand[roleKey]?.[m] || 0;
+                      return <FreeCell key={m} value={includePotential ? Math.max(0, free - pDemand) : free} hasPotential={pDemand > 0 && includePotential} />;
+                    })}
                   </div>
-                  {/* Seniority rows */}
-                  {roleExpanded && r.seniorities.map((s) => (
-                    <div key={s.seniority} className="flex items-center border-b border-border-light/50 hover:bg-primary-bg/20">
-                      <div className="w-[270px] shrink-0 px-3 py-1 flex items-center gap-2 pl-14">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-bg text-text-mid font-mono">
-                          {SENIORITY_SHORT[s.seniority] || s.seniority}
-                        </span>
-                        <span className="text-[10px] text-text-light">{s.seniority}</span>
-                        <span className="text-[10px] text-text-light ml-auto">({s.resources.length})</span>
+                  {roleExpanded && r.seniorities.map((s) => {
+                    const senKey = `${d.domain}|${r.role}|${s.seniority}`;
+                    return (
+                      <div key={s.seniority} className="flex items-center border-b border-border-light/50 hover:bg-primary-bg/20">
+                        <div className="w-[270px] shrink-0 px-3 py-1 flex items-center gap-2 pl-14">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-bg text-text-mid font-mono">
+                            {SENIORITY_SHORT[s.seniority] || s.seniority}
+                          </span>
+                          <span className="text-[10px] text-text-light">{s.seniority}</span>
+                          <span className="text-[10px] text-text-light ml-auto">({s.resources.length})</span>
+                        </div>
+                        {months.map((m) => {
+                          const free = computeFree(s.resources, m);
+                          const pDemand = potentialDemand[senKey]?.[m] || 0;
+                          return <FreeCell key={m} value={includePotential ? Math.max(0, free - pDemand) : free} hasPotential={pDemand > 0 && includePotential} small />;
+                        })}
                       </div>
-                      {months.map((m) => (
-                        <FreeCell key={m} value={computeFree(s.resources, m)} small />
-                      ))}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })}
@@ -150,11 +188,20 @@ export default function FreeCapacity({ months, includePotential }) {
   );
 }
 
-function FreeCell({ value, small }) {
-  if (value === 0) {
+function FreeCell({ value, small, hasPotential }) {
+  if (value === 0 && !hasPotential) {
     return (
       <div className={`w-[82px] shrink-0 flex items-center justify-center font-mono text-text-light ${small ? 'text-[10px]' : 'text-[11px]'}`}>
         —
+      </div>
+    );
+  }
+
+  if (hasPotential) {
+    return (
+      <div className={`w-[82px] shrink-0 flex items-center justify-center font-mono font-semibold ${small ? 'text-[10px]' : 'text-[11px]'}`}
+        style={{ color: '#9CA3AF', backgroundColor: '#F3F4F6' }}>
+        {value.toFixed(2)}
       </div>
     );
   }

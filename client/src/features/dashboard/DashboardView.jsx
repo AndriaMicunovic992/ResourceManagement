@@ -27,11 +27,11 @@ export default function DashboardView() {
             onClick={() => setIncludePotential((v) => !v)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all active:scale-95 ${
               includePotential
-                ? 'bg-warning-bg text-warning border-warning-border'
+                ? 'bg-[#F0F2F5] text-[#6B7280] border-[#D1D5DB]'
                 : 'bg-white text-text-mid border-border hover:border-border-dark'
             }`}
           >
-            <span className={`w-2 h-2 rounded-full ${includePotential ? 'bg-warning' : 'bg-border'}`} />
+            <span className={`w-2 h-2 rounded-full ${includePotential ? 'bg-[#9CA3AF]' : 'bg-border'}`} />
             Include Potential
           </button>
           <TimeRangePicker timeRange={timeRange} onChange={setTimeRange}
