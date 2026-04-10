@@ -6,6 +6,7 @@ import CustomerForm from '../../../components/forms/CustomerForm';
 import ProjectForm from '../../../components/forms/ProjectForm';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
+import EntityFilter from './EntityFilter';
 
 const SORT_OPTIONS = [
   { value: 'name-asc', label: 'Name A–Z' },
@@ -15,7 +16,7 @@ const SORT_OPTIONS = [
   { value: 'oldest', label: 'Oldest' },
 ];
 
-export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange, showUnassignedOnly, onToggleUnassigned, customerSort, onCustomerSortChange }) {
+export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange, showUnassignedOnly, onToggleUnassigned, customerSort, onCustomerSortChange, filterIds, onFilterChange }) {
   const { customers, addCustomer, addProject } = useData();
   const { canEdit, currentOrg } = useOrg();
   const [showCustomerForm, setShowCustomerForm] = useState(false);
@@ -43,6 +44,7 @@ export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregati
         <span className={`w-2 h-2 rounded-full ${showUnassignedOnly ? 'bg-warning' : 'bg-border'}`} />
         Unassigned
       </button>
+      <EntityFilter selectedIds={filterIds} onChange={onFilterChange} />
       <select
         value={customerSort}
         onChange={(e) => onCustomerSortChange(e.target.value)}

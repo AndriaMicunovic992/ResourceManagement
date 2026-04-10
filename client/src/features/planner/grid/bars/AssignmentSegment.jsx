@@ -1,5 +1,5 @@
 import BarAvatar from './BarAvatar';
-import { firstName } from '../../../../lib/resourceUtils';
+import { shortName } from '../../../../lib/resourceUtils';
 import { CW } from '../../../../lib/constants';
 
 export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, onClick }) {
@@ -24,14 +24,14 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
         <>
           <BarAvatar name={resource.name} color={domainColor} size={18} />
           <span className="text-[9px] font-semibold truncate" style={{ color: domainColor }}>
-            {firstName(resource.name)}
+            {shortName(resource.name)}
           </span>
         </>
       )}
       <div className="flex-1" />
       <span className="text-[8px] font-mono px-0.5 rounded shrink-0"
         style={{ backgroundColor: domainColor + '15', color: domainColor }}>
-        {segment.fte.toFixed(1)}
+        {segment.fte.toFixed(2)}
       </span>
     </div>
   );

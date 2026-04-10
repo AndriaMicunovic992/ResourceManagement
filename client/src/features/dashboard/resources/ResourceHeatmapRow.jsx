@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import Avatar from '../../../components/ui/Avatar';
-import RoleBadge from '../../../components/badges/RoleBadge';
 import ResourceUtilCell from './ResourceUtilCell';
 import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import { utilColor } from '../../../lib/statusUtils';
@@ -29,13 +28,10 @@ export default function ResourceHeatmapRow({ resource, months, onClick }) {
     <div className="flex items-center border-b border-border-light cursor-pointer hover:bg-primary-bg/30"
       onClick={onClick}>
       <div className="w-[270px] shrink-0 px-3 py-2 flex items-center gap-2">
-        <Avatar name={resource.name} color={color} size={24} className="text-[10px]" />
+        <Avatar name={resource.name} color={color} size={28} className="text-[10px]" />
         <div className="flex-1 min-w-0">
           <div className="text-xs font-semibold text-text truncate">{resource.name}</div>
           <div className="text-[10px] font-mono" style={{ color: avgColor }}>{avgPct}% avg</div>
-        </div>
-        <div className="flex flex-wrap gap-0.5">
-          {resource.roles?.map((r, i) => <RoleBadge key={i} {...r} small />)}
         </div>
       </div>
       {months.map((m) => (

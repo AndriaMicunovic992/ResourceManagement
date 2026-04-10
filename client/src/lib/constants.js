@@ -15,3 +15,15 @@ export const BH = 28;  // Bar height
 export const RH = 42;  // Row height min
 
 export const ALL_ROLES = [...new Set(Object.values(DOMAINS).flatMap((d) => d.roles))];
+
+// FTE ↔ Hours conversion
+export const YEARLY_WORKING_DAYS = 260;
+export const MONTHLY_HOURS_PER_FTE = (YEARLY_WORKING_DAYS / 12) * 8; // ≈173.33
+
+export function fteToHours(fte) {
+  return Math.round(fte * MONTHLY_HOURS_PER_FTE * 100) / 100;
+}
+
+export function hoursToFte(hours) {
+  return Math.round((hours / MONTHLY_HOURS_PER_FTE) * 100) / 100;
+}

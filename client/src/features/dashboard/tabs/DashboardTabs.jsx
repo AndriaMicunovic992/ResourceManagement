@@ -5,7 +5,7 @@ export default function DashboardTabs({ activeTab, onChange }) {
   ];
 
   return (
-    <div className="flex gap-1 mb-6">
+    <div className="flex gap-1">
       {tabs.map((tab) => (
         <button key={tab.id} onClick={() => onChange(tab.id)}
           className={`px-5 py-2.5 text-sm font-semibold cursor-pointer border-0 rounded-t-lg transition ${

@@ -21,7 +21,7 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, onC
     >
       {needed > 0 && (
         <span className={`text-[9px] font-mono px-1 rounded border ${ok ? 'bg-success-bg text-success border-success-border' : 'bg-white text-text-mid border-border'}`}>
-          {filled.toFixed(1)}/{needed.toFixed(1)}
+          {filled.toFixed(2)}/{needed.toFixed(2)}
         </span>
       )}
     </div>
