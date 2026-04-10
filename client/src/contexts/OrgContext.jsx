@@ -33,10 +33,16 @@ export function OrgProvider({ children }) {
     window.location.reload();
   }, []);
 
+  const updateOrg = useCallback(async (data) => {
+    const updated = await api.updateOrg(data);
+    setCurrentOrg(updated);
+    return updated;
+  }, []);
+
   const canEdit = role !== 'viewer';
 
   return (
-    <OrgContext.Provider value={{ currentOrg, orgs, role, canEdit, loading, switchOrg }}>
+    <OrgContext.Provider value={{ currentOrg, orgs, role, canEdit, loading, switchOrg, updateOrg }}>
       {children}
     </OrgContext.Provider>
   );

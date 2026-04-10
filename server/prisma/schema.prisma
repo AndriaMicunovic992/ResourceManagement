@@ -8,11 +8,13 @@ datasource db {
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  minPlanningDate String?
+  maxPlanningDate String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   members     OrgMember[]
   customers   Customer[]

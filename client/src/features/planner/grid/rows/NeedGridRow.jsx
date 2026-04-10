@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import NeedCell from '../cells/NeedCell';
 import AssignmentBar from '../bars/AssignmentBar';
-import { computeNeedFulfillment, isNeedOk } from '../../../../lib/gridUtils';
+import { computeNeedFulfillment } from '../../../../lib/gridUtils';
 import { resourceMatchesNeed } from '../../../../lib/resourceUtils';
 import { monthRange } from '../../../../lib/dateUtils';
 import { CW } from '../../../../lib/constants';
 import { useData } from '../../../../contexts/DataContext';
 
-export default function NeedGridRow({ need, project, months, periods, heldResource, onCellClick, onBarClick }) {
+export default function NeedGridRow({ need, project, months, periods, heldResource, rowHeight, onCellClick, onBarClick }) {
   const { assignments, resources } = useData();
   const nf = useMemo(() => computeNeedFulfillment(need, assignments), [need, assignments]);
   const needMonths = useMemo(() => {
@@ -21,16 +21,12 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
     [assignments, need.id]);
 
   const canHeldPlace = heldResource && resourceMatchesNeed(heldResource, need);
-  const needsMore = !isNeedOk(need, assignments);
-  const barCount = visibleAssignments.length;
   const barH = 24;
   const barGap = 2;
-  // Add extra click space when a matching resource is held and the need isn't fully covered
-  const clickPad = canHeldPlace && needsMore ? barH + 8 : 0;
-  const rowHeight = Math.max(42, barCount * (barH + barGap) + 18 + clickPad);
+  const height = rowHeight || 42;
 
   return (
-    <div className="flex relative overflow-hidden" style={{ minHeight: rowHeight }}>
+    <div className="flex relative overflow-hidden" style={{ minHeight: height }}>
       {periods.map((p) => {
         const periodInRange = p.months.some((m) => needMonths.includes(m));
         // Aggregate needed/filled for the period

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import ResourcePool from './pool/ResourcePool';
 import PlannerToolbar from './toolbar/PlannerToolbar';
 import PlannerGrid from './grid/PlannerGrid';
@@ -8,10 +8,12 @@ import ProjectForm from '../../components/forms/ProjectForm';
 import NeedForm from '../../components/forms/NeedForm';
 import EmptyState from '../../components/ui/EmptyState';
 import { useData } from '../../contexts/DataContext';
+import { useOrg } from '../../contexts/OrgContext';
 import { currentMonth, addMonths } from '../../lib/dateUtils';
 
 export default function PlannerView() {
   const { customers, needs, assignments, updateCustomer, deleteCustomer, updateProject, deleteProject, addNeed, updateNeed, deleteNeed, upsertAssignment } = useData();
+  const { currentOrg } = useOrg();
 
   const [heldResource, setHeldResource] = useState(null);
   const [popover, setPopover] = useState(null);
@@ -19,6 +21,18 @@ export default function PlannerView() {
   const [aggregation, setAggregation] = useState('M');
   const [editModal, setEditModal] = useState(null);
   const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
+  const [customerSort, setCustomerSort] = useState('name-asc');
+
+  // Clamp timeRange when org planning limits change
+  useEffect(() => {
+    const minDate = currentOrg?.minPlanningDate;
+    const maxDate = currentOrg?.maxPlanningDate;
+    if (!minDate && !maxDate) return;
+    setTimeRange((prev) => ({
+      start: minDate && prev.start < minDate ? minDate : prev.start,
+      end: maxDate && prev.end > maxDate ? maxDate : prev.end,
+    }));
+  }, [currentOrg?.minPlanningDate, currentOrg?.maxPlanningDate]);
 
   const handleCellClick = useCallback((need, month, periodMonths, e) => {
     if (heldResource) {
@@ -122,13 +136,14 @@ export default function PlannerView() {
           aggregation={aggregation} onAggregationChange={setAggregation}
           showUnassignedOnly={showUnassignedOnly}
           onToggleUnassigned={() => setShowUnassignedOnly((v) => !v)}
+          customerSort={customerSort} onCustomerSortChange={setCustomerSort}
         />
         {customers.length === 0 ? (
           <EmptyState icon="📅" message="Create a customer to start planning" />
         ) : (
           <PlannerGrid
             heldResource={heldResource} timeRange={timeRange} aggregation={aggregation}
-            showUnassignedOnly={showUnassignedOnly}
+            showUnassignedOnly={showUnassignedOnly} customerSort={customerSort}
             onCellClick={handleCellClick} onBarClick={handleBarClick}
             onEditCustomer={handleEditCustomer} onDeleteCustomer={handleDeleteCustomer}
             onEditProject={handleEditProject} onDeleteProject={handleDeleteProject}
