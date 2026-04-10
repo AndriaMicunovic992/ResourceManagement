@@ -18,6 +18,7 @@ export default function PlannerView() {
   const [timeRange, setTimeRange] = useState({ start: currentMonth(), end: addMonths(currentMonth(), 11) });
   const [aggregation, setAggregation] = useState('M');
   const [editModal, setEditModal] = useState(null);
+  const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 
   const handleCellClick = useCallback((need, month, periodMonths, e) => {
     if (heldResource) {
@@ -119,12 +120,15 @@ export default function PlannerView() {
         <PlannerToolbar
           timeRange={timeRange} onTimeRangeChange={setTimeRange}
           aggregation={aggregation} onAggregationChange={setAggregation}
+          showUnassignedOnly={showUnassignedOnly}
+          onToggleUnassigned={() => setShowUnassignedOnly((v) => !v)}
         />
         {customers.length === 0 ? (
           <EmptyState icon="📅" message="Create a customer to start planning" />
         ) : (
           <PlannerGrid
             heldResource={heldResource} timeRange={timeRange} aggregation={aggregation}
+            showUnassignedOnly={showUnassignedOnly}
             onCellClick={handleCellClick} onBarClick={handleBarClick}
             onEditCustomer={handleEditCustomer} onDeleteCustomer={handleDeleteCustomer}
             onEditProject={handleEditProject} onDeleteProject={handleDeleteProject}

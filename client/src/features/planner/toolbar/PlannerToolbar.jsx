@@ -7,7 +7,7 @@ import ProjectForm from '../../../components/forms/ProjectForm';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
 
-export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange }) {
+export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange, showUnassignedOnly, onToggleUnassigned }) {
   const { customers, addCustomer, addProject } = useData();
   const { canEdit } = useOrg();
   const [showCustomerForm, setShowCustomerForm] = useState(false);
@@ -24,6 +24,17 @@ export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregati
         </>
       )}
       <div className="flex-1" />
+      <button
+        onClick={onToggleUnassigned}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all active:scale-95 ${
+          showUnassignedOnly
+            ? 'bg-warning-bg text-warning border-warning-border'
+            : 'bg-white text-text-mid border-border hover:border-border-dark'
+        }`}
+      >
+        <span className={`w-2 h-2 rounded-full ${showUnassignedOnly ? 'bg-warning' : 'bg-border'}`} />
+        Unassigned
+      </button>
       <TimeRangePicker timeRange={timeRange} onChange={onTimeRangeChange} />
       <AggregationToggle value={aggregation} onChange={onAggregationChange} />
 

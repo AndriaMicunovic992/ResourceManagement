@@ -1,19 +1,15 @@
 import { useMemo } from 'react';
 import { CW } from '../../../../lib/constants';
 import { monthRange } from '../../../../lib/dateUtils';
-import { isProjectOk } from '../../../../lib/gridUtils';
-import { useData } from '../../../../contexts/DataContext';
 
 export default function ProjectGridRow({ project, periods }) {
-  const { needs, assignments } = useData();
-  const ok = useMemo(() => isProjectOk(project, needs, assignments), [project, needs, assignments]);
   const projMonths = useMemo(() => monthRange(project.startMonth, project.endMonth), [project]);
 
   return (
     <div className="flex h-[34px]">
       {periods.map((p) => {
         const inRange = p.months.some((m) => projMonths.includes(m));
-        const bg = inRange ? (ok ? '#EAFAF008' : '#F8FBFC') : 'transparent';
+        const bg = inRange ? '#F8FBFC' : 'transparent';
         return <div key={p.label} className="shrink-0 border-r border-border-light" style={{ width: p.months.length * CW, background: bg }} />;
       })}
     </div>

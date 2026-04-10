@@ -25,7 +25,7 @@ export default function StatsCards() {
     }
     const utilPct = totalCapacity > 0 ? Math.round((totalRealisedFte / totalCapacity) * 100) : 0;
 
-    // Unfilled need-month pairs (realised only)
+    // Unfilled needs (realised only) — a need counts as unfilled if any month isn't fully staffed
     let unfilled = 0;
     for (const n of needs) {
       if (n.status !== 'realised') continue;
@@ -34,10 +34,11 @@ export default function StatsCards() {
       const customer = customers.find((c) => c.id === project.customerId);
       if (!customer || customer.status !== 'realised') continue;
       const allocs = n.monthAllocations || {};
-      for (const [m, needed] of Object.entries(allocs)) {
+      const hasUnfilledMonth = Object.entries(allocs).some(([m, needed]) => {
         const filled = nF[n.id]?.[m]?.filled || 0;
-        if (needed > 0 && filled < needed) unfilled++;
-      }
+        return needed > 0 && filled < needed;
+      });
+      if (hasUnfilledMonth) unfilled++;
     }
 
     return { activeProjects, teamSize, utilPct, unfilled };
