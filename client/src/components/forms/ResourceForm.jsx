@@ -35,7 +35,7 @@ export default function ResourceForm({ initial, onSave, onClose }) {
                 const n = parseFloat(e.target.value);
                 if (!isNaN(n)) setCapacityHours(fteToHours(n));
               }}
-              className="w-20 px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary font-mono" />
+              className="w-24 px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary font-mono" />
             <span className="text-[10px] text-text-light">FTE</span>
           </div>
           <div className="flex items-center gap-2 mt-1.5">
@@ -45,7 +45,7 @@ export default function ResourceForm({ initial, onSave, onClose }) {
                 const n = parseFloat(e.target.value);
                 if (!isNaN(n)) setCapacity(hoursToFte(n));
               }}
-              className="w-20 px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary font-mono" />
+              className="w-24 px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary font-mono" />
             <span className="text-[10px] text-text-light">hours / month</span>
           </div>
         </Field>
