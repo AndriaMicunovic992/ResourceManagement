@@ -2,6 +2,7 @@ export default function DashboardTabs({ activeTab, onChange }) {
   const tabs = [
     { id: 'clients', icon: '🏢', label: 'Client Overview' },
     { id: 'resources', icon: '👤', label: 'Resource Capacity' },
+    { id: 'free', icon: '📊', label: 'Free Capacity' },
   ];
 
   return (
