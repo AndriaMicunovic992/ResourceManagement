@@ -103,6 +103,9 @@ export default function FreeCapacity({ months, includePotential }) {
     );
   }
 
+  // Total free capacity per month (all resources, deduplicated)
+  const allResourceIds = useMemo(() => [...new Set(resources.map((r) => r.id))], [resources]);
+
   return (
     <div className="bg-white rounded-xl border border-border shadow-card overflow-auto">
       <h3 className="text-base font-bold text-text px-5 pt-4 pb-2">Free Capacity (FTE)</h3>
@@ -184,6 +187,22 @@ export default function FreeCapacity({ months, includePotential }) {
           </div>
         );
       })}
+      {/* Totals row */}
+      <div className="flex items-center border-t-2 border-border bg-primary-bg/30 sticky bottom-0">
+        <div className="w-[270px] shrink-0 px-3 py-2">
+          <span className="text-xs font-bold text-text">Total Free</span>
+        </div>
+        {months.map((m) => {
+          const free = computeFree(allResourceIds, m);
+          const totalPDemand = Object.values(potentialDemand).reduce((s, dm) => s + (dm[m] || 0), 0);
+          const val = includePotential ? Math.max(0, free - totalPDemand) : free;
+          return (
+            <div key={m} className="w-[82px] shrink-0 flex items-center justify-center text-[11px] font-mono font-bold text-primary">
+              {val > 0 ? val.toFixed(1) : '—'}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
