@@ -10,7 +10,7 @@ export default function HeatmapCell({ value, showDash, totalFilled, isPotential 
   }
 
   const pct = Math.round(value * 100);
-  const filledStr = totalFilled > 0 ? totalFilled.toFixed(1) : null;
+  const filledStr = (totalFilled != null) ? totalFilled.toFixed(1) : null;
 
   // Potential cells: grey
   if (isPotential) {
@@ -18,7 +18,10 @@ export default function HeatmapCell({ value, showDash, totalFilled, isPotential 
       <div className="w-[82px] shrink-0 flex items-center justify-center gap-1 py-0.5"
         style={{ backgroundColor: '#F3F4F6' }}>
         <span className="text-[11px] font-mono font-semibold" style={{ color: '#9CA3AF' }}>{pct}%</span>
-        {filledStr && <span className="text-[11px] font-mono" style={{ color: '#9CA3AF' }}>{filledStr}</span>}
+        {filledStr && <>
+          <span className="text-[9px]" style={{ color: '#D1D5DB' }}>|</span>
+          <span className="text-[11px] font-mono" style={{ color: '#9CA3AF' }}>{filledStr}</span>
+        </>}
       </div>
     );
   }
@@ -31,7 +34,10 @@ export default function HeatmapCell({ value, showDash, totalFilled, isPotential 
     <div className="w-[82px] shrink-0 flex items-center justify-center gap-1 py-0.5"
       style={{ backgroundColor: bg }}>
       <span className="text-[11px] font-mono font-semibold" style={{ color }}>{pct}%</span>
-      {filledStr && <span className="text-[11px] font-mono" style={{ color: fteColor }}>{filledStr}</span>}
+      {filledStr && <>
+        <span className="text-[9px]" style={{ color: color + '60' }}>|</span>
+        <span className="text-[11px] font-mono" style={{ color: fteColor }}>{filledStr}</span>
+      </>}
     </div>
   );
 }
