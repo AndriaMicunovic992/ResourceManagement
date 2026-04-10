@@ -78,11 +78,12 @@ export default function PlannerView() {
     });
   }, [heldResource, assignments, upsertAssignment]);
 
-  const handleBarClick = useCallback((assignment, segment, e) => {
+  const handleBarClick = useCallback((assignment, segment, clickedMonth, e) => {
     const need = needs.find((n) => n.id === assignment.needId);
     const needAllocs = need?.monthAllocations || {};
-    const month = segment.months[0];
+    const month = clickedMonth;
     const needed = needAllocs[month] || 1;
+    const currentFte = (assignment.monthAllocations || {})[month] || segment.fte;
 
     // maxFte = need requirement minus other assignments' FTE for this month
     const otherFilled = assignments
@@ -97,8 +98,8 @@ export default function PlannerView() {
       needId: assignment.needId,
       resourceId: assignment.resourceId,
       month,
-      months: segment.months,
-      currentFte: segment.fte,
+      months: [month],
+      currentFte,
       maxFte,
       type: 'edit',
     });

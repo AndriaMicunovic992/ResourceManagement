@@ -55,7 +55,7 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
           <div key={a.id} className="absolute left-0 right-0" style={{ top: idx * (barH + barGap) + 2 }}>
             <AssignmentBar
               assignment={a} need={need} resource={resource} months={months}
-              onClickSegment={(seg, e) => onBarClick(a, seg, e)}
+              onClickSegment={(seg, month, e) => onBarClick(a, seg, month, e)}
             />
           </div>
         );
