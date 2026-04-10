@@ -21,6 +21,7 @@ export default function PlannerView() {
   const [aggregation, setAggregation] = useState('M');
   const [editModal, setEditModal] = useState(null);
   const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
+  const [customerSort, setCustomerSort] = useState('name-asc');
 
   // Clamp timeRange when org planning limits change
   useEffect(() => {
@@ -135,13 +136,14 @@ export default function PlannerView() {
           aggregation={aggregation} onAggregationChange={setAggregation}
           showUnassignedOnly={showUnassignedOnly}
           onToggleUnassigned={() => setShowUnassignedOnly((v) => !v)}
+          customerSort={customerSort} onCustomerSortChange={setCustomerSort}
         />
         {customers.length === 0 ? (
           <EmptyState icon="📅" message="Create a customer to start planning" />
         ) : (
           <PlannerGrid
             heldResource={heldResource} timeRange={timeRange} aggregation={aggregation}
-            showUnassignedOnly={showUnassignedOnly}
+            showUnassignedOnly={showUnassignedOnly} customerSort={customerSort}
             onCellClick={handleCellClick} onBarClick={handleBarClick}
             onEditCustomer={handleEditCustomer} onDeleteCustomer={handleDeleteCustomer}
             onEditProject={handleEditProject} onDeleteProject={handleDeleteProject}

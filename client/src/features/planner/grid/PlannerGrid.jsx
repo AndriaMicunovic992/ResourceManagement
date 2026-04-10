@@ -12,13 +12,28 @@ import { LW } from '../../../lib/constants';
 const BAR_H = 24;
 const BAR_GAP = 2;
 
-export default function PlannerGrid({ heldResource, timeRange, aggregation, showUnassignedOnly, onCellClick, onBarClick, onEditCustomer, onDeleteCustomer, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed }) {
+const STATUS_ORDER = { realised: 0, potential: 1 };
+
+function sortCustomers(customers, sort) {
+  const sorted = [...customers];
+  switch (sort) {
+    case 'name-asc': return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case 'name-desc': return sorted.sort((a, b) => b.name.localeCompare(a.name));
+    case 'status': return sorted.sort((a, b) => (STATUS_ORDER[a.status] ?? 2) - (STATUS_ORDER[b.status] ?? 2) || a.name.localeCompare(b.name));
+    case 'newest': return sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    case 'oldest': return sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    default: return sorted;
+  }
+}
+
+export default function PlannerGrid({ heldResource, timeRange, aggregation, showUnassignedOnly, customerSort, onCellClick, onBarClick, onEditCustomer, onDeleteCustomer, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed }) {
   const { customers, projects, needs, assignments } = useData();
   const { canEdit } = useOrg();
 
   const months = useMemo(() => monthRange(timeRange.start, timeRange.end), [timeRange]);
   const periods = useMemo(() => computePeriods(months, aggregation), [months, aggregation]);
-  const allRows = useMemo(() => buildRows(customers, projects, needs), [customers, projects, needs]);
+  const sortedCustomers = useMemo(() => sortCustomers(customers, customerSort), [customers, customerSort]);
+  const allRows = useMemo(() => buildRows(sortedCustomers, projects, needs), [sortedCustomers, projects, needs]);
 
   const rows = useMemo(() => {
     if (!showUnassignedOnly) return allRows;

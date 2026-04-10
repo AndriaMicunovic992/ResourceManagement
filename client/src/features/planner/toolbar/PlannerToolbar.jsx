@@ -7,7 +7,15 @@ import ProjectForm from '../../../components/forms/ProjectForm';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
 
-export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange, showUnassignedOnly, onToggleUnassigned }) {
+const SORT_OPTIONS = [
+  { value: 'name-asc', label: 'Name A–Z' },
+  { value: 'name-desc', label: 'Name Z–A' },
+  { value: 'status', label: 'Status' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+];
+
+export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange, showUnassignedOnly, onToggleUnassigned, customerSort, onCustomerSortChange }) {
   const { customers, addCustomer, addProject } = useData();
   const { canEdit, currentOrg } = useOrg();
   const [showCustomerForm, setShowCustomerForm] = useState(false);
@@ -35,6 +43,15 @@ export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregati
         <span className={`w-2 h-2 rounded-full ${showUnassignedOnly ? 'bg-warning' : 'bg-border'}`} />
         Unassigned
       </button>
+      <select
+        value={customerSort}
+        onChange={(e) => onCustomerSortChange(e.target.value)}
+        className="px-2 py-1.5 rounded-lg text-[11px] font-semibold border border-border bg-white text-text-mid outline-none focus:border-primary cursor-pointer"
+      >
+        {SORT_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
       <TimeRangePicker timeRange={timeRange} onChange={onTimeRangeChange}
         minDate={currentOrg?.minPlanningDate} maxDate={currentOrg?.maxPlanningDate} />
       <AggregationToggle value={aggregation} onChange={onAggregationChange} />
