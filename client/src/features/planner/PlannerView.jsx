@@ -21,33 +21,49 @@ export default function PlannerView() {
 
   const handleCellClick = useCallback((need, month, periodMonths, e) => {
     if (heldResource) {
-      // Auto-assign resource to ALL need months with smart default FTE
       const needAllocs = need.monthAllocations || {};
       const needMonths = Object.keys(needAllocs).sort();
       if (needMonths.length === 0) return;
 
-      // Skip if already assigned
       const existing = assignments.find((a) => a.needId === need.id && a.resourceId === heldResource.id);
-      if (existing) return;
 
+      if (existing) {
+        // Already assigned — open popover to edit THIS month's FTE
+        const rect = e.currentTarget.getBoundingClientRect();
+        const currentMonthFte = (existing.monthAllocations || {})[month] || 0;
+        const needed = needAllocs[month] || 1;
+        const otherFilled = assignments
+          .filter((a) => a.needId === need.id && a.id !== existing.id)
+          .reduce((s, a) => s + ((a.monthAllocations || {})[month] || 0), 0);
+        setPopover({
+          x: rect.left, y: rect.bottom + 4,
+          needId: need.id, resourceId: heldResource.id,
+          month, months: periodMonths,
+          currentFte: currentMonthFte,
+          maxFte: Math.max(0.01, needed - otherFilled),
+          type: 'edit',
+        });
+        return;
+      }
+
+      // New assignment: compute per-month FTE to handle variable need
       const needAssigns = assignments.filter((a) => a.needId === need.id);
       const resourceAssigns = assignments.filter((a) => a.resourceId === heldResource.id);
-
-      // Compute smart default FTE: min across all months of min(gap, resource capacity)
-      let minAvail = Infinity;
+      const monthAllocations = {};
+      let hasAny = false;
       for (const m of needMonths) {
         const needed = needAllocs[m] || 0;
         const filled = needAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
         const gap = needed - filled;
         const resourceUsed = resourceAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
         const cap = Math.max(0, 1.0 - resourceUsed);
-        minAvail = Math.min(minAvail, gap, cap);
+        const fte = Math.round(Math.max(0, Math.min(gap, cap)) * 100) / 100;
+        monthAllocations[m] = fte;
+        if (fte > 0) hasAny = true;
       }
+      if (!hasAny) return;
 
-      const fte = Math.max(0.01, Math.round(Math.min(minAvail, needAllocs[needMonths[0]] || 1) * 100) / 100);
-      if (minAvail <= 0) return;
-
-      upsertAssignment({ needId: need.id, resourceId: heldResource.id, fte });
+      upsertAssignment({ needId: need.id, resourceId: heldResource.id, monthAllocations });
       return;
     }
 
@@ -139,6 +155,7 @@ export default function PlannerView() {
           x={popover.x} y={popover.y}
           maxFte={popover.maxFte} currentFte={popover.currentFte}
           title={popover.type === 'editNeed' ? 'Need FTE (max 2.0)' : undefined}
+          showRemove={popover.type === 'edit'}
           onSave={handleFteSave} onClose={() => setPopover(null)}
         />
       )}

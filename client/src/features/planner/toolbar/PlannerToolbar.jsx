@@ -19,8 +19,7 @@ export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregati
         <>
           <Button onClick={() => setShowCustomerForm(true)}>+ Customer</Button>
           {customers.length > 0 && (
-            <Button onClick={() => setShowProjectForm(true)}
-              className="bg-[#6366f1] hover:bg-[#5558e8]">+ Project</Button>
+            <Button onClick={() => setShowProjectForm(true)}>+ Project</Button>
           )}
         </>
       )}

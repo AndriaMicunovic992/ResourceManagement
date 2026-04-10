@@ -10,11 +10,10 @@ export default function ProjectLabel({ project, customer, onEdit, onDelete, onAd
   const ok = useMemo(() => isProjectOk(project, needs, assignments), [project, needs, assignments]);
   const hasNeeds = needs.some((n) => n.projectId === project.id);
   const isPotential = customer.status === 'potential' || project.status === 'potential';
-  const borderColor = ok ? '#5BC68A80' : hasNeeds ? '#F5A62380' : isPotential ? '#F5A62380' : '#D8E8EF';
-  const bg = ok ? '#EAFAF0' : 'transparent';
+  const borderColor = isPotential ? '#F5A62330' : '#D8E8EF';
 
   return (
-    <div className="group flex items-center gap-1.5 h-[34px]" style={{ paddingLeft: 28, borderLeft: `4px solid ${borderColor}`, background: bg, opacity: isPotential ? 0.7 : 1 }}>
+    <div className="group flex items-center gap-1.5 h-[34px]" style={{ paddingLeft: 28, borderLeft: `4px solid ${borderColor}`, opacity: isPotential ? 0.7 : 1 }}>
       {(ok || hasNeeds) && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ok ? 'bg-success' : 'bg-warning'}`} />}
       <span className="text-xs font-semibold text-text-mid truncate flex-1">{project.name}</span>
       <span className="text-[9px] font-mono text-text-light mr-1">{formatMonth(project.startMonth)}</span>
