@@ -144,28 +144,24 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
         </>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-2">
-            <div className="flex-1">
-              <FteRow
-                label="Assignment" value={value} hours={hours} maxFte={maxFte}
-                onFteChange={handleFteChange} onHoursChange={handleHoursChange}
-                onKeyDown={handleKeyDown} onSave={() => onSave(parseFloat(value))}
-                inputRef={inputRef} accent
-              />
-            </div>
-            <div className="flex flex-col gap-1 pt-4">
-              {showRemove && (
-                <button onClick={() => { if (onRemove) onRemove(); else onSave(0); }}
-                  className="px-2 py-1 text-danger text-[10px] font-semibold cursor-pointer border border-danger/30 bg-white rounded-lg hover:bg-danger-bg active:scale-95 transition">
-                  Remove
-                </button>
-              )}
-              <button onClick={onClose}
-                className="px-2 py-1 text-text-mid text-xs cursor-pointer border-0 bg-transparent hover:text-danger">
-                ✕
+          <div className="flex items-center justify-end gap-2 -mt-1 -mr-1">
+            {showRemove && (
+              <button onClick={() => { if (onRemove) onRemove(); else onSave(0); }}
+                className="px-2 py-0.5 text-danger text-[10px] font-semibold cursor-pointer border border-danger/30 bg-white rounded-lg hover:bg-danger-bg active:scale-95 transition">
+                Remove
               </button>
-            </div>
+            )}
+            <button onClick={onClose}
+              className="px-1.5 py-0.5 text-text-mid text-xs cursor-pointer border-0 bg-transparent hover:text-danger">
+              ✕
+            </button>
           </div>
+          <FteRow
+            label="Assignment" value={value} hours={hours} maxFte={maxFte}
+            onFteChange={handleFteChange} onHoursChange={handleHoursChange}
+            onKeyDown={handleKeyDown} onSave={() => onSave(parseFloat(value))}
+            inputRef={inputRef} accent
+          />
           <div className="border-t border-border-light pt-2">
             <FteRow
               label="Need" value={needValue} hours={needHours} maxFte={2.0}
