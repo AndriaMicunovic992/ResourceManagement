@@ -4,14 +4,15 @@ import NeedLabel from './NeedLabel';
 import EmptyProjectLabel from './EmptyProjectLabel';
 import { LW } from '../../../../lib/constants';
 
-export default function LabelColumn({ rows, onEditCustomer, onDeleteCustomer, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, canEdit, needHeights }) {
+export default function LabelColumn({ rows, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, canEdit, needHeights }) {
   return (
     <div className="sticky left-0 z-[5] bg-[#FAFBFD]" style={{ width: LW, minWidth: LW }}>
       <div style={{ height: 38 }} /> {/* spacer for header (36px + 2px border) */}
       {rows.map((row, i) => {
         if (row.type === 'customer') {
           return <CustomerLabel key={`c-${row.data.id}`} customer={row.data}
-            index={i} onEdit={() => onEditCustomer(row.data)} onDelete={() => onDeleteCustomer(row.data.id)} canEdit={canEdit} />;
+            index={i} onEdit={() => onEditCustomer(row.data)} onDelete={() => onDeleteCustomer(row.data.id)}
+            onAddProject={() => onAddProject(row.data)} canEdit={canEdit} />;
         }
         if (row.type === 'project') {
           return <ProjectLabel key={`p-${row.data.id}`} project={row.data} customer={row.customer}

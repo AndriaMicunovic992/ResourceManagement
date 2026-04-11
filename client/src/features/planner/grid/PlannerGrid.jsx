@@ -26,7 +26,7 @@ function sortCustomers(customers, sort) {
   }
 }
 
-export default function PlannerGrid({ heldResource, timeRange, aggregation, showUnassignedOnly, customerSort, filterIds, onCellClick, onBarClick, onEditCustomer, onDeleteCustomer, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed }) {
+export default function PlannerGrid({ heldResource, timeRange, aggregation, showUnassignedOnly, customerSort, filterIds, onCellClick, onBarClick, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed }) {
   const { customers, projects, needs, assignments } = useData();
   const { canEdit } = useOrg();
 
@@ -95,7 +95,7 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
       <LabelColumn
         rows={rows} canEdit={canEdit} needHeights={needHeights}
         onEditCustomer={onEditCustomer} onDeleteCustomer={onDeleteCustomer}
-        onEditProject={onEditProject} onDeleteProject={onDeleteProject}
+        onAddProject={onAddProject} onEditProject={onEditProject} onDeleteProject={onDeleteProject}
         onAddNeed={onAddNeed} onEditNeed={onEditNeed} onDeleteNeed={onDeleteNeed}
       />
       <div className="flex-1 min-w-0">
