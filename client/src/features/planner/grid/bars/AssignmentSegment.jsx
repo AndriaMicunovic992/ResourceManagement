@@ -4,6 +4,7 @@ import { CW } from '../../../../lib/constants';
 
 export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, onClickMonth }) {
   const width = segment.months.length * CW;
+  const hasLeftSeparator = !isFirst && totalSegments > 1;
 
   return (
     <div
@@ -14,11 +15,15 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
         backgroundColor: domainColor + '18',
         borderTop: `1.5px solid ${domainColor}40`,
         borderBottom: `1.5px solid ${domainColor}40`,
-        borderLeft: isFirst ? `1.5px solid ${domainColor}40` : `1px dashed ${domainColor}35`,
+        borderLeft: isFirst ? `1.5px solid ${domainColor}40` : 'none',
         borderRight: isLast ? `1.5px solid ${domainColor}40` : 'none',
         borderRadius: isFirst && isLast ? 12 : isFirst ? '12px 0 0 12px' : isLast ? '0 12px 12px 0' : 0,
       }}
     >
+      {/* Segment separator line */}
+      {hasLeftSeparator && (
+        <div className="absolute left-0 top-[3px] bottom-[3px] w-[1px]" style={{ backgroundColor: domainColor + '40' }} />
+      )}
       {/* Per-month click zones */}
       {segment.months.map((m, mi) => (
         <div
