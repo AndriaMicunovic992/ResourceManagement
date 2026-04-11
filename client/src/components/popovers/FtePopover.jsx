@@ -1,9 +1,51 @@
 import { useState, useEffect, useRef } from 'react';
 import { fteToHours, hoursToFte } from '../../lib/constants';
 
-export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, showRemove, onSave, onRemove, onClose }) {
+function FteRow({ label, value, hours, maxFte, onFteChange, onHoursChange, onKeyDown, onSave, inputRef, accent }) {
+  const bg = accent ? 'bg-primary' : 'bg-text-mid';
+  return (
+    <div>
+      <div className="text-[10px] font-semibold text-text-mid mb-1">
+        {label}{maxFte != null && ` (max ${maxFte.toFixed(1)})`}
+      </div>
+      <div className="flex gap-2 items-center">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1">
+            <input
+              ref={inputRef}
+              type="number" step="0.01" min="0" max={maxFte}
+              value={value}
+              onChange={onFteChange}
+              onKeyDown={onKeyDown}
+              className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
+            />
+            <span className="text-[10px] text-text-light">FTE</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <input
+              type="number" step="1" min="0"
+              value={hours}
+              onChange={onHoursChange}
+              onKeyDown={onKeyDown}
+              className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
+            />
+            <span className="text-[10px] text-text-light">h/mo</span>
+          </div>
+        </div>
+        <button onClick={onSave}
+          className={`px-3 py-1 ${bg} text-white rounded-lg text-xs font-bold cursor-pointer border-0 hover:opacity-90 active:scale-95 transition`}>
+          Set
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, showRemove, showNeedEdit, needFte, onSave, onSaveNeed, onRemove, onClose }) {
   const [value, setValue] = useState(currentFte || 0.5);
   const [hours, setHours] = useState(fteToHours(currentFte || 0.5));
+  const [needValue, setNeedValue] = useState(needFte || 0.5);
+  const [needHours, setNeedHours] = useState(fteToHours(needFte || 0.5));
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -25,8 +67,27 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
     if (!isNaN(n)) setValue(hoursToFte(n));
   };
 
+  const handleNeedFteChange = (e) => {
+    const v = e.target.value;
+    setNeedValue(v);
+    const n = parseFloat(v);
+    if (!isNaN(n)) setNeedHours(fteToHours(n));
+  };
+
+  const handleNeedHoursChange = (e) => {
+    const v = e.target.value;
+    setNeedHours(v);
+    const n = parseFloat(v);
+    if (!isNaN(n)) setNeedValue(hoursToFte(n));
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') { e.preventDefault(); onSave(parseFloat(value)); }
+    if (e.key === 'Escape') onClose();
+  };
+
+  const handleNeedKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); onSaveNeed?.(parseFloat(needValue)); }
     if (e.key === 'Escape') onClose();
   };
 
@@ -36,48 +97,84 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
       style={{ left: x, top: y }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="text-[10px] font-semibold text-text-mid mb-2">
-        {title || `FTE (max ${maxFte.toFixed(1)})`}
-      </div>
-      <div className="flex gap-2 items-center">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-1">
-            <input
-              ref={inputRef}
-              type="number" step="0.01" min="0" max={maxFte}
-              value={value}
-              onChange={handleFteChange}
-              onKeyDown={handleKeyDown}
-              className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
-            />
-            <span className="text-[10px] text-text-light">FTE</span>
+      {!showNeedEdit ? (
+        <>
+          <div className="text-[10px] font-semibold text-text-mid mb-2">
+            {title || `FTE (max ${maxFte.toFixed(1)})`}
           </div>
-          <div className="flex items-center gap-1">
-            <input
-              type="number" step="1" min="0"
-              value={hours}
-              onChange={handleHoursChange}
-              onKeyDown={handleKeyDown}
-              className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
+          <div className="flex gap-2 items-center">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1">
+                <input
+                  ref={inputRef}
+                  type="number" step="0.01" min="0" max={maxFte}
+                  value={value}
+                  onChange={handleFteChange}
+                  onKeyDown={handleKeyDown}
+                  className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
+                />
+                <span className="text-[10px] text-text-light">FTE</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number" step="1" min="0"
+                  value={hours}
+                  onChange={handleHoursChange}
+                  onKeyDown={handleKeyDown}
+                  className="w-20 px-2 py-1 border border-border rounded-lg text-sm font-mono text-text outline-none focus:border-primary"
+                />
+                <span className="text-[10px] text-text-light">h/mo</span>
+              </div>
+            </div>
+            <button onClick={() => onSave(parseFloat(value))}
+              className="px-3 py-1 bg-primary text-white rounded-lg text-xs font-bold cursor-pointer border-0 hover:opacity-90 active:scale-95 transition">
+              Set
+            </button>
+            {showRemove && (
+              <button onClick={() => { if (onRemove) onRemove(); else onSave(0); }}
+                className="px-2 py-1 text-danger text-xs font-semibold cursor-pointer border border-danger/30 bg-white rounded-lg hover:bg-danger-bg active:scale-95 transition">
+                Remove
+              </button>
+            )}
+            <button onClick={onClose}
+              className="px-2 py-1 text-text-mid text-xs cursor-pointer border-0 bg-transparent hover:text-danger">
+              ✕
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <FteRow
+                label="Assignment" value={value} hours={hours} maxFte={maxFte}
+                onFteChange={handleFteChange} onHoursChange={handleHoursChange}
+                onKeyDown={handleKeyDown} onSave={() => onSave(parseFloat(value))}
+                inputRef={inputRef} accent
+              />
+            </div>
+            <div className="flex flex-col gap-1 pt-4">
+              {showRemove && (
+                <button onClick={() => { if (onRemove) onRemove(); else onSave(0); }}
+                  className="px-2 py-1 text-danger text-[10px] font-semibold cursor-pointer border border-danger/30 bg-white rounded-lg hover:bg-danger-bg active:scale-95 transition">
+                  Remove
+                </button>
+              )}
+              <button onClick={onClose}
+                className="px-2 py-1 text-text-mid text-xs cursor-pointer border-0 bg-transparent hover:text-danger">
+                ✕
+              </button>
+            </div>
+          </div>
+          <div className="border-t border-border-light pt-2">
+            <FteRow
+              label="Need" value={needValue} hours={needHours} maxFte={2.0}
+              onFteChange={handleNeedFteChange} onHoursChange={handleNeedHoursChange}
+              onKeyDown={handleNeedKeyDown} onSave={() => onSaveNeed?.(parseFloat(needValue))}
             />
-            <span className="text-[10px] text-text-light">h/mo</span>
           </div>
         </div>
-        <button onClick={() => onSave(parseFloat(value))}
-          className="px-3 py-1 bg-primary text-white rounded-lg text-xs font-bold cursor-pointer border-0 hover:opacity-90 active:scale-95 transition">
-          Set
-        </button>
-        {showRemove && (
-          <button onClick={() => { if (onRemove) onRemove(); else onSave(0); }}
-            className="px-2 py-1 text-danger text-xs font-semibold cursor-pointer border border-danger/30 bg-white rounded-lg hover:bg-danger-bg active:scale-95 transition">
-            Remove
-          </button>
-        )}
-        <button onClick={onClose}
-          className="px-2 py-1 text-text-mid text-xs cursor-pointer border-0 bg-transparent hover:text-danger">
-          ✕
-        </button>
-      </div>
+      )}
     </div>
   );
 }

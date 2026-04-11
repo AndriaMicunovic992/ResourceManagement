@@ -100,6 +100,7 @@ export default function PlannerView() {
       month,
       months: [month],
       currentFte,
+      needFte: needed,
       maxFte,
       type: 'edit',
     });
@@ -118,6 +119,12 @@ export default function PlannerView() {
       for (const m of months) monthAllocs[m] = fte;
       await updateNeed(popover.needId, { monthAllocations: monthAllocs });
     }
+    setPopover(null);
+  };
+
+  const handleNeedFteSave = async (fte) => {
+    if (!popover) return;
+    await updateNeed(popover.needId, { monthAllocations: { [popover.month]: fte } });
     setPopover(null);
   };
 
@@ -162,7 +169,11 @@ export default function PlannerView() {
           maxFte={popover.maxFte} currentFte={popover.currentFte}
           title={popover.type === 'editNeed' ? 'Need FTE (max 2.0)' : undefined}
           showRemove={popover.type === 'edit'}
-          onSave={handleFteSave} onClose={() => setPopover(null)}
+          showNeedEdit={popover.type === 'edit'}
+          needFte={popover.needFte}
+          onSave={handleFteSave}
+          onSaveNeed={handleNeedFteSave}
+          onClose={() => setPopover(null)}
         />
       )}
 
