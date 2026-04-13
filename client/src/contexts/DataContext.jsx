@@ -11,6 +11,7 @@ export function DataProvider({ children }) {
   const [projects, setProjects] = useState([]);
   const [resources, setResources] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [skills, setSkills] = useState([]);
   const [needs, setNeeds] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
@@ -18,10 +19,10 @@ export function DataProvider({ children }) {
     if (!currentOrg) return;
     setLoading(true);
     try {
-      const [c, p, r, t, n, a] = await Promise.all([
-        api.getCustomers(), api.getProjects(), api.getResources(), api.getTeams(), api.getNeeds(), api.getAssignments(),
+      const [c, p, r, t, s, n, a] = await Promise.all([
+        api.getCustomers(), api.getProjects(), api.getResources(), api.getTeams(), api.getSkills(), api.getNeeds(), api.getAssignments(),
       ]);
-      setCustomers(c); setProjects(p); setResources(r); setTeams(t); setNeeds(n); setAssignments(a);
+      setCustomers(c); setProjects(p); setResources(r); setTeams(t); setSkills(s); setNeeds(n); setAssignments(a);
     } catch (e) {
       console.error('Load failed:', e);
     }
@@ -100,6 +101,21 @@ export function DataProvider({ children }) {
     setResources((prev) => prev.map((r) => (r.teamId === id ? { ...r, teamId: null, team: null } : r)));
   }, []);
 
+  // Skill CRUD
+  const addSkill = useCallback(async (data) => {
+    const created = await api.createSkill(data);
+    setSkills((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+    return created;
+  }, []);
+  const updateSkill = useCallback(async (id, data) => {
+    const updated = await api.updateSkill(id, data);
+    setSkills((prev) => prev.map((s) => (s.id === id ? updated : s)).sort((a, b) => a.name.localeCompare(b.name)));
+  }, []);
+  const deleteSkill = useCallback(async (id) => {
+    await api.deleteSkill(id);
+    setSkills((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
   // Need CRUD
   const addNeed = useCallback(async (data) => {
     const created = await api.createNeed(data);
@@ -136,11 +152,12 @@ export function DataProvider({ children }) {
   }, []);
 
   const value = {
-    loading, customers, projects, resources, teams, needs, assignments, reload,
+    loading, customers, projects, resources, teams, skills, needs, assignments, reload,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
     addResource, updateResource, deleteResource,
     addTeam, updateTeam, deleteTeam,
+    addSkill, updateSkill, deleteSkill,
     addNeed, updateNeed, deleteNeed,
     upsertAssignment, updateAssignment, deleteAssignment,
   };
