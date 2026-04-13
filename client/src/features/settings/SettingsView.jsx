@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOrg } from '../../contexts/OrgContext';
 import { useData } from '../../contexts/DataContext';
 import { api } from '../../lib/api';
+import { DEFAULT_SKILLS } from '../../lib/defaultSkills';
 import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
 
@@ -9,7 +10,7 @@ const ROLES = ['viewer', 'member', 'admin'];
 
 export default function SettingsView() {
   const { currentOrg, role, updateOrg } = useOrg();
-  const { teams, resources, addTeam, updateTeam, deleteTeam } = useData();
+  const { teams, resources, addTeam, updateTeam, deleteTeam, skills, addSkill, updateSkill, deleteSkill } = useData();
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState('');
   const [newRole, setNewRole] = useState('member');
@@ -19,7 +20,32 @@ export default function SettingsView() {
   const [teamError, setTeamError] = useState('');
   const [editingTeamId, setEditingTeamId] = useState(null);
   const [editingTeamName, setEditingTeamName] = useState('');
+  const [skillsError, setSkillsError] = useState('');
+  const [seedingSkills, setSeedingSkills] = useState(false);
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newSkillCategory, setNewSkillCategory] = useState('');
+  const [editingSkillId, setEditingSkillId] = useState(null);
+  const [editingSkillName, setEditingSkillName] = useState('');
+  const [editingSkillCategory, setEditingSkillCategory] = useState('');
   const isAdmin = role === 'admin' || role === 'owner';
+
+  const skillsByCategory = useMemo(() => {
+    const groups = {};
+    for (const s of skills) {
+      const cat = s.category || 'Uncategorized';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(s);
+    }
+    for (const cat of Object.keys(groups)) {
+      groups[cat].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    const sorted = Object.keys(groups).sort((a, b) => {
+      if (a === 'Uncategorized') return 1;
+      if (b === 'Uncategorized') return -1;
+      return a.localeCompare(b);
+    });
+    return sorted.map((cat) => ({ category: cat, skills: groups[cat] }));
+  }, [skills]);
 
   const [minDate, setMinDate] = useState(currentOrg?.minPlanningDate || '');
   const [maxDate, setMaxDate] = useState(currentOrg?.maxPlanningDate || '');
@@ -120,6 +146,73 @@ export default function SettingsView() {
       await deleteTeam(team.id);
     } catch (err) {
       setTeamError(err.message || 'Failed to delete team');
+    }
+  };
+
+  const handleAddSkill = async (e) => {
+    e.preventDefault();
+    if (!newSkillName.trim()) return;
+    setSkillsError('');
+    try {
+      await addSkill({ name: newSkillName.trim(), category: newSkillCategory.trim() || null });
+      setNewSkillName('');
+      setNewSkillCategory('');
+    } catch (err) {
+      setSkillsError(err.message || 'Failed to add skill');
+    }
+  };
+
+  const handleStartEditSkill = (skill) => {
+    setEditingSkillId(skill.id);
+    setEditingSkillName(skill.name);
+    setEditingSkillCategory(skill.category || '');
+    setSkillsError('');
+  };
+
+  const handleSaveEditSkill = async () => {
+    if (!editingSkillName.trim()) return;
+    try {
+      await updateSkill(editingSkillId, {
+        name: editingSkillName.trim(),
+        category: editingSkillCategory.trim() || null,
+      });
+      setEditingSkillId(null);
+      setEditingSkillName('');
+      setEditingSkillCategory('');
+    } catch (err) {
+      setSkillsError(err.message || 'Failed to update skill');
+    }
+  };
+
+  const handleCancelEditSkill = () => {
+    setEditingSkillId(null);
+    setEditingSkillName('');
+    setEditingSkillCategory('');
+  };
+
+  const handleDeleteSkill = async (skill) => {
+    if (!confirm('Delete skill "' + skill.name + '"?')) return;
+    try {
+      await deleteSkill(skill.id);
+    } catch (err) {
+      setSkillsError(err.message || 'Failed to delete skill');
+    }
+  };
+
+  const handleSeedSkills = async () => {
+    setSeedingSkills(true);
+    setSkillsError('');
+    try {
+      const existing = new Set(skills.map((s) => s.name.toLowerCase()));
+      for (const seed of DEFAULT_SKILLS) {
+        if (existing.has(seed.name.toLowerCase())) continue;
+        await addSkill(seed);
+        existing.add(seed.name.toLowerCase());
+      }
+    } catch (err) {
+      setSkillsError(err.message || 'Failed to seed skills');
+    } finally {
+      setSeedingSkills(false);
     }
   };
 
@@ -254,6 +347,126 @@ export default function SettingsView() {
               />
             </div>
             <Button type="submit">Add Team</Button>
+          </form>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-3">Skills</h3>
+          <p className="text-[10px] text-text-light mb-3">
+            Define the skill vocabulary for your organization. Skills can later be assigned to people with proficiency levels.
+          </p>
+
+          {skillsError && (
+            <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{skillsError}</div>
+          )}
+
+          {skills.length === 0 ? (
+            <div className="text-center py-6 mb-3">
+              <p className="text-xs text-text-light mb-3">
+                No skills defined yet. Get started with a recommended set of {DEFAULT_SKILLS.length} common engineering skills, or add your own below.
+              </p>
+              <Button onClick={handleSeedSkills} disabled={seedingSkills}>
+                {seedingSkills ? 'Seeding...' : 'Seed default skills'}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3 mb-3">
+              {skillsByCategory.map((group) => (
+                <div key={group.category}>
+                  <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">
+                    {group.category}
+                  </div>
+                  <div className="space-y-1">
+                    {group.skills.map((skill) => {
+                      const isEditing = editingSkillId === skill.id;
+                      return (
+                        <div key={skill.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
+                          {isEditing ? (
+                            <>
+                              <input
+                                type="text"
+                                value={editingSkillName}
+                                onChange={(e) => setEditingSkillName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveEditSkill();
+                                  if (e.key === 'Escape') handleCancelEditSkill();
+                                }}
+                                autoFocus
+                                className="flex-1 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                              />
+                              <input
+                                type="text"
+                                value={editingSkillCategory}
+                                onChange={(e) => setEditingSkillCategory(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveEditSkill();
+                                  if (e.key === 'Escape') handleCancelEditSkill();
+                                }}
+                                placeholder="Category"
+                                className="w-32 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                              />
+                              <button
+                                onClick={handleSaveEditSkill}
+                                className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:underline px-1"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={handleCancelEditSkill}
+                                className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-text-mid px-1"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="flex-1 text-xs font-semibold text-text">{skill.name}</span>
+                              {skill.category && (
+                                <span className="text-[10px] text-text-light">{skill.category}</span>
+                              )}
+                              <button
+                                onClick={() => handleStartEditSkill(skill)}
+                                className="text-[10px] text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary px-1"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteSkill(skill)}
+                                className="text-[10px] text-danger bg-transparent border-0 cursor-pointer hover:text-danger/80 px-1"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <form onSubmit={handleAddSkill} className="flex gap-2 items-end pt-3 border-t border-border-light">
+            <div className="flex-1">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Skill name</label>
+              <input
+                type="text" value={newSkillName} onChange={(e) => setNewSkillName(e.target.value)}
+                placeholder="e.g. Kubernetes" required
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
+              />
+            </div>
+            <div className="w-40">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Category</label>
+              <input
+                type="text" value={newSkillCategory} onChange={(e) => setNewSkillCategory(e.target.value)}
+                placeholder="optional"
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
+              />
+            </div>
+            <Button type="submit">Add Skill</Button>
           </form>
         </div>
       )}
