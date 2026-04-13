@@ -68,6 +68,12 @@ export const api = {
   updateSkill: (id, data) => apiFetch('/skills/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteSkill: (id) => apiFetch('/skills/' + id, { method: 'DELETE' }),
 
+  // Person Skills
+  getPersonSkills: () => apiFetch('/person-skills'),
+  upsertPersonSkill: (data) => apiFetch('/person-skills', { method: 'POST', body: JSON.stringify(data) }),
+  updatePersonSkill: (id, data) => apiFetch('/person-skills/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  deletePersonSkill: (id) => apiFetch('/person-skills/' + id, { method: 'DELETE' }),
+
   // Needs
   getNeeds: () => apiFetch('/needs'),
   createNeed: (data) => apiFetch('/needs', { method: 'POST', body: JSON.stringify(data) }),

@@ -22,6 +22,7 @@ model Organization {
   resources   Resource[]
   teams       Team[]
   skills      Skill[]
+  personSkills PersonSkill[]
   needs       Need[]
   assignments Assignment[]
 }
@@ -104,6 +105,7 @@ model Resource {
 
   roles       ResourceRole[]
   assignments Assignment[]
+  personSkills PersonSkill[]
   responsibleProjects Project[] @relation("ProjectResponsible")
 
   @@index([orgId])
@@ -136,7 +138,31 @@ model Skill {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  personSkills PersonSkill[]
+
   @@unique([orgId, name])
+  @@index([orgId])
+}
+
+model PersonSkill {
+  id         String   @id @default(cuid())
+  level      Int
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  skillId    String
+  skill      Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, skillId])
+  @@index([resourceId])
+  @@index([skillId])
   @@index([orgId])
 }
 
