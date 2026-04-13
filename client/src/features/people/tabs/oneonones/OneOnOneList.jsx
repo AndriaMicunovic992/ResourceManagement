@@ -1,0 +1,23 @@
+import { useMemo } from 'react';
+import OneOnOneCard from './OneOnOneCard';
+
+export default function OneOnOneList({ oneOnOnes, onEdit, onDelete }) {
+  const sorted = useMemo(() => {
+    return [...oneOnOnes].sort(
+      (a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime()
+    );
+  }, [oneOnOnes]);
+
+  return (
+    <div className="space-y-2">
+      {sorted.map((record) => (
+        <OneOnOneCard
+          key={record.id}
+          record={record}
+          onEdit={() => onEdit(record.id)}
+          onDelete={() => onDelete(record.id)}
+        />
+      ))}
+    </div>
+  );
+}

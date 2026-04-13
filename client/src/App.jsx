@@ -15,6 +15,7 @@ import PersonPage from './features/people/PersonPage';
 import PersonOverview from './features/people/tabs/PersonOverview';
 import PersonAllocation from './features/people/tabs/PersonAllocation';
 import PersonSkills from './features/people/tabs/PersonSkills';
+import PersonOneOnOnes from './features/people/tabs/oneonones/PersonOneOnOnes';
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
               <Route index element={<PersonOverview />} />
               <Route path="allocation" element={<PersonAllocation />} />
               <Route path="skills" element={<PersonSkills />} />
+              <Route path="oneonones" element={<PersonOneOnOnes />} />
             </Route>
             <Route path="/skills" element={<SkillsView />} />
             <Route path="/settings" element={<SettingsView />} />
