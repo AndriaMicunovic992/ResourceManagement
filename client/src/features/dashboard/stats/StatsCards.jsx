@@ -59,7 +59,7 @@ export default function StatsCards({ months, includePotential, teamId }) {
   return (
     <div className="grid grid-cols-4 gap-4 mb-6">
       <StatCard icon="📋" value={stats.activeProjects} label="Projects" color="#3B82F6" />
-      <StatCard icon="👥" value={stats.teamSize} label="Team" color="#5BC68A" />
+      <StatCard icon="👥" value={stats.teamSize} label="People" color="#5BC68A" />
       <StatCard icon="📊" value={`${stats.utilPct}%`} label="Utilization" color="#F5A623" />
       <StatCard icon="⚠️" value={stats.unfilled} label="Unfilled" color="#E8636F" />
     </div>
