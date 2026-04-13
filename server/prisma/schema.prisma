@@ -241,14 +241,10 @@ model OneOnOne {
   authorUserId          String
   authorUser            User     @relation("AuthoredOneOnOnes", fields: [authorUserId], references: [id], onDelete: Restrict)
   meetingDate           DateTime
-  goodSides             String?
-  badSides              String?
-  suggestions           String?
   generalStatus         String?
   personalNotes         String?
   careerDevelopment     String?
   managerPersonalNotes  String?
-  legacyFieldsMigratedAt DateTime?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

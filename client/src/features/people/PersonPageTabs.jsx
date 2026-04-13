@@ -12,6 +12,7 @@ export default function PersonPageTabs({ resourceId }) {
   ];
   if (isAdmin) {
     tabs.push({ to: `/people/${resourceId}/oneonones`, label: '1:1s', end: false });
+    tabs.push({ to: `/people/${resourceId}/activity`, label: 'Activity', end: false });
   }
 
   return (
