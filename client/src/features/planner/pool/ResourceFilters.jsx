@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import ResourceFilterRow from './ResourceFilterRow';
 import { DOMAINS, SENIORITIES, SENIORITY_SHORT } from '../../../lib/constants';
 
-export default function ResourceFilters({ filters, onChange }) {
+export default function ResourceFilters({ filters, onChange, teams = [] }) {
   const domainOptions = ['All', ...Object.keys(DOMAINS)];
 
   const roleOptions = useMemo(() => {
@@ -15,6 +15,7 @@ export default function ResourceFilters({ filters, onChange }) {
   }, [filters.domain]);
 
   const seniorityOptions = ['All', ...Object.values(SENIORITY_SHORT)];
+  const teamOptions = ['All', ...teams.map((t) => t.name)];
 
   return (
     <div className="px-3 pb-3 border-b border-border-light">
@@ -24,6 +25,10 @@ export default function ResourceFilters({ filters, onChange }) {
         onChange={(v) => onChange({ ...filters, role: v })} />
       <ResourceFilterRow label="Seniority" options={seniorityOptions} value={filters.seniority}
         onChange={(v) => onChange({ ...filters, seniority: v })} />
+      {teams.length > 0 && (
+        <ResourceFilterRow label="Team" options={teamOptions} value={filters.team || 'All'}
+          onChange={(v) => onChange({ ...filters, team: v })} />
+      )}
     </div>
   );
 }

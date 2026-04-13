@@ -4,13 +4,14 @@ import { utilColor } from '../../../lib/statusUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 
-export default function DomainCard({ domain, months, includePotential }) {
+export default function DomainCard({ domain, months, includePotential, teamId }) {
   const { resources } = useData();
   const { rURealised, rU } = useComputed();
   const d = DOMAINS[domain];
 
   const { count, utilPct, usedFte, totalFte } = useMemo(() => {
-    const domResources = resources.filter((r) => r.roles?.some((rl) => rl.domain === domain));
+    const scoped = teamId ? resources.filter((r) => r.teamId === teamId) : resources;
+    const domResources = scoped.filter((r) => r.roles?.some((rl) => rl.domain === domain));
     const count = domResources.length;
     const rUsed = includePotential ? rU : rURealised;
     let used = 0, total = 0;
@@ -29,7 +30,7 @@ export default function DomainCard({ domain, months, includePotential }) {
       usedFte: avgUsed,
       totalFte: avgTotal,
     };
-  }, [resources, rURealised, rU, domain, months, includePotential]);
+  }, [resources, rURealised, rU, domain, months, includePotential, teamId]);
 
   const color = utilColor(utilPct);
   const label = includePotential ? 'all' : 'realised';

@@ -3,12 +3,13 @@ import StatCard from './StatCard';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 
-export default function StatsCards({ months, includePotential }) {
+export default function StatsCards({ months, includePotential, teamId }) {
   const { customers, projects, resources, needs } = useData();
   const { rURealised, rU, nF } = useComputed();
 
   const stats = useMemo(() => {
     const monthSet = new Set(months);
+    const teamResources = teamId ? resources.filter((r) => r.teamId === teamId) : resources;
 
     // Active projects that overlap with the selected time range
     const activeProjects = projects.filter((p) => {
@@ -18,13 +19,13 @@ export default function StatsCards({ months, includePotential }) {
     }).length;
 
     // Team size
-    const teamSize = resources.length;
+    const teamSize = teamResources.length;
 
     // Utilization averaged across selected months
     let totalUsedFte = 0;
     let totalCapacity = 0;
     const rUsed = includePotential ? rU : rURealised;
-    for (const r of resources) {
+    for (const r of teamResources) {
       for (const m of months) {
         totalCapacity += r.capacity;
         totalUsedFte += rUsed[r.id]?.[m] || 0;
@@ -53,7 +54,7 @@ export default function StatsCards({ months, includePotential }) {
     }
 
     return { activeProjects, teamSize, utilPct, unfilled };
-  }, [projects, resources, needs, customers, rURealised, rU, nF, months, includePotential]);
+  }, [projects, resources, needs, customers, rURealised, rU, nF, months, includePotential, teamId]);
 
   return (
     <div className="grid grid-cols-4 gap-4 mb-6">

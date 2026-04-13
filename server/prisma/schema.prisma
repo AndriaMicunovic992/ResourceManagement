@@ -20,6 +20,7 @@ model Organization {
   customers   Customer[]
   projects    Project[]
   resources   Resource[]
+  teams       Team[]
   needs       Need[]
   assignments Assignment[]
 }
@@ -97,10 +98,30 @@ model Resource {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
+  teamId String?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
   roles       ResourceRole[]
   assignments Assignment[]
   responsibleProjects Project[] @relation("ProjectResponsible")
 
+  @@index([orgId])
+  @@index([teamId])
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  resources Resource[]
+
+  @@unique([orgId, name])
   @@index([orgId])
 }
 
