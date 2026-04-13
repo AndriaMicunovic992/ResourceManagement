@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
+import LevelPicker from '../../../components/ui/LevelPicker';
 import { SKILL_LEVELS, SKILL_LEVEL_LIST } from '../../../lib/skillLevels';
 
-export default function ProfileSkills({ resource }) {
+export default function PersonSkills() {
+  const { resource } = useOutletContext();
   const { resources, skills, upsertPersonSkill, deletePersonSkill } = useData();
   const { canEdit } = useOrg();
   const [addingSkillId, setAddingSkillId] = useState('');
   const [addingLevel, setAddingLevel] = useState(3);
   const [error, setError] = useState('');
 
-  // Live resource from context so edits reflect instantly
   const live = resources.find((r) => r.id === resource.id) || resource;
   const personSkills = live.personSkills || [];
 
@@ -83,9 +85,7 @@ export default function ProfileSkills({ resource }) {
   };
 
   return (
-    <div className="mt-4">
-      <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">Skills</div>
-
+    <div className="bg-white rounded-xl border border-border p-4">
       {error && (
         <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-2">{error}</div>
       )}
@@ -110,16 +110,10 @@ export default function ProfileSkills({ resource }) {
                     >
                       <span className="text-xs font-semibold text-text">{skill.name}</span>
                       {canEdit ? (
-                        <select
+                        <LevelPicker
                           value={personSkill.level}
-                          onChange={(e) => handleLevelChange(personSkill, parseInt(e.target.value, 10))}
-                          className="text-[10px] font-bold border border-border rounded px-1 py-0.5 outline-none bg-white cursor-pointer"
-                          style={{ color: lvl?.color }}
-                        >
-                          {SKILL_LEVEL_LIST.map((n) => (
-                            <option key={n} value={n}>{SKILL_LEVELS[n].short} · {SKILL_LEVELS[n].label}</option>
-                          ))}
-                        </select>
+                          onChange={(n) => handleLevelChange(personSkill, n)}
+                        />
                       ) : (
                         <span
                           className="text-[10px] font-bold px-1.5 py-0.5 rounded text-white"
@@ -147,7 +141,7 @@ export default function ProfileSkills({ resource }) {
       )}
 
       {canEdit && availableSkills.length > 0 && (
-        <form onSubmit={handleAdd} className="flex gap-2 items-end pt-2 border-t border-border-light">
+        <form onSubmit={handleAdd} className="flex gap-2 items-end pt-3 border-t border-border-light">
           <div className="flex-1">
             <label className="block text-[10px] font-semibold text-text-mid mb-1">Add skill</label>
             <select

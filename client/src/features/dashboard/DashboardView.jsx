@@ -1,18 +1,18 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StatsCards from './stats/StatsCards';
 import DashboardTabs from './tabs/DashboardTabs';
 import ClientHeatmap from './clients/ClientHeatmap';
 import ResourceCapacity from './resources/ResourceCapacity';
 import FreeCapacity from './capacity/FreeCapacity';
-import ResourceProfile from './profile/ResourceProfile';
 import TimeRangePicker from '../planner/toolbar/TimeRangePicker';
 import { currentMonth, addMonths, monthRange } from '../../lib/dateUtils';
 import { useOrg } from '../../contexts/OrgContext';
 import { useData } from '../../contexts/DataContext';
 
 export default function DashboardView() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('clients');
-  const [profileResource, setProfileResource] = useState(null);
   const { currentOrg } = useOrg();
   const { teams } = useData();
   const [timeRange, setTimeRange] = useState({ start: currentMonth(), end: addMonths(currentMonth(), 11) });
@@ -52,11 +52,8 @@ export default function DashboardView() {
         </div>
       </div>
       {activeTab === 'clients' && <ClientHeatmap months={months} includePotential={includePotential} teamId={teamId} />}
-      {activeTab === 'resources' && <ResourceCapacity months={months} includePotential={includePotential} teamId={teamId} onResourceClick={setProfileResource} />}
+      {activeTab === 'resources' && <ResourceCapacity months={months} includePotential={includePotential} teamId={teamId} onResourceClick={(r) => navigate(`/people/${r.id}`)} />}
       {activeTab === 'free' && <FreeCapacity months={months} includePotential={includePotential} teamId={teamId} />}
-      {profileResource && (
-        <ResourceProfile resource={profileResource} onClose={() => setProfileResource(null)} />
-      )}
     </div>
   );
 }

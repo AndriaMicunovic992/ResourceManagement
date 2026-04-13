@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import Avatar from '../../../components/ui/Avatar';
 import RoleBadge from '../../../components/badges/RoleBadge';
 import ProgressBar from '../../../components/ui/ProgressBar';
@@ -22,7 +23,9 @@ export default function ResourceCard({ resource, selected, onSelect, onEdit, onD
     return (
       <div className="p-3 mb-2 rounded-xl border border-border bg-white opacity-40 cursor-default">
         <div className="flex items-center gap-2">
-          <Avatar name={resource.name} color={color} size={36} />
+          <Link to={`/people/${resource.id}`} onClick={(e) => e.stopPropagation()}>
+            <Avatar name={resource.name} color={color} size={36} />
+          </Link>
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-semibold text-text truncate">{resource.name}</div>
             <div className="flex flex-wrap gap-1 mt-0.5">
@@ -46,7 +49,9 @@ export default function ResourceCard({ resource, selected, onSelect, onEdit, onD
     >
       <div className="flex items-center gap-2">
         <div className="relative">
-          <Avatar name={resource.name} color={color} size={36} />
+          <Link to={`/people/${resource.id}`} onClick={(e) => e.stopPropagation()}>
+            <Avatar name={resource.name} color={color} size={36} />
+          </Link>
           {selected && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center text-white text-[8px]">✓</div>
           )}
