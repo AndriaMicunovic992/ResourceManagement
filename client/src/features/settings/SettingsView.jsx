@@ -113,7 +113,7 @@ export default function SettingsView() {
   const handleDeleteTeam = async (team) => {
     const count = resources.filter((r) => r.teamId === team.id).length;
     const msg = count > 0
-      ? `Delete team "${team.name}"? ${count} resource(s) will be unassigned.`
+      ? `Delete team "${team.name}"? ${count} person(s) will be unassigned.`
       : `Delete team "${team.name}"?`;
     if (!confirm(msg)) return;
     try {
@@ -179,7 +179,7 @@ export default function SettingsView() {
         <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Teams</h3>
           <p className="text-[10px] text-text-light mb-3">
-            Group resources into teams. Each resource can belong to one team.
+            Group people into teams. Each person can belong to one team.
           </p>
 
           {teamError && (
@@ -221,7 +221,7 @@ export default function SettingsView() {
                   ) : (
                     <>
                       <span className="flex-1 text-xs font-semibold text-text">{t.name}</span>
-                      <span className="text-[10px] text-text-light">{count} resource{count === 1 ? '' : 's'}</span>
+                      <span className="text-[10px] text-text-light">{count === 1 ? '1 person' : `${count} people`}</span>
                       <button
                         onClick={() => handleStartEditTeam(t)}
                         className="text-[10px] text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary px-1"

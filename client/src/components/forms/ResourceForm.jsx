@@ -24,7 +24,7 @@ export default function ResourceForm({ initial, onSave, onClose }) {
   };
 
   return (
-    <Modal title={initial ? 'Edit Resource' : 'New Resource'} onClose={onClose} wide>
+    <Modal title={initial ? 'Edit Person' : 'New Person'} onClose={onClose} wide>
       <form onSubmit={handleSubmit}>
         <Field label="Name">
           <input value={name} onChange={(e) => setName(e.target.value)}

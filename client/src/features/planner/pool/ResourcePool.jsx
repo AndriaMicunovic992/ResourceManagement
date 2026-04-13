@@ -23,7 +23,7 @@ export default function ResourcePool({ heldResource, onHold, timeRange }) {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this resource?')) return;
+    if (!confirm('Delete this person?')) return;
     await deleteResource(id);
     if (heldResource?.id === id) onHold(null);
   };

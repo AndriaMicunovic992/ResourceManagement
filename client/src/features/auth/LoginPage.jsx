@@ -28,7 +28,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-primary-bg flex items-center justify-center">
       <div className="bg-white rounded-2xl shadow-card border border-border p-8 w-full max-w-sm">
         <h1 className="text-xl font-bold text-text mb-1">databob</h1>
-        <p className="text-xs text-text-mid mb-6">Resource Manager — Sign in</p>
+        <p className="text-xs text-text-mid mb-6">People Hub — Sign in</p>
         {error && <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-4">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
