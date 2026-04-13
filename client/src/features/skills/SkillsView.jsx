@@ -26,19 +26,23 @@ export default function SkillsView() {
     <div className="max-w-[1400px] mx-auto px-5 py-6">
       <div className="flex items-center justify-between mb-5">
         <div className="text-2xl font-bold text-text">Skills</div>
-        <div className="inline-flex bg-white border border-border rounded-full p-0.5 shadow-sm">
+        <div className="inline-flex bg-white border border-border rounded-full p-1 shadow-card">
           <button
             onClick={() => setMode('company')}
-            className={`px-5 py-1.5 rounded-full text-xs font-bold cursor-pointer border-0 transition ${
-              mode === 'company' ? 'bg-primary-light text-primary' : 'bg-transparent text-text-mid hover:text-text'
+            className={`px-6 py-2 rounded-full text-sm font-bold cursor-pointer border-0 transition ${
+              mode === 'company'
+                ? 'bg-primary-light text-primary'
+                : 'bg-transparent text-text hover:text-primary'
             }`}
           >
             Company
           </button>
           <button
             onClick={() => setMode('individual')}
-            className={`px-5 py-1.5 rounded-full text-xs font-bold cursor-pointer border-0 transition ${
-              mode === 'individual' ? 'bg-primary-light text-primary' : 'bg-transparent text-text-mid hover:text-text'
+            className={`px-6 py-2 rounded-full text-sm font-bold cursor-pointer border-0 transition ${
+              mode === 'individual'
+                ? 'bg-primary-light text-primary'
+                : 'bg-transparent text-text hover:text-primary'
             }`}
           >
             Individual
