@@ -5,24 +5,29 @@ import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { utilColor } from '../../../lib/statusUtils';
 
-export default function ResourceHeatmap({ months, onResourceClick, includePotential }) {
+export default function ResourceHeatmap({ months, onResourceClick, includePotential, teamId }) {
   const { resources } = useData();
   const { rURealised, rU } = useComputed();
 
-  // Totals: average utilization per month across all resources
+  const visibleResources = useMemo(
+    () => (teamId ? resources.filter((r) => r.teamId === teamId) : resources),
+    [resources, teamId]
+  );
+
+  // Totals: average utilization per month across visible resources
   const totals = useMemo(() => {
     const result = {};
     const rUsed = includePotential ? rU : rURealised;
     for (const m of months) {
       let totalUsed = 0, totalCap = 0;
-      for (const r of resources) {
+      for (const r of visibleResources) {
         totalCap += r.capacity;
         totalUsed += rUsed[r.id]?.[m] || 0;
       }
       result[m] = totalCap > 0 ? Math.round((totalUsed / totalCap) * 100) : 0;
     }
     return result;
-  }, [resources, months, rURealised, rU, includePotential]);
+  }, [visibleResources, months, rURealised, rU, includePotential]);
 
   return (
     <div className="bg-white rounded-xl border border-border shadow-card overflow-auto">
@@ -37,7 +42,7 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
           </div>
         ))}
       </div>
-      {resources.map((r) => (
+      {visibleResources.map((r) => (
         <ResourceHeatmapRow key={r.id} resource={r} months={months}
           onClick={() => onResourceClick(r)} includePotential={includePotential} />
       ))}

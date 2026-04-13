@@ -6,7 +6,7 @@ export const resourceService = {
   async list(orgId: string) {
     return prisma.resource.findMany({
       where: { orgId },
-      include: { roles: true, assignments: true },
+      include: { roles: true, assignments: true, team: true },
       orderBy: { createdAt: 'asc' },
     });
   },
@@ -14,7 +14,7 @@ export const resourceService = {
   async getById(orgId: string, id: string) {
     const resource = await prisma.resource.findFirst({
       where: { id, orgId },
-      include: { roles: true, assignments: true },
+      include: { roles: true, assignments: true, team: true },
     });
     if (!resource) throw new NotFoundError('Resource not found');
     return resource;
@@ -28,7 +28,7 @@ export const resourceService = {
         orgId,
         roles: { create: roles },
       },
-      include: { roles: true, assignments: true },
+      include: { roles: true, assignments: true, team: true },
     });
   },
 
@@ -46,7 +46,7 @@ export const resourceService = {
     return prisma.resource.update({
       where: { id },
       data: rest,
-      include: { roles: true, assignments: true },
+      include: { roles: true, assignments: true, team: true },
     });
   },
 

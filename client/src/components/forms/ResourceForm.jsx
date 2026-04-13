@@ -4,11 +4,14 @@ import Field from '../ui/Field';
 import Button from '../ui/Button';
 import RolePicker from './RolePicker';
 import { fteToHours, hoursToFte } from '../../lib/constants';
+import { useData } from '../../contexts/DataContext';
 
 export default function ResourceForm({ initial, onSave, onClose }) {
+  const { teams } = useData();
   const [name, setName] = useState(initial?.name || '');
   const [capacity, setCapacity] = useState(initial?.capacity ?? 1);
   const [capacityHours, setCapacityHours] = useState(fteToHours(initial?.capacity ?? 1));
+  const [teamId, setTeamId] = useState(initial?.teamId || '');
   const [roles, setRoles] = useState(
     initial?.roles?.length ? initial.roles.map((r) => ({ domain: r.domain, role: r.role, seniority: r.seniority }))
       : [{ domain: 'Web', role: 'FE', seniority: 'Medior' }]
@@ -17,7 +20,7 @@ export default function ResourceForm({ initial, onSave, onClose }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onSave({ name: name.trim(), capacity: parseFloat(capacity), roles });
+    onSave({ name: name.trim(), capacity: parseFloat(capacity), teamId: teamId || null, roles });
   };
 
   return (
@@ -48,6 +51,13 @@ export default function ResourceForm({ initial, onSave, onClose }) {
               className="w-24 px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary font-mono" />
             <span className="text-[10px] text-text-light">hours / month</span>
           </div>
+        </Field>
+        <Field label="Team">
+          <select value={teamId} onChange={(e) => setTeamId(e.target.value)}
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary bg-white">
+            <option value="">No team</option>
+            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
         </Field>
         <Field label="Roles">
           <RolePicker roles={roles} onChange={setRoles} />

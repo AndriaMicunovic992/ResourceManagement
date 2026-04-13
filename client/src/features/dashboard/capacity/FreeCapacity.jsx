@@ -4,11 +4,16 @@ import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { DOMAINS, SENIORITY_SHORT } from '../../../lib/constants';
 
-export default function FreeCapacity({ months, includePotential }) {
-  const { resources, needs, projects, customers } = useData();
+export default function FreeCapacity({ months, includePotential, teamId }) {
+  const { resources: allResources, needs, projects, customers } = useData();
   const { rURealised } = useComputed();
   const [expanded, setExpanded] = useState({});
   const [expandedRoles, setExpandedRoles] = useState({});
+
+  const resources = useMemo(
+    () => (teamId ? allResources.filter((r) => r.teamId === teamId) : allResources),
+    [allResources, teamId]
+  );
 
   const toggleDomain = (d) => setExpanded((s) => ({ ...s, [d]: !s[d] }));
   const toggleRole = (key) => setExpandedRoles((s) => ({ ...s, [key]: !s[key] }));

@@ -8,9 +8,9 @@ import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
 
 export default function ResourcePool({ heldResource, onHold, timeRange }) {
-  const { resources, addResource, updateResource, deleteResource } = useData();
+  const { resources, teams, addResource, updateResource, deleteResource } = useData();
   const { canEdit } = useOrg();
-  const [filters, setFilters] = useState({ domain: 'All', role: 'All', seniority: 'All' });
+  const [filters, setFilters] = useState({ domain: 'All', role: 'All', seniority: 'All', team: 'All' });
   const [modal, setModal] = useState(null);
 
   const handleSave = async (data) => {
@@ -34,7 +34,7 @@ export default function ResourcePool({ heldResource, onHold, timeRange }) {
       {heldResource && (
         <HeldResourceBanner resource={heldResource} onDeselect={() => onHold(null)} />
       )}
-      <ResourceFilters filters={filters} onChange={setFilters} />
+      <ResourceFilters filters={filters} onChange={setFilters} teams={teams} />
       <ResourceList
         resources={resources} filters={filters}
         heldResource={heldResource} onHold={onHold}

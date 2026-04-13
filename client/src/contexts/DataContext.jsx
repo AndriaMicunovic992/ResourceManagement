@@ -10,6 +10,7 @@ export function DataProvider({ children }) {
   const [customers, setCustomers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [resources, setResources] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [needs, setNeeds] = useState([]);
   const [assignments, setAssignments] = useState([]);
 
@@ -17,10 +18,10 @@ export function DataProvider({ children }) {
     if (!currentOrg) return;
     setLoading(true);
     try {
-      const [c, p, r, n, a] = await Promise.all([
-        api.getCustomers(), api.getProjects(), api.getResources(), api.getNeeds(), api.getAssignments(),
+      const [c, p, r, t, n, a] = await Promise.all([
+        api.getCustomers(), api.getProjects(), api.getResources(), api.getTeams(), api.getNeeds(), api.getAssignments(),
       ]);
-      setCustomers(c); setProjects(p); setResources(r); setNeeds(n); setAssignments(a);
+      setCustomers(c); setProjects(p); setResources(r); setTeams(t); setNeeds(n); setAssignments(a);
     } catch (e) {
       console.error('Load failed:', e);
     }
@@ -83,6 +84,22 @@ export function DataProvider({ children }) {
     setResources((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
+  // Team CRUD
+  const addTeam = useCallback(async (data) => {
+    const created = await api.createTeam(data);
+    setTeams((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+    return created;
+  }, []);
+  const updateTeam = useCallback(async (id, data) => {
+    const updated = await api.updateTeam(id, data);
+    setTeams((prev) => prev.map((t) => (t.id === id ? updated : t)).sort((a, b) => a.name.localeCompare(b.name)));
+  }, []);
+  const deleteTeam = useCallback(async (id) => {
+    await api.deleteTeam(id);
+    setTeams((prev) => prev.filter((t) => t.id !== id));
+    setResources((prev) => prev.map((r) => (r.teamId === id ? { ...r, teamId: null, team: null } : r)));
+  }, []);
+
   // Need CRUD
   const addNeed = useCallback(async (data) => {
     const created = await api.createNeed(data);
@@ -119,10 +136,11 @@ export function DataProvider({ children }) {
   }, []);
 
   const value = {
-    loading, customers, projects, resources, needs, assignments, reload,
+    loading, customers, projects, resources, teams, needs, assignments, reload,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
     addResource, updateResource, deleteResource,
+    addTeam, updateTeam, deleteTeam,
     addNeed, updateNeed, deleteNeed,
     upsertAssignment, updateAssignment, deleteAssignment,
   };

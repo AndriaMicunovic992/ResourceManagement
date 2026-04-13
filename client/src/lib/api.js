@@ -56,6 +56,12 @@ export const api = {
   updateResource: (id, data) => apiFetch('/resources/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteResource: (id) => apiFetch('/resources/' + id, { method: 'DELETE' }),
 
+  // Teams
+  getTeams: () => apiFetch('/teams'),
+  createTeam: (data) => apiFetch('/teams', { method: 'POST', body: JSON.stringify(data) }),
+  updateTeam: (id, data) => apiFetch('/teams/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteTeam: (id) => apiFetch('/teams/' + id, { method: 'DELETE' }),
+
   // Needs
   getNeeds: () => apiFetch('/needs'),
   createNeed: (data) => apiFetch('/needs', { method: 'POST', body: JSON.stringify(data) }),
