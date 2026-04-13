@@ -21,6 +21,7 @@ model Organization {
   projects    Project[]
   resources   Resource[]
   teams       Team[]
+  skills      Skill[]
   needs       Need[]
   assignments Assignment[]
 }
@@ -120,6 +121,20 @@ model Team {
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   resources Resource[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+}
+
+model Skill {
+  id          String   @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  category    String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([orgId, name])
   @@index([orgId])
