@@ -26,6 +26,7 @@ model Organization {
   needs       Need[]
   assignments Assignment[]
   oneOnOnes   OneOnOne[]
+  logs        Log[]
 }
 
 model User {
@@ -38,6 +39,7 @@ model User {
 
   memberships        OrgMember[]
   authoredOneOnOnes  OneOnOne[]  @relation("AuthoredOneOnOnes")
+  authoredLogs       Log[]       @relation("AuthoredLogs")
 }
 
 model OrgMember {
@@ -64,6 +66,7 @@ model Customer {
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   projects Project[]
+  logs     Log[]
 
   @@index([orgId])
 }
@@ -87,6 +90,7 @@ model Project {
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   needs Need[]
+  logs  Log[]
 
   @@index([orgId])
   @@index([customerId])
@@ -109,6 +113,7 @@ model Resource {
   assignments Assignment[]
   personSkills PersonSkill[]
   oneOnOnes   OneOnOne[]
+  logs        Log[]
   responsibleProjects Project[] @relation("ProjectResponsible")
 
   @@index([orgId])
@@ -243,10 +248,41 @@ model OneOnOne {
   personalNotes         String?
   careerDevelopment     String?
   managerPersonalNotes  String?
+  legacyFieldsMigratedAt DateTime?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+
+  logs Log[]
 
   @@index([orgId])
   @@index([resourceId])
   @@index([authorUserId])
+}
+
+model Log {
+  id              String   @id @default(cuid())
+  orgId           String
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  resourceId      String
+  resource        Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  authorUserId    String
+  authorUser      User     @relation("AuthoredLogs", fields: [authorUserId], references: [id], onDelete: Restrict)
+  content         String
+  kind            String
+  dimensionCode   String?
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  projectId       String?
+  project         Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  jiraUrl         String?
+  oneOnOneId      String?
+  oneOnOne        OneOnOne? @relation(fields: [oneOnOneId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([resourceId])
+  @@index([authorUserId])
+  @@index([oneOnOneId])
+  @@index([dimensionCode])
 }
