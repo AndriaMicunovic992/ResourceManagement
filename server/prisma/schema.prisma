@@ -27,6 +27,7 @@ model Organization {
   assignments Assignment[]
   oneOnOnes   OneOnOne[]
   logs        Log[]
+  dimensions  Dimension[]
 }
 
 model User {
@@ -40,6 +41,7 @@ model User {
   memberships        OrgMember[]
   authoredOneOnOnes  OneOnOne[]  @relation("AuthoredOneOnOnes")
   authoredLogs       Log[]       @relation("AuthoredLogs")
+  resources          Resource[]  @relation("UserResources")
 }
 
 model OrgMember {
@@ -109,6 +111,9 @@ model Resource {
   teamId String?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
+  userId String?
+  user   User?   @relation("UserResources", fields: [userId], references: [id], onDelete: SetNull)
+
   roles       ResourceRole[]
   assignments Assignment[]
   personSkills PersonSkill[]
@@ -116,8 +121,10 @@ model Resource {
   logs        Log[]
   responsibleProjects Project[] @relation("ProjectResponsible")
 
+  @@unique([orgId, userId])
   @@index([orgId])
   @@index([teamId])
+  @@index([userId])
 }
 
 model Team {
@@ -281,4 +288,20 @@ model Log {
   @@index([authorUserId])
   @@index([oneOnOneId])
   @@index([dimensionCode])
+}
+
+model Dimension {
+  id          String   @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([orgId, code])
+  @@index([orgId])
 }

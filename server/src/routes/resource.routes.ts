@@ -8,6 +8,10 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
     return resourceService.list(req.orgId);
   });
 
+  app.get('/me/resource', async (req) => {
+    return resourceService.getByUserId(req.orgId, req.userId);
+  });
+
   app.post('/resources', { preHandler: requireRole('member') }, async (req) => {
     const data = createResourceSchema.parse(req.body);
     return resourceService.create(req.orgId, data);

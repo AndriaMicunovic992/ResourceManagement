@@ -1,10 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma.js';
 import { NotFoundError, ForbiddenError } from '../utils/errors.js';
-import type {
-  CreateLogInput,
-  UpdateLogInput,
-  ListLogsQuery,
+import {
+  EMPLOYEE_LOG_KINDS,
+  type CreateLogInput,
+  type UpdateLogInput,
+  type ListLogsQuery,
 } from '../schemas/log.schema.js';
 
 const customerSelect = { id: true, name: true } as const;
@@ -23,9 +24,23 @@ function isAdminRole(role: string): boolean {
   return role === 'admin' || role === 'owner';
 }
 
+function isEmployeeKind(kind: string): boolean {
+  return (EMPLOYEE_LOG_KINDS as readonly string[]).includes(kind);
+}
+
 async function ensureResourceInOrg(orgId: string, resourceId: string): Promise<void> {
   const resource = await prisma.resource.findFirst({ where: { id: resourceId, orgId } });
   if (!resource) throw new NotFoundError('Resource not found');
+}
+
+async function findResourceForUser(
+  orgId: string,
+  userId: string
+): Promise<{ id: string } | null> {
+  return prisma.resource.findFirst({
+    where: { orgId, userId },
+    select: { id: true },
+  });
 }
 
 async function ensureCustomerInOrg(orgId: string, customerId: string): Promise<void> {
@@ -49,6 +64,11 @@ async function ensureOneOnOneForResource(
   if (!oneOnOne) throw new NotFoundError('1:1 meeting not found');
 }
 
+async function ensureDimensionCodeInOrg(orgId: string, code: string): Promise<void> {
+  const dim = await prisma.dimension.findFirst({ where: { orgId, code } });
+  if (!dim) throw new NotFoundError('Dimension not found');
+}
+
 function parseBoundaryDate(value: string, endOfDay: boolean): Date {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     const suffix = endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
@@ -61,15 +81,24 @@ export async function listLogs(
   orgId: string,
   resourceId: string,
   filters: ListLogsQuery,
-  _requestingUserId: string,
+  requestingUserId: string,
   requestingUserRole: string
 ) {
   await ensureResourceInOrg(orgId, resourceId);
 
-  if (!isAdminRole(requestingUserRole)) return [];
-
+  const admin = isAdminRole(requestingUserRole);
   const where: Prisma.LogWhereInput = { orgId, resourceId };
-  if (filters.kind) where.kind = filters.kind;
+
+  if (!admin) {
+    // Non-admins can only see their own employee-kind logs on their own resource.
+    const self = await findResourceForUser(orgId, requestingUserId);
+    if (!self || self.id !== resourceId) return [];
+    where.kind = { in: [...EMPLOYEE_LOG_KINDS] };
+    if (filters.kind && isEmployeeKind(filters.kind)) where.kind = filters.kind;
+  } else if (filters.kind) {
+    where.kind = filters.kind;
+  }
+
   if (filters.dimensionCode) where.dimensionCode = filters.dimensionCode;
   if (filters.customerId) where.customerId = filters.customerId;
   if (filters.projectId) where.projectId = filters.projectId;
@@ -93,7 +122,7 @@ export async function listLogs(
 export async function getLog(
   orgId: string,
   id: string,
-  _requestingUserId: string,
+  requestingUserId: string,
   requestingUserRole: string
 ) {
   const log = await prisma.log.findFirst({
@@ -101,9 +130,14 @@ export async function getLog(
     include: logInclude,
   });
   if (!log) throw new NotFoundError('Log not found');
+
   if (!isAdminRole(requestingUserRole)) {
-    // Don't leak existence.
-    throw new NotFoundError('Log not found');
+    const self = await findResourceForUser(orgId, requestingUserId);
+    const canSee =
+      self &&
+      self.id === log.resourceId &&
+      isEmployeeKind(log.kind);
+    if (!canSee) throw new NotFoundError('Log not found');
   }
   return log;
 }
@@ -112,13 +146,31 @@ export async function createLog(
   orgId: string,
   resourceId: string,
   authorUserId: string,
+  authorRole: string,
   data: CreateLogInput
 ) {
   await ensureResourceInOrg(orgId, resourceId);
 
+  const admin = isAdminRole(authorRole);
+  if (!admin) {
+    // Employees can only log win/down/blocker on their own resource and cannot
+    // attach to a 1:1.
+    if (!isEmployeeKind(data.kind)) {
+      throw new ForbiddenError('You cannot create logs of this kind');
+    }
+    if (data.oneOnOneId) {
+      throw new ForbiddenError('Employee logs cannot be attached to a 1:1');
+    }
+    const self = await findResourceForUser(orgId, authorUserId);
+    if (!self || self.id !== resourceId) {
+      throw new ForbiddenError('You can only log against your own profile');
+    }
+  }
+
   if (data.customerId) await ensureCustomerInOrg(orgId, data.customerId);
   if (data.projectId) await ensureProjectInOrg(orgId, data.projectId);
   if (data.oneOnOneId) await ensureOneOnOneForResource(orgId, data.oneOnOneId, resourceId);
+  if (data.dimensionCode) await ensureDimensionCodeInOrg(orgId, data.dimensionCode);
 
   return prisma.log.create({
     data: {
@@ -141,6 +193,7 @@ export async function updateLog(
   orgId: string,
   id: string,
   requestingUserId: string,
+  requestingUserRole: string,
   data: UpdateLogInput
 ) {
   const existing = await prisma.log.findFirst({ where: { id, orgId } });
@@ -149,10 +202,23 @@ export async function updateLog(
     throw new ForbiddenError('Only the author can edit a log');
   }
 
+  if (!isAdminRole(requestingUserRole)) {
+    // Employees can only edit their own employee-kind logs.
+    if (!isEmployeeKind(existing.kind)) {
+      throw new ForbiddenError('You cannot edit this log');
+    }
+    if (data.kind !== undefined && !isEmployeeKind(data.kind)) {
+      throw new ForbiddenError('You cannot change this log to that kind');
+    }
+  }
+
   const patch: Prisma.LogUpdateInput = {};
   if (data.content !== undefined) patch.content = data.content;
   if (data.kind !== undefined) patch.kind = data.kind;
-  if (data.dimensionCode !== undefined) patch.dimensionCode = data.dimensionCode ?? null;
+  if (data.dimensionCode !== undefined) {
+    if (data.dimensionCode) await ensureDimensionCodeInOrg(orgId, data.dimensionCode);
+    patch.dimensionCode = data.dimensionCode ?? null;
+  }
   if (data.jiraUrl !== undefined) patch.jiraUrl = data.jiraUrl ?? null;
 
   if (data.customerId !== undefined) {
@@ -188,8 +254,12 @@ export async function deleteLog(
   const existing = await prisma.log.findFirst({ where: { id, orgId } });
   if (!existing) throw new NotFoundError('Log not found');
   const isAuthor = existing.authorUserId === requestingUserId;
-  const isAdmin = isAdminRole(requestingUserRole);
-  if (!isAuthor && !isAdmin) {
+  const admin = isAdminRole(requestingUserRole);
+  if (!admin) {
+    if (!isAuthor || !isEmployeeKind(existing.kind)) {
+      throw new ForbiddenError('You cannot delete this log');
+    }
+  } else if (!isAuthor && !admin) {
     throw new ForbiddenError('You cannot delete this log');
   }
   await prisma.log.delete({ where: { id } });

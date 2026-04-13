@@ -3,7 +3,6 @@ import Modal from '../../../../components/ui/Modal';
 import { api } from '../../../../lib/api';
 import { useData } from '../../../../contexts/DataContext';
 
-const DIMENSION_CODES = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6'];
 const KINDS = [
   { value: 'observation', label: 'Observation' },
   { value: 'good', label: 'Good' },
@@ -12,7 +11,7 @@ const KINDS = [
 ];
 
 export default function NewLogModal({ resourceId, onCancel, onCreated }) {
-  const { customers, projects } = useData();
+  const { customers, projects, dimensions } = useData();
   const [content, setContent] = useState('');
   const [kind, setKind] = useState('observation');
   const [customerId, setCustomerId] = useState('');
@@ -108,9 +107,9 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
               className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="">None</option>
-              {DIMENSION_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
+              {dimensions.map((dim) => (
+                <option key={dim.id} value={dim.code}>
+                  {dim.name}
                 </option>
               ))}
             </select>

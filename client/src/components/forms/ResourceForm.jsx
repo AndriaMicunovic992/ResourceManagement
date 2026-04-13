@@ -1,26 +1,52 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Modal from '../ui/Modal';
 import Field from '../ui/Field';
 import Button from '../ui/Button';
 import RolePicker from './RolePicker';
 import { fteToHours, hoursToFte } from '../../lib/constants';
 import { useData } from '../../contexts/DataContext';
+import { useOrg } from '../../contexts/OrgContext';
+import { api } from '../../lib/api';
 
 export default function ResourceForm({ initial, onSave, onClose }) {
-  const { teams } = useData();
+  const { teams, resources } = useData();
+  const { role } = useOrg();
+  const isAdmin = role === 'admin' || role === 'owner';
   const [name, setName] = useState(initial?.name || '');
   const [capacity, setCapacity] = useState(initial?.capacity ?? 1);
   const [capacityHours, setCapacityHours] = useState(fteToHours(initial?.capacity ?? 1));
   const [teamId, setTeamId] = useState(initial?.teamId || '');
+  const [userId, setUserId] = useState(initial?.userId || '');
+  const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState(
     initial?.roles?.length ? initial.roles.map((r) => ({ domain: r.domain, role: r.role, seniority: r.seniority }))
       : [{ domain: 'Web', role: 'FE', seniority: 'Medior' }]
   );
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.getMembers().then(setMembers).catch(() => setMembers([]));
+  }, [isAdmin]);
+
+  const linkedUserIds = useMemo(() => {
+    const set = new Set();
+    for (const r of resources) {
+      if (r.userId && r.id !== initial?.id) set.add(r.userId);
+    }
+    return set;
+  }, [resources, initial?.id]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onSave({ name: name.trim(), capacity: parseFloat(capacity), teamId: teamId || null, roles });
+    const payload = {
+      name: name.trim(),
+      capacity: parseFloat(capacity),
+      teamId: teamId || null,
+      roles,
+    };
+    if (isAdmin) payload.userId = userId || null;
+    onSave(payload);
   };
 
   return (
@@ -59,6 +85,25 @@ export default function ResourceForm({ initial, onSave, onClose }) {
             {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </Field>
+        {isAdmin && (
+          <Field label="Linked user account">
+            <select value={userId} onChange={(e) => setUserId(e.target.value)}
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary bg-white">
+              <option value="">Not linked</option>
+              {members.map((m) => {
+                const isLinkedElsewhere = linkedUserIds.has(m.user.id);
+                return (
+                  <option key={m.user.id} value={m.user.id} disabled={isLinkedElsewhere}>
+                    {m.user.name} ({m.user.email}){isLinkedElsewhere ? ' — already linked' : ''}
+                  </option>
+                );
+              })}
+            </select>
+            <div className="text-[10px] text-text-light mt-1">
+              Linking a user account lets this person log their own wins, downs and blockers.
+            </div>
+          </Field>
+        )}
         <Field label="Roles">
           <RolePicker roles={roles} onChange={setRoles} />
         </Field>
