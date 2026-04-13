@@ -27,3 +27,5 @@ export function fteToHours(fte) {
 export function hoursToFte(hours) {
   return Math.round((hours / MONTHLY_HOURS_PER_FTE) * 100) / 100;
 }
+
+export { SKILL_LEVELS, SKILL_LEVEL_LIST } from './skillLevels';

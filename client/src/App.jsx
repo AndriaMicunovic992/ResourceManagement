@@ -9,6 +9,12 @@ import AppLayout from './layouts/AppLayout';
 import PlannerView from './features/planner/PlannerView';
 import DashboardView from './features/dashboard/DashboardView';
 import SettingsView from './features/settings/SettingsView';
+import SkillsView from './features/skills/SkillsView';
+import PeopleListView from './features/people/PeopleListView';
+import PersonPage from './features/people/PersonPage';
+import PersonOverview from './features/people/tabs/PersonOverview';
+import PersonAllocation from './features/people/tabs/PersonAllocation';
+import PersonSkills from './features/people/tabs/PersonSkills';
 
 export default function App() {
   return (
@@ -29,6 +35,13 @@ export default function App() {
             <Route path="/" element={<Navigate to="/planner" replace />} />
             <Route path="/planner" element={<PlannerView />} />
             <Route path="/dashboard" element={<DashboardView />} />
+            <Route path="/people" element={<PeopleListView />} />
+            <Route path="/people/:id" element={<PersonPage />}>
+              <Route index element={<PersonOverview />} />
+              <Route path="allocation" element={<PersonAllocation />} />
+              <Route path="skills" element={<PersonSkills />} />
+            </Route>
+            <Route path="/skills" element={<SkillsView />} />
             <Route path="/settings" element={<SettingsView />} />
           </Route>
         </Routes>

@@ -7,12 +7,14 @@ export default function HeaderTabs() {
   const tabs = [
     { path: '/planner', label: 'Planner' },
     { path: '/dashboard', label: 'Dashboard' },
+    { path: '/people', label: 'People' },
+    { path: '/skills', label: 'Skills' },
   ];
 
   return (
     <div className="flex gap-1">
       {tabs.map((tab) => {
-        const active = location.pathname === tab.path;
+        const active = location.pathname === tab.path || location.pathname.startsWith(tab.path + '/');
         return (
           <button key={tab.path} onClick={() => navigate(tab.path)}
             className={`px-4 py-1.5 rounded-full text-xs font-bold cursor-pointer border transition ${
