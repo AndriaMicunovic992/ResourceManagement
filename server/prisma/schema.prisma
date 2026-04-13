@@ -25,6 +25,7 @@ model Organization {
   personSkills PersonSkill[]
   needs       Need[]
   assignments Assignment[]
+  oneOnOnes   OneOnOne[]
 }
 
 model User {
@@ -35,7 +36,8 @@ model User {
   avatar    String?
   createdAt DateTime @default(now())
 
-  memberships OrgMember[]
+  memberships        OrgMember[]
+  authoredOneOnOnes  OneOnOne[]  @relation("AuthoredOneOnOnes")
 }
 
 model OrgMember {
@@ -106,6 +108,7 @@ model Resource {
   roles       ResourceRole[]
   assignments Assignment[]
   personSkills PersonSkill[]
+  oneOnOnes   OneOnOne[]
   responsibleProjects Project[] @relation("ProjectResponsible")
 
   @@index([orgId])
@@ -222,4 +225,28 @@ model Assignment {
   @@index([orgId])
   @@index([needId])
   @@index([resourceId])
+}
+
+model OneOnOne {
+  id                    String   @id @default(cuid())
+  orgId                 String
+  org                   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  resourceId            String
+  resource              Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  authorUserId          String
+  authorUser            User     @relation("AuthoredOneOnOnes", fields: [authorUserId], references: [id], onDelete: Restrict)
+  meetingDate           DateTime
+  goodSides             String?
+  badSides              String?
+  suggestions           String?
+  generalStatus         String?
+  personalNotes         String?
+  careerDevelopment     String?
+  managerPersonalNotes  String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([resourceId])
+  @@index([authorUserId])
 }

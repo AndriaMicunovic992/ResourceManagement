@@ -1,14 +1,65 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import StatCard from '../../dashboard/stats/StatCard';
 import { useData } from '../../../contexts/DataContext';
+import { useOrg } from '../../../contexts/OrgContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
+import { api } from '../../../lib/api';
+
+function formatRelative(date) {
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (days < 0) return 'scheduled';
+  if (days === 0) return 'today';
+  if (days === 1) return '1 day ago';
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months === 1) return '1 month ago';
+  if (months < 12) return `${months} months ago`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? '1 year ago' : `${years} years ago`;
+}
 
 export default function PersonOverview() {
   const { resource } = useOutletContext();
   const { assignments, needs, projects, customers } = useData();
+  const { role } = useOrg();
   const { rURealised } = useComputed();
+  const isAdmin = role === 'admin' || role === 'owner';
+
+  const [lastOneOnOne, setLastOneOnOne] = useState(null);
+  const [oneOnOneLoaded, setOneOnOneLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAdmin) {
+      setLastOneOnOne(null);
+      setOneOnOneLoaded(true);
+      return;
+    }
+    setOneOnOneLoaded(false);
+    api
+      .listOneOnOnes(resource.id)
+      .then((data) => {
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        const sorted = [...list].sort(
+          (a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime()
+        );
+        setLastOneOnOne(sorted[0] || null);
+        setOneOnOneLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLastOneOnOne(null);
+        setOneOnOneLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, resource.id]);
 
   const stats = useMemo(() => {
     const months = monthRange(currentMonth(), addMonths(currentMonth(), 2));
@@ -63,6 +114,28 @@ export default function PersonOverview() {
         <StatCard icon="🏢" value={stats.customers} label="Customers" color="#F97316" />
         <StatCard icon="🎯" value={stats.skills} label="Skills" color="#8B5CF6" />
       </div>
+
+      {isAdmin && oneOnOneLoaded && (
+        <div className="bg-white rounded-xl border border-border p-4 mb-4">
+          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">
+            Last 1:1
+          </div>
+          {lastOneOnOne ? (
+            <div className="text-xs text-text">
+              {new Date(lastOneOnOne.meetingDate).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })}{' '}
+              <span className="text-text-light">
+                ({formatRelative(new Date(lastOneOnOne.meetingDate))})
+              </span>
+            </div>
+          ) : (
+            <div className="text-xs text-text-light italic">No 1:1 meetings recorded yet.</div>
+          )}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-border p-4">
         <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">

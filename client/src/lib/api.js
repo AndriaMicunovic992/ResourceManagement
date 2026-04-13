@@ -74,6 +74,12 @@ export const api = {
   updatePersonSkill: (id, data) => apiFetch('/person-skills/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deletePersonSkill: (id) => apiFetch('/person-skills/' + id, { method: 'DELETE' }),
 
+  // 1:1 Meetings
+  listOneOnOnes: (resourceId) => apiFetch('/people/' + resourceId + '/oneonones'),
+  createOneOnOne: (resourceId, data) => apiFetch('/people/' + resourceId + '/oneonones', { method: 'POST', body: JSON.stringify(data) }),
+  updateOneOnOne: (resourceId, id, data) => apiFetch('/people/' + resourceId + '/oneonones/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteOneOnOne: (resourceId, id) => apiFetch('/people/' + resourceId + '/oneonones/' + id, { method: 'DELETE' }),
+
   // Needs
   getNeeds: () => apiFetch('/needs'),
   createNeed: (data) => apiFetch('/needs', { method: 'POST', body: JSON.stringify(data) }),
