@@ -6,6 +6,7 @@ import { projectRoutes } from './project.routes.js';
 import { resourceRoutes } from './resource.routes.js';
 import { teamRoutes } from './team.routes.js';
 import { skillRoutes } from './skill.routes.js';
+import { personSkillRoutes } from './personSkill.routes.js';
 import { needRoutes } from './need.routes.js';
 import { assignmentRoutes } from './assignment.routes.js';
 
@@ -17,6 +18,7 @@ export const routes: FastifyPluginAsync = async (app) => {
   await app.register(resourceRoutes);
   await app.register(teamRoutes);
   await app.register(skillRoutes);
+  await app.register(personSkillRoutes);
   await app.register(needRoutes);
   await app.register(assignmentRoutes);
 

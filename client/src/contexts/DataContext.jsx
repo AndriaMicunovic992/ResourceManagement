@@ -114,6 +114,32 @@ export function DataProvider({ children }) {
   const deleteSkill = useCallback(async (id) => {
     await api.deleteSkill(id);
     setSkills((prev) => prev.filter((s) => s.id !== id));
+    setResources((prev) => prev.map((r) => ({
+      ...r,
+      personSkills: (r.personSkills || []).filter((ps) => ps.skillId !== id),
+    })));
+  }, []);
+
+  // PersonSkill CRUD
+  const upsertPersonSkill = useCallback(async (data) => {
+    const result = await api.upsertPersonSkill(data);
+    setResources((prev) => prev.map((r) => {
+      if (r.id !== data.resourceId) return r;
+      const list = r.personSkills || [];
+      const idx = list.findIndex((ps) => ps.skillId === data.skillId);
+      const next = idx >= 0
+        ? list.map((ps) => (ps.skillId === data.skillId ? result : ps))
+        : [...list, result];
+      return { ...r, personSkills: next };
+    }));
+    return result;
+  }, []);
+  const deletePersonSkill = useCallback(async (resourceId, personSkillId) => {
+    await api.deletePersonSkill(personSkillId);
+    setResources((prev) => prev.map((r) => {
+      if (r.id !== resourceId) return r;
+      return { ...r, personSkills: (r.personSkills || []).filter((ps) => ps.id !== personSkillId) };
+    }));
   }, []);
 
   // Need CRUD
@@ -158,6 +184,7 @@ export function DataProvider({ children }) {
     addResource, updateResource, deleteResource,
     addTeam, updateTeam, deleteTeam,
     addSkill, updateSkill, deleteSkill,
+    upsertPersonSkill, deletePersonSkill,
     addNeed, updateNeed, deleteNeed,
     upsertAssignment, updateAssignment, deleteAssignment,
   };
