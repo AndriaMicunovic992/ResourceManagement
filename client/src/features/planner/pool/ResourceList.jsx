@@ -3,7 +3,7 @@ import ResourceCard from './ResourceCard';
 import { SENIORITY_SHORT } from '../../../lib/constants';
 import { useData } from '../../../contexts/DataContext';
 
-export default function ResourceList({ resources, filters, heldResource, onHold, onEdit, onDelete, timeRange, canEdit }) {
+export default function ResourceList({ resources, filters, heldResource, onHold, timeRange }) {
   const { teams } = useData();
   const filtered = useMemo(() => {
     const teamIdByName = new Map(teams.map((t) => [t.name, t.id]));
@@ -33,10 +33,7 @@ export default function ResourceList({ resources, filters, heldResource, onHold,
           key={r.id} resource={r}
           selected={heldResource?.id === r.id}
           onSelect={(res) => onHold(heldResource?.id === res.id ? null : res)}
-          onEdit={() => onEdit(r)}
-          onDelete={() => onDelete(r.id)}
           timeRange={timeRange}
-          canEdit={canEdit}
         />
       ))}
     </div>

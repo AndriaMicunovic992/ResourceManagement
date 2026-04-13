@@ -3,12 +3,11 @@ import { Link } from 'react-router-dom';
 import Avatar from '../../../components/ui/Avatar';
 import RoleBadge from '../../../components/badges/RoleBadge';
 import ProgressBar from '../../../components/ui/ProgressBar';
-import HoverButtons from '../../../components/ui/HoverButtons';
 import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import { useComputed } from '../../../hooks/useComputed';
 import { monthRange } from '../../../lib/dateUtils';
 
-export default function ResourceCard({ resource, selected, onSelect, onEdit, onDelete, timeRange, canEdit }) {
+export default function ResourceCard({ resource, selected, onSelect, timeRange }) {
   const { rU } = useComputed();
   const color = domainColor(resourcePrimaryDomain(resource));
 
@@ -63,7 +62,14 @@ export default function ResourceCard({ resource, selected, onSelect, onEdit, onD
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          {canEdit && <HoverButtons onEdit={onEdit} onDelete={onDelete} size="small" />}
+          <Link
+            to={`/people/${resource.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 rounded flex items-center justify-center bg-primary-light text-primary text-[11px] no-underline hover:brightness-95"
+            title="Open profile"
+          >
+            ↗
+          </Link>
           <span className="text-[10px] font-mono text-text-mid">{((1 - avgUtil) * resource.capacity).toFixed(1)}</span>
         </div>
       </div>

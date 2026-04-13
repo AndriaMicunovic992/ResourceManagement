@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useOutletContext, Link } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import StatCard from '../../dashboard/stats/StatCard';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
@@ -86,20 +86,6 @@ export default function PersonOverview() {
         )}
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
-        <Link
-          to="allocation"
-          className="text-xs font-semibold text-primary bg-transparent border border-primary rounded-full px-4 py-1.5 no-underline hover:bg-primary hover:text-white transition"
-        >
-          View allocation →
-        </Link>
-        <Link
-          to="skills"
-          className="text-xs font-semibold text-primary bg-transparent border border-primary rounded-full px-4 py-1.5 no-underline hover:bg-primary hover:text-white transition"
-        >
-          View skills →
-        </Link>
-      </div>
     </div>
   );
 }

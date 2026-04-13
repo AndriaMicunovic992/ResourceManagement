@@ -1,14 +1,20 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Avatar from '../../components/ui/Avatar';
 import RoleBadge from '../../components/badges/RoleBadge';
+import Button from '../../components/ui/Button';
+import ResourceForm from '../../components/forms/ResourceForm';
 import { useData } from '../../contexts/DataContext';
+import { useOrg } from '../../contexts/OrgContext';
 import { resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
 
 export default function PeopleListView() {
-  const { resources, teams } = useData();
+  const { resources, teams, addResource } = useData();
+  const { canEdit } = useOrg();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [teamId, setTeamId] = useState('');
+  const [adding, setAdding] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -17,6 +23,12 @@ export default function PeopleListView() {
       .filter((r) => !q || r.name.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [resources, search, teamId]);
+
+  const handleCreate = async (data) => {
+    const created = await addResource(data);
+    setAdding(false);
+    if (created?.id) navigate(`/people/${created.id}`);
+  };
 
   return (
     <div className="max-w-[1100px] mx-auto px-5 py-6">
@@ -44,6 +56,9 @@ export default function PeopleListView() {
               <option value="">All teams</option>
               {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
+          )}
+          {canEdit && (
+            <Button onClick={() => setAdding(true)}>+ Add person</Button>
           )}
         </div>
       </div>
@@ -78,6 +93,14 @@ export default function PeopleListView() {
             );
           })}
         </div>
+      )}
+
+      {adding && (
+        <ResourceForm
+          initial={null}
+          onSave={handleCreate}
+          onClose={() => setAdding(false)}
+        />
       )}
     </div>
   );

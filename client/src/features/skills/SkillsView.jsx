@@ -1,67 +1,52 @@
 import { useMemo, useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import SkillsSubTabs from './SkillsSubTabs';
-import SkillsFilters from './SkillsFilters';
+import CompanySkills from './company/CompanySkills';
 import SkillsMatrix from './matrix/SkillsMatrix';
-import SkillsCoverage from './coverage/SkillsCoverage';
 
 export default function SkillsView() {
-  const { resources, skills, teams } = useData();
-  const [activeTab, setActiveTab] = useState('matrix');
-  const [filters, setFilters] = useState({ search: '', teamId: '', category: '' });
+  const { resources, skills } = useData();
+  const [mode, setMode] = useState('company');
 
-  const categories = useMemo(() => {
-    const set = new Set();
-    for (const s of skills) if (s.category) set.add(s.category);
-    return Array.from(set).sort();
-  }, [skills]);
+  const sortedSkills = useMemo(
+    () => [...skills].sort((a, b) => {
+      const ca = a.category || 'Uncategorized';
+      const cb = b.category || 'Uncategorized';
+      if (ca !== cb) return ca.localeCompare(cb);
+      return a.name.localeCompare(b.name);
+    }),
+    [skills]
+  );
 
-  const filteredSkills = useMemo(() => {
-    const q = filters.search.trim().toLowerCase();
-    return skills
-      .filter((s) => !filters.category || s.category === filters.category)
-      .filter((s) => !q || s.name.toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q))
-      .sort((a, b) => {
-        const ca = a.category || 'Uncategorized';
-        const cb = b.category || 'Uncategorized';
-        if (ca !== cb) return ca.localeCompare(cb);
-        return a.name.localeCompare(b.name);
-      });
-  }, [skills, filters.category, filters.search]);
-
-  const filteredResources = useMemo(() => {
-    const q = filters.search.trim().toLowerCase();
-    return resources
-      .filter((r) => !filters.teamId || r.teamId === filters.teamId)
-      .filter((r) => {
-        if (!q) return true;
-        if (r.name.toLowerCase().includes(q)) return true;
-        for (const ps of r.personSkills || []) {
-          const s = skills.find((x) => x.id === ps.skillId);
-          if (s && s.name.toLowerCase().includes(q)) return true;
-        }
-        return false;
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [resources, skills, filters.teamId, filters.search]);
+  const sortedResources = useMemo(
+    () => [...resources].sort((a, b) => a.name.localeCompare(b.name)),
+    [resources]
+  );
 
   return (
     <div className="max-w-[1400px] mx-auto px-5 py-6">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <SkillsSubTabs activeTab={activeTab} onChange={setActiveTab} />
-        <SkillsFilters
-          filters={filters}
-          onChange={setFilters}
-          teams={teams}
-          categories={categories}
-        />
+      <div className="flex items-center justify-between mb-5">
+        <div className="text-2xl font-bold text-text">Skills</div>
+        <div className="inline-flex bg-white border border-border rounded-full p-0.5 shadow-sm">
+          <button
+            onClick={() => setMode('company')}
+            className={`px-5 py-1.5 rounded-full text-xs font-bold cursor-pointer border-0 transition ${
+              mode === 'company' ? 'bg-primary-light text-primary' : 'bg-transparent text-text-mid hover:text-text'
+            }`}
+          >
+            Company
+          </button>
+          <button
+            onClick={() => setMode('individual')}
+            className={`px-5 py-1.5 rounded-full text-xs font-bold cursor-pointer border-0 transition ${
+              mode === 'individual' ? 'bg-primary-light text-primary' : 'bg-transparent text-text-mid hover:text-text'
+            }`}
+          >
+            Individual
+          </button>
+        </div>
       </div>
-      {activeTab === 'matrix' && (
-        <SkillsMatrix resources={filteredResources} skills={filteredSkills} />
-      )}
-      {activeTab === 'coverage' && (
-        <SkillsCoverage resources={filteredResources} skills={filteredSkills} />
-      )}
+      {mode === 'company' && <CompanySkills resources={sortedResources} skills={sortedSkills} />}
+      {mode === 'individual' && <SkillsMatrix resources={sortedResources} skills={sortedSkills} />}
     </div>
   );
 }

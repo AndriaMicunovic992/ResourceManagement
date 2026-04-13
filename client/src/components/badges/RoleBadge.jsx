@@ -1,10 +1,34 @@
 import { DOMAINS, SENIORITY_SHORT } from '../../lib/constants';
 
-export default function RoleBadge({ domain, role, seniority, small }) {
+export default function RoleBadge({ domain, role, seniority, small, full }) {
   const d = DOMAINS[domain] || { color: '#6B8A9E', bg: '#F0F0F0' };
-  const abbr = domain?.slice(0, 3);
   const senShort = seniority ? SENIORITY_SHORT[seniority] : null;
 
+  if (full) {
+    return (
+      <span
+        className="inline-flex items-center rounded-md font-semibold whitespace-nowrap gap-1"
+        style={{
+          padding: '3px 10px',
+          fontSize: 11,
+          backgroundColor: d.bg,
+          color: d.color,
+        }}
+      >
+        <span>{domain}</span>
+        <span style={{ opacity: 0.6 }}>·</span>
+        <span>{role}</span>
+        {seniority && (
+          <>
+            <span style={{ opacity: 0.6 }}>·</span>
+            <span>{seniority}</span>
+          </>
+        )}
+      </span>
+    );
+  }
+
+  const abbr = domain?.slice(0, 3);
   return (
     <span
       className="inline-flex items-center rounded-md font-mono whitespace-nowrap"
