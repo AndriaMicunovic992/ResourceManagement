@@ -10,9 +10,6 @@ function toDateInputValue(value) {
 
 const TEXTAREA_FIELDS = [
   { key: 'generalStatus', label: 'General status' },
-  { key: 'goodSides', label: 'Good sides' },
-  { key: 'badSides', label: 'Bad sides' },
-  { key: 'suggestions', label: 'Suggestions' },
   { key: 'personalNotes', label: 'Personal notes' },
   { key: 'careerDevelopment', label: 'Career development' },
 ];

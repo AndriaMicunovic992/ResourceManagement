@@ -80,6 +80,22 @@ export const api = {
   updateOneOnOne: (resourceId, id, data) => apiFetch('/people/' + resourceId + '/oneonones/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteOneOnOne: (resourceId, id) => apiFetch('/people/' + resourceId + '/oneonones/' + id, { method: 'DELETE' }),
 
+  // Logs
+  listLogs: (resourceId, params) => {
+    const query = new URLSearchParams();
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v != null && v !== '') query.set(k, v);
+      }
+    }
+    const qs = query.toString();
+    return apiFetch('/people/' + resourceId + '/logs' + (qs ? '?' + qs : ''));
+  },
+  getLog: (resourceId, id) => apiFetch('/people/' + resourceId + '/logs/' + id),
+  createLog: (resourceId, data) => apiFetch('/people/' + resourceId + '/logs', { method: 'POST', body: JSON.stringify(data) }),
+  updateLog: (resourceId, id, data) => apiFetch('/people/' + resourceId + '/logs/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteLog: (resourceId, id) => apiFetch('/people/' + resourceId + '/logs/' + id, { method: 'DELETE' }),
+
   // Needs
   getNeeds: () => apiFetch('/needs'),
   createNeed: (data) => apiFetch('/needs', { method: 'POST', body: JSON.stringify(data) }),
