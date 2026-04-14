@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const LOG_KINDS = [
   'good',
   'bad',
-  'suggestion',
+  'incident',
   'observation',
   'win',
   'down',
@@ -11,26 +11,19 @@ export const LOG_KINDS = [
 ] as const;
 
 export const EMPLOYEE_LOG_KINDS = ['win', 'down', 'blocker'] as const;
-export const ONE_ON_ONE_LOG_KINDS = ['good', 'bad', 'suggestion'] as const;
+export const OBSERVER_LOG_KINDS = ['good', 'bad', 'incident', 'observation'] as const;
 
 const kindSchema = z.enum(LOG_KINDS);
 
-const isOneOnOneKind = (k: string): boolean =>
-  (ONE_ON_ONE_LOG_KINDS as readonly string[]).includes(k);
-
-export const createLogSchema = z
-  .object({
-    content: z.string().trim().min(1).max(5000),
-    kind: kindSchema,
-    categoryId: z.string().optional().nullable(),
-    customerId: z.string().optional().nullable(),
-    projectId: z.string().optional().nullable(),
-    jiraUrl: z.string().url().max(500).optional().nullable(),
-    oneOnOneId: z.string().optional().nullable(),
-  })
-  .refine((data) => !data.oneOnOneId || isOneOnOneKind(data.kind), {
-    message: '1:1 logs must have kind good, bad, or suggestion',
-  });
+export const createLogSchema = z.object({
+  content: z.string().trim().min(1).max(5000),
+  kind: kindSchema,
+  categoryId: z.string().optional().nullable(),
+  customerId: z.string().optional().nullable(),
+  projectId: z.string().optional().nullable(),
+  jiraUrl: z.string().url().max(500).optional().nullable(),
+  oneOnOneId: z.string().optional().nullable(),
+});
 
 export const updateLogSchema = z.object({
   content: z.string().trim().min(1).max(5000).optional(),
