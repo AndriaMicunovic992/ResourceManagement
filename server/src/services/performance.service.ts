@@ -113,7 +113,9 @@ export const performanceService = {
     requestingUserId: string,
     requestingUserRole: string,
     fromStr?: string,
-    toStr?: string
+    toStr?: string,
+    customerId?: string,
+    projectId?: string
   ): Promise<PerformanceOverall> {
     await ensureCanReadPerson(orgId, requestingUserId, requestingUserRole, resourceId);
     const resource = await prisma.resource.findFirst({ where: { id: resourceId, orgId } });
@@ -124,13 +126,24 @@ export const performanceService = {
     // period ends in the future are still counted.
     const windowEnd = toStr ? parseDateOnly(toStr, true) : new Date('9999-12-31T23:59:59.999Z');
 
+    const where: {
+      orgId: string;
+      resourceId: string;
+      state: string;
+      periodEnd: { gte: Date; lte: Date };
+      customerId?: string;
+      projectId?: string;
+    } = {
+      orgId,
+      resourceId,
+      state: 'finalized',
+      periodEnd: { gte: windowStart, lte: windowEnd },
+    };
+    if (customerId) where.customerId = customerId;
+    if (projectId) where.projectId = projectId;
+
     const evaluations = await prisma.evaluation.findMany({
-      where: {
-        orgId,
-        resourceId,
-        state: 'finalized',
-        periodEnd: { gte: windowStart, lte: windowEnd },
-      },
+      where,
       orderBy: { periodEnd: 'asc' },
     });
 
@@ -302,20 +315,33 @@ export const performanceService = {
     requestingUserRole: string,
     bucket: 'month' | 'quarter',
     fromStr?: string,
-    toStr?: string
+    toStr?: string,
+    customerId?: string,
+    projectId?: string
   ): Promise<{ bucketStart: string; overall: number; evaluationCount: number }[]> {
     await ensureCanReadPerson(orgId, requestingUserId, requestingUserRole, resourceId);
 
     const windowStart = fromStr ? parseDateOnly(fromStr, false) : new Date(0);
     const windowEnd = toStr ? parseDateOnly(toStr, true) : new Date('9999-12-31T23:59:59.999Z');
 
+    const where: {
+      orgId: string;
+      resourceId: string;
+      state: string;
+      periodEnd: { gte: Date; lte: Date };
+      customerId?: string;
+      projectId?: string;
+    } = {
+      orgId,
+      resourceId,
+      state: 'finalized',
+      periodEnd: { gte: windowStart, lte: windowEnd },
+    };
+    if (customerId) where.customerId = customerId;
+    if (projectId) where.projectId = projectId;
+
     const evaluations = await prisma.evaluation.findMany({
-      where: {
-        orgId,
-        resourceId,
-        state: 'finalized',
-        periodEnd: { gte: windowStart, lte: windowEnd },
-      },
+      where,
       orderBy: { periodEnd: 'asc' },
     });
     if (evaluations.length === 0) return [];

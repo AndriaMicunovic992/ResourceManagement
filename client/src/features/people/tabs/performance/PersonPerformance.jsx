@@ -170,7 +170,7 @@ function formatBucketLabel(bucketStart, bucket) {
   return `${MONTH_SHORT[parseInt(m[2], 10) - 1]} ${m[1]}`;
 }
 
-function TrendChart({ points, bucket }) {
+function TrendChart({ points, bucket, selectedBuckets = [], onPointClick }) {
   if (!points || points.length === 0) {
     return (
       <div className="text-[11px] text-text-light italic py-6 text-center">
@@ -187,6 +187,7 @@ function TrendChart({ points, bucket }) {
   const maxY = 5;
   const n = points.length;
   const stepX = n > 1 ? innerW / (n - 1) : 0;
+  const clickable = typeof onPointClick === 'function';
 
   const xy = points.map((p, i) => {
     const x = padding.left + (n > 1 ? i * stepX : innerW / 2);
@@ -234,17 +235,45 @@ function TrendChart({ points, bucket }) {
       {linePath && (
         <path d={linePath} fill="none" stroke="#6366f1" strokeWidth="2" />
       )}
-      {xy.map((q, i) =>
-        q.y == null ? null : (
-          <g key={i}>
-            <circle cx={q.x} cy={q.y} r="3" fill="#6366f1" />
+      {xy.map((q, i) => {
+        if (q.y == null) return null;
+        const selected = selectedBuckets.includes(q.point.bucketStart);
+        return (
+          <g
+            key={i}
+            onClick={clickable ? () => onPointClick(q.point.bucketStart) : undefined}
+            style={clickable ? { cursor: 'pointer' } : undefined}
+          >
+            {clickable && (
+              <circle cx={q.x} cy={q.y} r="12" fill="transparent" />
+            )}
+            <circle
+              cx={q.x}
+              cy={q.y}
+              r={selected ? 6 : 3.5}
+              fill="#6366f1"
+              stroke={selected ? '#ffffff' : 'none'}
+              strokeWidth={selected ? 2.5 : 0}
+            />
+            {selected && (
+              <circle
+                cx={q.x}
+                cy={q.y}
+                r={9}
+                fill="none"
+                stroke="#6366f1"
+                strokeWidth={1.5}
+                opacity={0.5}
+              />
+            )}
             <title>
               {formatBucketLabel(q.point.bucketStart, bucket)}: {q.point.overall?.toFixed(1)} ({q.point.evaluationCount} eval
               {q.point.evaluationCount === 1 ? '' : 's'})
+              {clickable ? ' — click to drill down' : ''}
             </title>
           </g>
-        )
-      )}
+        );
+      })}
       {xy.map((q, i) => {
         if (n <= 1) return null;
         if (i % Math.ceil(n / 6) !== 0 && i !== n - 1) return null;
@@ -263,6 +292,26 @@ function TrendChart({ points, bucket }) {
       })}
     </svg>
   );
+}
+
+/**
+ * Compute a { from, to } date range that covers the evaluations the trend
+ * endpoint groups into `bucketStart`. Month buckets use "YYYY-MM"; quarter
+ * buckets use "YYYY-QN".
+ */
+function bucketRange(bucketStart, bucket) {
+  if (bucket === 'quarter') {
+    const m = bucketStart.match(/^(\d{4})-Q([1-4])$/);
+    if (!m) return null;
+    return quarterRange(parseInt(m[1], 10), parseInt(m[2], 10));
+  }
+  const m = bucketStart.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return null;
+  const y = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  const from = toDateInputValue(new Date(Date.UTC(y, mm - 1, 1)));
+  const to = toDateInputValue(new Date(Date.UTC(y, mm, 0)));
+  return { from, to };
 }
 
 export default function PersonPerformance() {
@@ -324,12 +373,15 @@ export default function PersonPerformance() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedDetail, setSelectedDetail] = useState(null);
-  // Category breakdown scope filter — "" = all, "c:<id>" = customer, "p:<id>" = project
-  const [breakdownScope, setBreakdownScope] = useState('');
-  // Category breakdown evaluation filter — "" = average across all matching, else specific eval id
-  const [breakdownEvalId, setBreakdownEvalId] = useState('');
+  // Shared scope filter (customer/project) applied to trend, overall, AND
+  // category breakdown. "" = all, "c:<id>" = customer, "p:<id>" = project.
+  const [scope, setScope] = useState('');
+  // Category breakdown for the whole window (used when no trend point is selected).
   const [categories, setCategories] = useState([]);
-  const [comparison, setComparison] = useState(null); // { current, previous } evaluation details
+  // Bucket picks made by clicking data points on the trend chart. Max 2.
+  const [selectedBuckets, setSelectedBuckets] = useState([]);
+  // Cached category breakdown per selected bucket: { [bucketStart]: Row[] }.
+  const [bucketCategories, setBucketCategories] = useState({});
   // Period window
   const [periodPreset, setPeriodPreset] = useState('default');
   const [periodFrom, setPeriodFrom] = useState('');
@@ -399,6 +451,13 @@ export default function PersonPerformance() {
     setLoading(false);
   }, [canView, resource.id]);
 
+  // Shared scope params applied to all performance endpoints.
+  const scopeParams = useMemo(() => {
+    if (scope.startsWith('c:')) return { customerId: scope.slice(2) };
+    if (scope.startsWith('p:')) return { projectId: scope.slice(2) };
+    return {};
+  }, [scope]);
+
   const reloadTrend = useCallback(async () => {
     if (!canView) return;
     try {
@@ -406,12 +465,13 @@ export default function PersonPerformance() {
         bucket: trendBucket,
         from: periodWindow.from,
         to: periodWindow.to,
+        ...scopeParams,
       });
       setTrend(Array.isArray(data) ? data : []);
     } catch {
       setTrend([]);
     }
-  }, [canView, resource.id, trendBucket, periodWindow.from, periodWindow.to]);
+  }, [canView, resource.id, trendBucket, periodWindow.from, periodWindow.to, scopeParams]);
 
   const reloadOverall = useCallback(async () => {
     if (!canView) return;
@@ -419,34 +479,28 @@ export default function PersonPerformance() {
       const data = await api.getPerformanceOverall(resource.id, {
         from: periodWindow.from,
         to: periodWindow.to,
+        ...scopeParams,
       });
       setOverall(data);
     } catch {
       setOverall(null);
     }
-  }, [canView, resource.id, periodWindow.from, periodWindow.to]);
+  }, [canView, resource.id, periodWindow.from, periodWindow.to, scopeParams]);
 
   const reloadCategories = useCallback(async () => {
     if (!canView) return;
-    // If a single evaluation is selected, skip the aggregate endpoint — we
-    // render a per-category comparison against the previous matching eval.
-    if (breakdownEvalId) {
-      setCategories([]);
-      return;
-    }
     const params = {
       from: periodWindow.from,
       to: periodWindow.to,
+      ...scopeParams,
     };
-    if (breakdownScope.startsWith('c:')) params.customerId = breakdownScope.slice(2);
-    else if (breakdownScope.startsWith('p:')) params.projectId = breakdownScope.slice(2);
     try {
       const data = await api.getPerformanceCategories(resource.id, params);
       setCategories(Array.isArray(data) ? data : []);
     } catch {
       setCategories([]);
     }
-  }, [canView, resource.id, breakdownScope, breakdownEvalId, periodWindow.from, periodWindow.to]);
+  }, [canView, resource.id, scopeParams, periodWindow.from, periodWindow.to]);
 
   useEffect(() => {
     reloadEvaluations();
@@ -464,64 +518,64 @@ export default function PersonPerformance() {
     reloadCategories();
   }, [reloadCategories]);
 
-  // Reset the selected evaluation filter if the scope changes such that the
-  // current selection no longer matches.
+  // When the trend refreshes (period/bucket/scope change), drop any
+  // selected buckets that no longer appear in the current trend.
   useEffect(() => {
-    if (!breakdownEvalId) return;
-    const ev = evaluations.find((e) => e.id === breakdownEvalId);
-    if (!ev) {
-      setBreakdownEvalId('');
+    if (selectedBuckets.length === 0) return;
+    const validKeys = new Set(trend.map((p) => p.bucketStart));
+    const filtered = selectedBuckets.filter((k) => validKeys.has(k));
+    if (filtered.length !== selectedBuckets.length) {
+      setSelectedBuckets(filtered);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trend]);
+
+  // Load category breakdowns for each selected bucket (1 or 2). Each bucket's
+  // date range maps to the month/quarter it represents.
+  useEffect(() => {
+    if (selectedBuckets.length === 0) {
+      setBucketCategories({});
       return;
     }
-    if (breakdownScope.startsWith('c:') && ev.customerId !== breakdownScope.slice(2)) {
-      setBreakdownEvalId('');
-    } else if (breakdownScope.startsWith('p:') && ev.projectId !== breakdownScope.slice(2)) {
-      setBreakdownEvalId('');
-    }
-  }, [breakdownScope, breakdownEvalId, evaluations]);
-
-  // Load the comparison pair (current + previous matching) when a single
-  // evaluation is selected in the breakdown filter.
-  useEffect(() => {
     let cancelled = false;
-    if (!breakdownEvalId) {
-      setComparison(null);
-      return;
-    }
-    const current = evaluations.find((e) => e.id === breakdownEvalId);
-    if (!current) {
-      setComparison(null);
-      return;
-    }
-    const prior = evaluations
-      .filter(
-        (e) =>
-          e.id !== current.id &&
-          e.state === 'finalized' &&
-          e.customerId === current.customerId &&
-          e.projectId === current.projectId &&
-          new Date(e.periodEnd).getTime() < new Date(current.periodEnd).getTime()
-      )
-      .sort((a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime())[0];
-
+    const next = {};
     (async () => {
-      try {
-        const currentDetail = await api.getEvaluation(current.id);
-        let previousDetail = null;
-        if (prior) {
-          previousDetail = await api.getEvaluation(prior.id);
+      for (const key of selectedBuckets) {
+        const range = bucketRange(key, trendBucket);
+        if (!range) continue;
+        try {
+          const data = await api.getPerformanceCategories(resource.id, {
+            from: range.from,
+            to: range.to,
+            ...scopeParams,
+          });
+          if (cancelled) return;
+          next[key] = Array.isArray(data) ? data : [];
+        } catch {
+          if (cancelled) return;
+          next[key] = [];
         }
-        if (cancelled) return;
-        setComparison({ current: currentDetail, previous: previousDetail });
-      } catch {
-        if (cancelled) return;
-        setComparison(null);
       }
+      if (cancelled) return;
+      setBucketCategories(next);
     })();
     return () => {
       cancelled = true;
     };
-  }, [breakdownEvalId, evaluations]);
+  }, [selectedBuckets, trendBucket, resource.id, scopeParams]);
+
+  const handleTrendPointClick = useCallback((bucketStart) => {
+    setSelectedBuckets((prev) => {
+      if (prev.includes(bucketStart)) {
+        return prev.filter((k) => k !== bucketStart);
+      }
+      if (prev.length >= 2) {
+        // Rolling: drop the oldest click, keep the most recent + new one.
+        return [prev[1], bucketStart];
+      }
+      return [...prev, bucketStart];
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -570,64 +624,79 @@ export default function PersonPerformance() {
     return opts;
   }, [evaluations]);
 
-  // Evaluations eligible for the breakdown evaluation filter: finalized and
-  // matching the active scope. Window filter NOT applied here — users can
-  // drill into any single evaluation regardless of the broader period window.
-  const breakdownEvaluationOptions = useMemo(() => {
-    return evaluations
-      .filter((e) => {
-        if (e.state !== 'finalized') return false;
-        if (breakdownScope.startsWith('c:') && e.customerId !== breakdownScope.slice(2)) return false;
-        if (breakdownScope.startsWith('p:') && e.projectId !== breakdownScope.slice(2)) return false;
-        return true;
-      })
-      .sort((a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime())
-      .map((e) => ({
-        id: e.id,
-        label: `${e.customerNameSnapshot}${e.projectNameSnapshot ? ' · ' + e.projectNameSnapshot : ''} — ${formatDate(e.periodEnd)}`,
-      }));
-  }, [evaluations, breakdownScope]);
+  // Ordered list of selected buckets (earliest first) so a 2-bucket comparison
+  // reads "earlier → later".
+  const orderedSelectedBuckets = useMemo(() => {
+    return [...selectedBuckets].sort((a, b) => a.localeCompare(b));
+  }, [selectedBuckets]);
 
-  // Pairs of (snapshot, score) for the comparison view — joined, grouped,
-  // with per-category delta vs the previous evaluation if present.
-  const comparisonRows = useMemo(() => {
-    if (!comparison?.current) return [];
-    const { current, previous } = comparison;
-    const prevByKey = new Map();
-    if (previous?.categorySnapshots) {
-      for (const snap of previous.categorySnapshots) {
-        const score = previous.scores?.find((s) => s.categorySnapshotId === snap.id);
-        const val = score?.responsibleScore;
-        if (val == null) continue;
-        const key = `${snap.categoryGroupingSnapshot || ''}::${snap.categoryNameSnapshot}`;
-        prevByKey.set(key, val);
-      }
+  // Group breakdown rows (single bucket / window) by their grouping label for
+  // rendering. Chooses the right source: whole window, or the picked bucket.
+  const singleBreakdownRows = useMemo(() => {
+    if (orderedSelectedBuckets.length === 1) {
+      return bucketCategories[orderedSelectedBuckets[0]] || [];
     }
-    const rows = [];
-    for (const snap of current.categorySnapshots || []) {
-      const score = current.scores?.find((s) => s.categorySnapshotId === snap.id);
-      const val = score?.responsibleScore;
-      if (val == null) continue;
-      const key = `${snap.categoryGroupingSnapshot || ''}::${snap.categoryNameSnapshot}`;
-      const prev = prevByKey.has(key) ? prevByKey.get(key) : null;
-      rows.push({
-        grouping: snap.categoryGroupingSnapshot || null,
-        categoryName: snap.categoryNameSnapshot,
-        sortOrder: snap.sortOrderSnapshot,
-        current: val,
-        previous: prev,
-        delta: prev == null ? null : Math.round((val - prev) * 10) / 10,
+    if (orderedSelectedBuckets.length === 0) {
+      return categories;
+    }
+    return [];
+  }, [orderedSelectedBuckets, bucketCategories, categories]);
+
+  const singleBreakdownByGrouping = useMemo(() => {
+    const map = new Map();
+    for (const row of singleBreakdownRows) {
+      const key = row.grouping || '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    }
+    return Array.from(map.entries()).map(([grouping, rows]) => ({ grouping, rows }));
+  }, [singleBreakdownRows]);
+
+  // When exactly two buckets are selected, join their category rows by
+  // (grouping, categoryName) and compute per-category deltas.
+  const comparisonRows = useMemo(() => {
+    if (orderedSelectedBuckets.length !== 2) return [];
+    const [aKey, bKey] = orderedSelectedBuckets;
+    const a = bucketCategories[aKey] || [];
+    const b = bucketCategories[bKey] || [];
+    const keyFor = (r) => `${r.grouping || ''}::${r.categoryName}`;
+    const map = new Map();
+    for (const r of a) {
+      map.set(keyFor(r), {
+        grouping: r.grouping || null,
+        categoryName: r.categoryName,
+        earlier: r.averageScore,
+        later: null,
       });
     }
-    rows.sort((a, b) => {
-      const ga = a.grouping || '';
-      const gb = b.grouping || '';
-      if (ga !== gb) return ga.localeCompare(gb);
-      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
-      return a.categoryName.localeCompare(b.categoryName);
+    for (const r of b) {
+      const k = keyFor(r);
+      const existing = map.get(k);
+      if (existing) existing.later = r.averageScore;
+      else {
+        map.set(k, {
+          grouping: r.grouping || null,
+          categoryName: r.categoryName,
+          earlier: null,
+          later: r.averageScore,
+        });
+      }
+    }
+    const rows = Array.from(map.values()).map((r) => ({
+      ...r,
+      delta:
+        r.earlier == null || r.later == null
+          ? null
+          : Math.round((r.later - r.earlier) * 10) / 10,
+    }));
+    rows.sort((x, y) => {
+      const gx = x.grouping || '';
+      const gy = y.grouping || '';
+      if (gx !== gy) return gx.localeCompare(gy);
+      return x.categoryName.localeCompare(y.categoryName);
     });
     return rows;
-  }, [comparison]);
+  }, [orderedSelectedBuckets, bucketCategories]);
 
   const comparisonByGrouping = useMemo(() => {
     const map = new Map();
@@ -638,17 +707,6 @@ export default function PersonPerformance() {
     }
     return Array.from(map.entries()).map(([grouping, rows]) => ({ grouping, rows }));
   }, [comparisonRows]);
-
-  // Group the breakdown rows by their grouping label for rendering.
-  const categoriesByGrouping = useMemo(() => {
-    const map = new Map();
-    for (const row of categories) {
-      const key = row.grouping || '';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(row);
-    }
-    return Array.from(map.entries()).map(([grouping, rows]) => ({ grouping, rows }));
-  }, [categories]);
 
   // Group by "round" = shared periodEnd (the batch parameter users pick).
   const grouped = useMemo(() => {
@@ -717,6 +775,8 @@ export default function PersonPerformance() {
 
   const overallValue = overall?.overall;
   const overallCount = overall?.evaluations?.length ?? 0;
+  const comparisonMode = orderedSelectedBuckets.length === 2;
+  const singleBucketMode = orderedSelectedBuckets.length === 1;
 
   return (
     <div>
@@ -738,6 +798,19 @@ export default function PersonPerformance() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={scope}
+              onChange={(e) => setScope(e.target.value)}
+              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              title="Customer / project scope"
+            >
+              <option value="">All scopes combined</option>
+              {scopeOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
             <select
               value={periodPreset}
               onChange={(e) => setPeriodPreset(e.target.value)}
@@ -822,136 +895,135 @@ export default function PersonPerformance() {
             />
           </div>
         )}
-        <TrendChart points={trend} bucket={trendBucket} />
+        <TrendChart
+          points={trend}
+          bucket={trendBucket}
+          selectedBuckets={selectedBuckets}
+          onPointClick={handleTrendPointClick}
+        />
+        {selectedBuckets.length > 0 && (
+          <div className="flex items-center justify-between gap-2 mt-2 text-[11px] text-text-light">
+            <div>
+              {comparisonMode
+                ? `Comparing ${formatBucketLabel(orderedSelectedBuckets[0], trendBucket)} → ${formatBucketLabel(orderedSelectedBuckets[1], trendBucket)}`
+                : `Showing ${formatBucketLabel(orderedSelectedBuckets[0], trendBucket)} only`}
+              {' · click another point to '}
+              {comparisonMode ? 'replace' : 'compare'}
+            </div>
+            <button
+              onClick={() => setSelectedBuckets([])}
+              className="text-[11px] text-primary hover:underline cursor-pointer border-0 bg-transparent p-0"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-border p-4 mb-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
-            Category breakdown
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={breakdownScope}
-              onChange={(e) => setBreakdownScope(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
-            >
-              <option value="">All scopes combined</option>
-              {scopeOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={breakdownEvalId}
-              onChange={(e) => setBreakdownEvalId(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
-              disabled={breakdownEvaluationOptions.length === 0}
-              title="Single evaluation vs. average"
-            >
-              <option value="">Average across all</option>
-              {breakdownEvaluationOptions.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
+              Category breakdown
+            </div>
+            <div className="text-[11px] text-text-light mt-0.5">
+              {comparisonMode
+                ? `Comparing ${formatBucketLabel(orderedSelectedBuckets[0], trendBucket)} → ${formatBucketLabel(orderedSelectedBuckets[1], trendBucket)}`
+                : singleBucketMode
+                ? `${formatBucketLabel(orderedSelectedBuckets[0], trendBucket)} only`
+                : 'Average across the selected window'}
+            </div>
           </div>
         </div>
 
-        {breakdownEvalId ? (
-          comparison?.current ? (
-            <div>
-              <div className="text-[11px] text-text-light mb-2">
-                Comparing{' '}
-                <strong className="text-text">
-                  {formatDate(comparison.current.periodEnd)}
-                </strong>{' '}
-                vs{' '}
-                {comparison.previous ? (
-                  <strong className="text-text">
-                    {formatDate(comparison.previous.periodEnd)}
-                  </strong>
-                ) : (
-                  <em>no prior evaluation</em>
-                )}
-              </div>
-              {comparisonRows.length === 0 ? (
-                <div className="text-[11px] text-text-light italic py-2">
-                  No responsible scores recorded on this evaluation.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {comparisonByGrouping.map((group) => (
-                    <div key={group.grouping || '_'}>
-                      {group.grouping && (
-                        <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">
-                          {group.grouping}
-                        </div>
-                      )}
-                      <div className="space-y-1">
-                        {group.rows.map((row) => {
-                          const pct = Math.max(
-                            0,
-                            Math.min(100, ((row.current - 1) / 4) * 100)
-                          );
-                          const deltaColor =
-                            row.delta == null
-                              ? 'text-text-light'
-                              : row.delta > 0
-                              ? 'text-emerald-600'
-                              : row.delta < 0
-                              ? 'text-danger'
-                              : 'text-text-light';
-                          const deltaLabel =
-                            row.delta == null
-                              ? '—'
-                              : row.delta > 0
-                              ? `+${row.delta.toFixed(1)}`
-                              : row.delta.toFixed(1);
-                          return (
-                            <div
-                              key={`${group.grouping || ''}::${row.categoryName}`}
-                              className="flex items-center gap-2"
-                            >
-                              <div className="text-xs text-text w-48 shrink-0 truncate">
-                                {row.categoryName}
-                              </div>
-                              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-primary rounded-full"
-                                  style={{ width: `${pct}%` }}
-                                />
-                              </div>
-                              <div className="text-xs font-bold text-primary w-10 text-right shrink-0">
-                                {row.current.toFixed(1)}
-                              </div>
-                              <div className="text-[10px] text-text-light w-12 text-right shrink-0">
-                                prev {row.previous == null ? '—' : row.previous.toFixed(1)}
-                              </div>
-                              <div className={`text-[11px] font-semibold w-10 text-right shrink-0 ${deltaColor}`}>
-                                {deltaLabel}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+        {comparisonMode ? (
+          comparisonRows.length === 0 ? (
+            <div className="text-[11px] text-text-light italic py-2">
+              No category scores in common between these two points.
             </div>
           ) : (
-            <div className="text-[11px] text-text-light italic py-2">Loading comparison…</div>
+            <div className="space-y-3">
+              {comparisonByGrouping.map((group) => (
+                <div key={group.grouping || '_'}>
+                  {group.grouping && (
+                    <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">
+                      {group.grouping}
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    {group.rows.map((row) => {
+                      const earlierPct =
+                        row.earlier == null
+                          ? 0
+                          : Math.max(0, Math.min(100, ((row.earlier - 1) / 4) * 100));
+                      const laterPct =
+                        row.later == null
+                          ? 0
+                          : Math.max(0, Math.min(100, ((row.later - 1) / 4) * 100));
+                      const deltaColor =
+                        row.delta == null
+                          ? 'text-text-light'
+                          : row.delta > 0
+                          ? 'text-emerald-600'
+                          : row.delta < 0
+                          ? 'text-danger'
+                          : 'text-text-light';
+                      const deltaLabel =
+                        row.delta == null
+                          ? '—'
+                          : row.delta > 0
+                          ? `+${row.delta.toFixed(1)}`
+                          : row.delta.toFixed(1);
+                      return (
+                        <div
+                          key={`${group.grouping || ''}::${row.categoryName}`}
+                          className="flex items-center gap-2"
+                        >
+                          <div className="text-xs text-text w-48 shrink-0 truncate">
+                            {row.categoryName}
+                          </div>
+                          <div className="flex-1 flex flex-col gap-0.5">
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gray-400 rounded-full"
+                                style={{ width: `${earlierPct}%` }}
+                              />
+                            </div>
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary rounded-full"
+                                style={{ width: `${laterPct}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-text-light w-10 text-right shrink-0">
+                            {row.earlier == null ? '—' : row.earlier.toFixed(1)}
+                          </div>
+                          <div className="text-xs font-bold text-primary w-10 text-right shrink-0">
+                            {row.later == null ? '—' : row.later.toFixed(1)}
+                          </div>
+                          <div
+                            className={`text-[11px] font-semibold w-10 text-right shrink-0 ${deltaColor}`}
+                          >
+                            {deltaLabel}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           )
-        ) : categories.length === 0 ? (
+        ) : singleBreakdownRows.length === 0 ? (
           <div className="text-[11px] text-text-light italic py-2">
-            No finalized scores yet for this scope.
+            {singleBucketMode
+              ? 'No finalized scores for the selected point.'
+              : 'No finalized scores yet for this window.'}
           </div>
         ) : (
           <div className="space-y-3">
-            {categoriesByGrouping.map((group) => (
+            {singleBreakdownByGrouping.map((group) => (
               <div key={group.grouping || '_'}>
                 {group.grouping && (
                   <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">
