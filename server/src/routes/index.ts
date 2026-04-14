@@ -13,6 +13,7 @@ import { performanceLogCategoryRoutes } from './performanceLogCategory.routes.js
 import { needRoutes } from './need.routes.js';
 import { assignmentRoutes } from './assignment.routes.js';
 import { evaluationRoutes } from './evaluation.routes.js';
+import { insightsRoutes } from './insights.routes.js';
 
 export const routes: FastifyPluginAsync = async (app) => {
   await app.register(authRoutes);
@@ -29,6 +30,7 @@ export const routes: FastifyPluginAsync = async (app) => {
   await app.register(needRoutes);
   await app.register(assignmentRoutes);
   await app.register(evaluationRoutes);
+  await app.register(insightsRoutes);
 
   app.get('/health', async () => {
     const dbOk = !!process.env.DATABASE_URL;

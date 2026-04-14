@@ -1,7 +1,9 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma.js';
 import { monthRange } from '../utils/months.js';
 import { NotFoundError } from '../utils/errors.js';
 import { isAdminRole, userIsManagerOf } from './personAccess.service.js';
+import type { InsightsFilterQuery } from '../schemas/insights.schema.js';
 
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
@@ -376,5 +378,430 @@ export const performanceService = {
       });
     }
     return out;
+  },
+
+  // ==========================================================================
+  // Org-wide insights (admin-only). All filters AND-combine.
+  // ==========================================================================
+
+  /**
+   * Resolve the set of resourceIds in this org that match the filter
+   * (team / domain / role / seniority). Returns all org resources if no
+   * filter is provided.
+   */
+  async _resolveFilteredResourceIds(orgId: string, filters: InsightsFilterQuery): Promise<string[]> {
+    const where: Prisma.ResourceWhereInput = { orgId };
+    if (filters.teamId) {
+      where.teams = { some: { id: filters.teamId } };
+    }
+    const needsRoleFilter = !!(filters.domain || filters.role || filters.seniority);
+    if (needsRoleFilter) {
+      const roleWhere: Prisma.ResourceRoleWhereInput = {};
+      if (filters.domain) roleWhere.domain = filters.domain;
+      if (filters.role) roleWhere.role = filters.role;
+      if (filters.seniority) roleWhere.seniority = filters.seniority;
+      where.roles = { some: roleWhere };
+    }
+    const resources = await prisma.resource.findMany({ where, select: { id: true } });
+    return resources.map((r) => r.id);
+  },
+
+  async _getFilteredEvaluations(orgId: string, filters: InsightsFilterQuery) {
+    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters);
+    if (resourceIds.length === 0) return [];
+    const windowStart = filters.from ? parseDateOnly(filters.from, false) : new Date(0);
+    const windowEnd = filters.to
+      ? parseDateOnly(filters.to, true)
+      : new Date('9999-12-31T23:59:59.999Z');
+    return prisma.evaluation.findMany({
+      where: {
+        orgId,
+        state: 'finalized',
+        resourceId: { in: resourceIds },
+        periodEnd: { gte: windowStart, lte: windowEnd },
+      },
+      orderBy: { periodEnd: 'asc' },
+    });
+  },
+
+  /**
+   * Top-line numbers: how many people are included, how many evaluations are
+   * included, and what the mean overall score is across them.
+   */
+  async orgSummary(
+    orgId: string,
+    filters: InsightsFilterQuery
+  ): Promise<{
+    peopleIncluded: number;
+    evaluationsIncluded: number;
+    meanOverall: number | null;
+  }> {
+    const evaluations = await this._getFilteredEvaluations(orgId, filters);
+    if (evaluations.length === 0) {
+      return { peopleIncluded: 0, evaluationsIncluded: 0, meanOverall: null };
+    }
+    const peopleSet = new Set<string>();
+    let sum = 0;
+    let count = 0;
+    for (const e of evaluations) {
+      peopleSet.add(e.resourceId);
+      const n = e.overrideFinal ?? e.computedFinal;
+      if (n != null) {
+        sum += n;
+        count += 1;
+      }
+    }
+    return {
+      peopleIncluded: peopleSet.size,
+      evaluationsIncluded: evaluations.length,
+      meanOverall: count > 0 ? round1(sum / count) : null,
+    };
+  },
+
+  /**
+   * Histogram of final scores, bucketed by 0.5-point steps from 1.0 to 5.0.
+   */
+  async orgDistribution(
+    orgId: string,
+    filters: InsightsFilterQuery
+  ): Promise<{ bucket: string; lower: number; upper: number; count: number }[]> {
+    const evaluations = await this._getFilteredEvaluations(orgId, filters);
+    // 8 buckets: [1.0,1.5), [1.5,2.0), ..., [4.5,5.0]
+    const buckets = [
+      { bucket: '1.0–1.5', lower: 1.0, upper: 1.5, count: 0 },
+      { bucket: '1.5–2.0', lower: 1.5, upper: 2.0, count: 0 },
+      { bucket: '2.0–2.5', lower: 2.0, upper: 2.5, count: 0 },
+      { bucket: '2.5–3.0', lower: 2.5, upper: 3.0, count: 0 },
+      { bucket: '3.0–3.5', lower: 3.0, upper: 3.5, count: 0 },
+      { bucket: '3.5–4.0', lower: 3.5, upper: 4.0, count: 0 },
+      { bucket: '4.0–4.5', lower: 4.0, upper: 4.5, count: 0 },
+      { bucket: '4.5–5.0', lower: 4.5, upper: 5.0, count: 0 },
+    ];
+    for (const e of evaluations) {
+      const n = e.overrideFinal ?? e.computedFinal;
+      if (n == null) continue;
+      // Last bucket is inclusive on the upper edge for the 5.0 case.
+      let idx = Math.floor((n - 1) * 2);
+      if (idx < 0) idx = 0;
+      if (idx > buckets.length - 1) idx = buckets.length - 1;
+      buckets[idx].count += 1;
+    }
+    return buckets;
+  },
+
+  /**
+   * Average score per category (by grouping+name snapshot), across all
+   * filtered evaluations. Uses responsibleScore to match per-person breakdown.
+   */
+  async orgCategoryBreakdown(
+    orgId: string,
+    filters: InsightsFilterQuery
+  ): Promise<
+    { grouping: string | null; categoryName: string; averageScore: number; evaluationCount: number }[]
+  > {
+    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters);
+    if (resourceIds.length === 0) return [];
+    const windowStart = filters.from ? parseDateOnly(filters.from, false) : new Date(0);
+    const windowEnd = filters.to
+      ? parseDateOnly(filters.to, true)
+      : new Date('9999-12-31T23:59:59.999Z');
+    const evaluations = await prisma.evaluation.findMany({
+      where: {
+        orgId,
+        state: 'finalized',
+        resourceId: { in: resourceIds },
+        periodEnd: { gte: windowStart, lte: windowEnd },
+      },
+      include: {
+        categorySnapshots: true,
+        scores: { select: { categorySnapshotId: true, responsibleScore: true } },
+      },
+    });
+    if (evaluations.length === 0) return [];
+    type Bucket = {
+      grouping: string | null;
+      categoryName: string;
+      sortOrder: number;
+      sum: number;
+      count: number;
+    };
+    const buckets = new Map<string, Bucket>();
+    for (const e of evaluations) {
+      for (const snap of e.categorySnapshots) {
+        const score = e.scores.find((s) => s.categorySnapshotId === snap.id);
+        if (!score || score.responsibleScore == null) continue;
+        const key = `${snap.categoryGroupingSnapshot ?? ''}::${snap.categoryNameSnapshot}`;
+        const existing = buckets.get(key);
+        if (existing) {
+          existing.sum += score.responsibleScore;
+          existing.count += 1;
+        } else {
+          buckets.set(key, {
+            grouping: snap.categoryGroupingSnapshot ?? null,
+            categoryName: snap.categoryNameSnapshot,
+            sortOrder: snap.sortOrderSnapshot,
+            sum: score.responsibleScore,
+            count: 1,
+          });
+        }
+      }
+    }
+    const sorted = Array.from(buckets.values()).sort((a, b) => {
+      const ga = a.grouping ?? '';
+      const gb = b.grouping ?? '';
+      if (ga !== gb) return ga.localeCompare(gb);
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.categoryName.localeCompare(b.categoryName);
+    });
+    return sorted.map((b) => ({
+      grouping: b.grouping,
+      categoryName: b.categoryName,
+      averageScore: round1(b.sum / b.count),
+      evaluationCount: b.count,
+    }));
+  },
+
+  /**
+   * Heatmap: average responsible score by (domain, category). Returns the
+   * domain axis, category axis and a cells array keyed by domain+category.
+   */
+  async orgCategoryHeatmap(
+    orgId: string,
+    filters: InsightsFilterQuery
+  ): Promise<{
+    domains: string[];
+    categories: { grouping: string | null; categoryName: string }[];
+    cells: { domain: string; grouping: string | null; categoryName: string; averageScore: number; count: number }[];
+  }> {
+    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters);
+    if (resourceIds.length === 0) return { domains: [], categories: [], cells: [] };
+    const windowStart = filters.from ? parseDateOnly(filters.from, false) : new Date(0);
+    const windowEnd = filters.to
+      ? parseDateOnly(filters.to, true)
+      : new Date('9999-12-31T23:59:59.999Z');
+
+    // Pull resources with their roles so we know what domain(s) they belong to.
+    // A person may have multiple roles — in that case, we attribute their
+    // scores to each of their domains (common enough in small orgs).
+    const resources = await prisma.resource.findMany({
+      where: { id: { in: resourceIds } },
+      select: { id: true, roles: { select: { domain: true } } },
+    });
+    const resourceDomains = new Map<string, string[]>();
+    for (const r of resources) {
+      const domains = Array.from(new Set(r.roles.map((rr) => rr.domain)));
+      resourceDomains.set(r.id, domains);
+    }
+
+    const evaluations = await prisma.evaluation.findMany({
+      where: {
+        orgId,
+        state: 'finalized',
+        resourceId: { in: resourceIds },
+        periodEnd: { gte: windowStart, lte: windowEnd },
+      },
+      include: {
+        categorySnapshots: true,
+        scores: { select: { categorySnapshotId: true, responsibleScore: true } },
+      },
+    });
+    if (evaluations.length === 0) return { domains: [], categories: [], cells: [] };
+
+    type Key = string; // domain::grouping::categoryName
+    type Bucket = {
+      domain: string;
+      grouping: string | null;
+      categoryName: string;
+      sortOrder: number;
+      sum: number;
+      count: number;
+    };
+    const buckets = new Map<Key, Bucket>();
+    const domainSet = new Set<string>();
+    const categoryMap = new Map<string, { grouping: string | null; categoryName: string; sortOrder: number }>();
+
+    for (const e of evaluations) {
+      const domains = resourceDomains.get(e.resourceId) ?? [];
+      if (domains.length === 0) continue;
+      for (const snap of e.categorySnapshots) {
+        const score = e.scores.find((s) => s.categorySnapshotId === snap.id);
+        if (!score || score.responsibleScore == null) continue;
+        const catKey = `${snap.categoryGroupingSnapshot ?? ''}::${snap.categoryNameSnapshot}`;
+        if (!categoryMap.has(catKey)) {
+          categoryMap.set(catKey, {
+            grouping: snap.categoryGroupingSnapshot ?? null,
+            categoryName: snap.categoryNameSnapshot,
+            sortOrder: snap.sortOrderSnapshot,
+          });
+        }
+        for (const d of domains) {
+          domainSet.add(d);
+          const key = `${d}::${catKey}`;
+          const existing = buckets.get(key);
+          if (existing) {
+            existing.sum += score.responsibleScore;
+            existing.count += 1;
+          } else {
+            buckets.set(key, {
+              domain: d,
+              grouping: snap.categoryGroupingSnapshot ?? null,
+              categoryName: snap.categoryNameSnapshot,
+              sortOrder: snap.sortOrderSnapshot,
+              sum: score.responsibleScore,
+              count: 1,
+            });
+          }
+        }
+      }
+    }
+
+    const domains = Array.from(domainSet).sort();
+    const categories = Array.from(categoryMap.values())
+      .sort((a, b) => {
+        const ga = a.grouping ?? '';
+        const gb = b.grouping ?? '';
+        if (ga !== gb) return ga.localeCompare(gb);
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        return a.categoryName.localeCompare(b.categoryName);
+      })
+      .map((c) => ({ grouping: c.grouping, categoryName: c.categoryName }));
+    const cells = Array.from(buckets.values()).map((b) => ({
+      domain: b.domain,
+      grouping: b.grouping,
+      categoryName: b.categoryName,
+      averageScore: round1(b.sum / b.count),
+      count: b.count,
+    }));
+    return { domains, categories, cells };
+  },
+
+  /**
+   * Company trend line, equal-weighted mean of finalized evaluations per
+   * bucket (month or quarter).
+   */
+  async orgTrend(
+    orgId: string,
+    filters: InsightsFilterQuery,
+    bucket: 'month' | 'quarter'
+  ): Promise<{ bucketStart: string; overall: number; evaluationCount: number; peopleCount: number }[]> {
+    const evaluations = await this._getFilteredEvaluations(orgId, filters);
+    if (evaluations.length === 0) return [];
+
+    function bucketKey(d: Date): string {
+      const y = d.getUTCFullYear();
+      const m = d.getUTCMonth() + 1;
+      if (bucket === 'quarter') {
+        const q = Math.ceil(m / 3);
+        return `${y}-Q${q}`;
+      }
+      return `${y}-${String(m).padStart(2, '0')}`;
+    }
+
+    type Group = { sum: number; count: number; people: Set<string> };
+    const groups = new Map<string, Group>();
+    for (const e of evaluations) {
+      const n = e.overrideFinal ?? e.computedFinal;
+      if (n == null) continue;
+      const key = bucketKey(e.periodEnd);
+      const existing = groups.get(key);
+      if (existing) {
+        existing.sum += n;
+        existing.count += 1;
+        existing.people.add(e.resourceId);
+      } else {
+        groups.set(key, { sum: n, count: 1, people: new Set([e.resourceId]) });
+      }
+    }
+
+    return Array.from(groups.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, g]) => ({
+        bucketStart: key,
+        overall: round1(g.sum / g.count),
+        evaluationCount: g.count,
+        peopleCount: g.people.size,
+      }));
+  },
+
+  /**
+   * Sorted people list: each person's mean final score across the filtered
+   * evaluations, plus their evaluation count.
+   */
+  async orgPeopleList(
+    orgId: string,
+    filters: InsightsFilterQuery
+  ): Promise<
+    {
+      resourceId: string;
+      name: string;
+      teamNames: string[];
+      domains: string[];
+      meanOverall: number;
+      evaluationCount: number;
+    }[]
+  > {
+    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters);
+    if (resourceIds.length === 0) return [];
+    const windowStart = filters.from ? parseDateOnly(filters.from, false) : new Date(0);
+    const windowEnd = filters.to
+      ? parseDateOnly(filters.to, true)
+      : new Date('9999-12-31T23:59:59.999Z');
+
+    const evaluations = await prisma.evaluation.findMany({
+      where: {
+        orgId,
+        state: 'finalized',
+        resourceId: { in: resourceIds },
+        periodEnd: { gte: windowStart, lte: windowEnd },
+      },
+      select: {
+        resourceId: true,
+        overrideFinal: true,
+        computedFinal: true,
+      },
+    });
+    if (evaluations.length === 0) return [];
+
+    type Agg = { sum: number; count: number };
+    const byPerson = new Map<string, Agg>();
+    for (const e of evaluations) {
+      const n = e.overrideFinal ?? e.computedFinal;
+      if (n == null) continue;
+      const existing = byPerson.get(e.resourceId);
+      if (existing) {
+        existing.sum += n;
+        existing.count += 1;
+      } else {
+        byPerson.set(e.resourceId, { sum: n, count: 1 });
+      }
+    }
+    if (byPerson.size === 0) return [];
+
+    const personIds = Array.from(byPerson.keys());
+    const people = await prisma.resource.findMany({
+      where: { id: { in: personIds } },
+      select: {
+        id: true,
+        name: true,
+        teams: { select: { name: true } },
+        roles: { select: { domain: true } },
+      },
+    });
+    const peopleById = new Map(people.map((p) => [p.id, p]));
+
+    return personIds
+      .map((id) => {
+        const p = peopleById.get(id);
+        const agg = byPerson.get(id) as Agg;
+        return {
+          resourceId: id,
+          name: p?.name ?? '—',
+          teamNames: p ? Array.from(new Set(p.teams.map((t) => t.name))).sort() : [],
+          domains: p ? Array.from(new Set(p.roles.map((r) => r.domain))).sort() : [],
+          meanOverall: round1(agg.sum / agg.count),
+          evaluationCount: agg.count,
+        };
+      })
+      .sort((a, b) => b.meanOverall - a.meanOverall || a.name.localeCompare(b.name));
   },
 };

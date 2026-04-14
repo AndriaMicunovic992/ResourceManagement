@@ -14,6 +14,25 @@ export function utilBg(pct) {
   return 'transparent';
 }
 
+// Color helpers for 1-5 evaluation scores.
+export function scoreColor(score) {
+  if (score == null) return '#A0BCC9';
+  if (score >= 4.5) return '#2E7D4F'; // deep green
+  if (score >= 3.5) return '#5BC68A'; // green
+  if (score >= 2.5) return '#F5A623'; // amber
+  if (score >= 1.5) return '#E8636F'; // red
+  return '#B42318'; // deep red
+}
+
+export function scoreBg(score) {
+  if (score == null) return 'transparent';
+  if (score >= 4.5) return '#DCF3E4';
+  if (score >= 3.5) return '#EAFAF0';
+  if (score >= 2.5) return '#FFF6E8';
+  if (score >= 1.5) return '#FDE8EA';
+  return '#FBD5D1';
+}
+
 export function isRealised(item) {
   return item?.status === 'realised';
 }

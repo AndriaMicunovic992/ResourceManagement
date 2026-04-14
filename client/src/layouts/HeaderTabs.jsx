@@ -6,7 +6,7 @@ export default function HeaderTabs() {
 
   const tabs = [
     { path: '/planner', label: 'Planner' },
-    { path: '/dashboard', label: 'Dashboard' },
+    { path: '/dashboard', label: 'Insights' },
     { path: '/people', label: 'People' },
     { path: '/skills', label: 'Skills' },
   ];
