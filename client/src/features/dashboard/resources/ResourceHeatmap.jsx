@@ -10,7 +10,7 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
   const { rURealised, rU } = useComputed();
 
   const visibleResources = useMemo(
-    () => (teamId ? resources.filter((r) => r.teamId === teamId) : resources),
+    () => (teamId ? resources.filter((r) => (r.teams || []).some((t) => t.id === teamId)) : resources),
     [resources, teamId]
   );
 

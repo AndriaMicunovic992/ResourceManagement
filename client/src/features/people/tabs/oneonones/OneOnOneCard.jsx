@@ -8,6 +8,7 @@ const OBSERVER_SECTIONS = [
   { kind: 'good', label: 'Good sides' },
   { kind: 'bad', label: 'Bad sides' },
   { kind: 'incident', label: 'Incidents' },
+  { kind: 'observation', label: 'Observations' },
 ];
 
 const EMPLOYEE_SECTIONS = [
@@ -138,6 +139,7 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
     good: logs.filter((l) => l.kind === 'good'),
     bad: logs.filter((l) => l.kind === 'bad'),
     incident: logs.filter((l) => l.kind === 'incident'),
+    observation: logs.filter((l) => l.kind === 'observation'),
     win: logs.filter((l) => l.kind === 'win'),
     down: logs.filter((l) => l.kind === 'down'),
     blocker: logs.filter((l) => l.kind === 'blocker'),

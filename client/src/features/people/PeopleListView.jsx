@@ -19,7 +19,7 @@ export default function PeopleListView() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return resources
-      .filter((r) => !teamId || r.teamId === teamId)
+      .filter((r) => !teamId || (r.teams || []).some((t) => t.id === teamId))
       .filter((r) => !q || r.name.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [resources, search, teamId]);
@@ -86,7 +86,7 @@ export default function PeopleListView() {
                   </div>
                   <div className="text-[10px] font-mono text-text-light mt-1">
                     {r.capacity} FTE · {skillCount} {skillCount === 1 ? 'skill' : 'skills'}
-                    {r.team && ` · ${r.team.name}`}
+                    {Array.isArray(r.teams) && r.teams.length > 0 && ` · ${r.teams.map((t) => t.name).join(', ')}`}
                   </div>
                 </div>
               </Link>

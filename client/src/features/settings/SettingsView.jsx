@@ -17,9 +17,11 @@ export default function SettingsView() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [teamName, setTeamName] = useState('');
+  const [teamManagerId, setTeamManagerId] = useState('');
   const [teamError, setTeamError] = useState('');
   const [editingTeamId, setEditingTeamId] = useState(null);
   const [editingTeamName, setEditingTeamName] = useState('');
+  const [editingTeamManagerId, setEditingTeamManagerId] = useState('');
   const [skillsError, setSkillsError] = useState('');
   const [seedingSkills, setSeedingSkills] = useState(false);
   const [newSkillName, setNewSkillName] = useState('');
@@ -138,8 +140,9 @@ export default function SettingsView() {
     if (!teamName.trim()) return;
     setTeamError('');
     try {
-      await addTeam({ name: teamName.trim() });
+      await addTeam({ name: teamName.trim(), managerId: teamManagerId || null });
       setTeamName('');
+      setTeamManagerId('');
     } catch (err) {
       setTeamError(err.message || 'Failed to add team');
     }
@@ -148,22 +151,31 @@ export default function SettingsView() {
   const handleStartEditTeam = (team) => {
     setEditingTeamId(team.id);
     setEditingTeamName(team.name);
+    setEditingTeamManagerId(team.managerId || team.manager?.id || '');
     setTeamError('');
+  };
+
+  const handleCancelEditTeam = () => {
+    setEditingTeamId(null);
+    setEditingTeamName('');
+    setEditingTeamManagerId('');
   };
 
   const handleSaveEditTeam = async () => {
     if (!editingTeamName.trim()) return;
     try {
-      await updateTeam(editingTeamId, { name: editingTeamName.trim() });
-      setEditingTeamId(null);
-      setEditingTeamName('');
+      await updateTeam(editingTeamId, {
+        name: editingTeamName.trim(),
+        managerId: editingTeamManagerId || null,
+      });
+      handleCancelEditTeam();
     } catch (err) {
       setTeamError(err.message || 'Failed to update team');
     }
   };
 
   const handleDeleteTeam = async (team) => {
-    const count = resources.filter((r) => r.teamId === team.id).length;
+    const count = resources.filter((r) => (r.teams || []).some((t) => t.id === team.id)).length;
     const msg = count > 0
       ? `Delete team "${team.name}"? ${count} person(s) will be unassigned.`
       : `Delete team "${team.name}"?`;
@@ -354,7 +366,7 @@ export default function SettingsView() {
         <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Teams</h3>
           <p className="text-[10px] text-text-light mb-3">
-            Group people into teams. Each person can belong to one team.
+            Group people into teams. A person can belong to multiple teams. Each team can have a manager whose ownership is inherited by all team members.
           </p>
 
           {teamError && (
@@ -363,23 +375,34 @@ export default function SettingsView() {
 
           <div className="space-y-1 mb-3">
             {teams.map((t) => {
-              const count = resources.filter((r) => r.teamId === t.id).length;
+              const count = resources.filter((r) => (r.teams || []).some((rt) => rt.id === t.id)).length;
               const isEditing = editingTeamId === t.id;
+              const managerName = t.manager?.name || resources.find((r) => r.id === t.managerId)?.name;
               return (
-                <div key={t.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
+                <div key={t.id} className="py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
                   {isEditing ? (
-                    <>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <input
                         type="text"
                         value={editingTeamName}
                         onChange={(e) => setEditingTeamName(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleSaveEditTeam();
-                          if (e.key === 'Escape') { setEditingTeamId(null); setEditingTeamName(''); }
+                          if (e.key === 'Escape') handleCancelEditTeam();
                         }}
                         autoFocus
-                        className="flex-1 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                        className="flex-1 min-w-[120px] px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
                       />
+                      <select
+                        value={editingTeamManagerId}
+                        onChange={(e) => setEditingTeamManagerId(e.target.value)}
+                        className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+                      >
+                        <option value="">No manager</option>
+                        {resources.map((r) => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
                       <button
                         onClick={handleSaveEditTeam}
                         className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:underline px-1"
@@ -387,15 +410,18 @@ export default function SettingsView() {
                         Save
                       </button>
                       <button
-                        onClick={() => { setEditingTeamId(null); setEditingTeamName(''); }}
+                        onClick={handleCancelEditTeam}
                         className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-text-mid px-1"
                       >
                         Cancel
                       </button>
-                    </>
+                    </div>
                   ) : (
-                    <>
+                    <div className="flex items-center gap-2">
                       <span className="flex-1 text-xs font-semibold text-text">{t.name}</span>
+                      {managerName && (
+                        <span className="text-[10px] text-text-light">Manager: {managerName}</span>
+                      )}
                       <span className="text-[10px] text-text-light">{count === 1 ? '1 person' : `${count} people`}</span>
                       <button
                         onClick={() => handleStartEditTeam(t)}
@@ -409,7 +435,7 @@ export default function SettingsView() {
                       >
                         Delete
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
               );
@@ -419,14 +445,27 @@ export default function SettingsView() {
             )}
           </div>
 
-          <form onSubmit={handleAddTeam} className="flex gap-2 items-end pt-3 border-t border-border-light">
-            <div className="flex-1">
+          <form onSubmit={handleAddTeam} className="flex gap-2 items-end pt-3 border-t border-border-light flex-wrap">
+            <div className="flex-1 min-w-[140px]">
               <label className="block text-[10px] font-semibold text-text-mid mb-1">Team name</label>
               <input
                 type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)}
                 placeholder="e.g. Data Platform" required
                 className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
               />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Manager</label>
+              <select
+                value={teamManagerId}
+                onChange={(e) => setTeamManagerId(e.target.value)}
+                className="px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
+              >
+                <option value="">No manager</option>
+                {resources.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
             </div>
             <Button type="submit">Add Team</Button>
           </form>

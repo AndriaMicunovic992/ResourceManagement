@@ -36,16 +36,44 @@ export default function PersonPageHeader({ resource, canEdit, onEdit }) {
           <div className="flex flex-wrap gap-1.5 mt-2">
             {resource.roles?.map((r, i) => <RoleBadge key={i} {...r} full />)}
           </div>
-          <div className="flex items-center gap-3 mt-2 text-[11px] text-text-light">
+          <div className="flex items-center gap-3 mt-2 text-[11px] text-text-light flex-wrap">
             <span className="font-semibold">Capacity: <span className="font-mono text-text-mid">{resource.capacity} FTE</span></span>
-            {resource.team && (
+            {Array.isArray(resource.teams) && resource.teams.length > 0 && (
               <>
                 <span className="text-border">|</span>
                 <span className="font-semibold">
-                  Team: <span className="text-text-mid">{resource.team.name}</span>
+                  {resource.teams.length === 1 ? 'Team:' : 'Teams:'}{' '}
+                  <span className="text-text-mid">
+                    {resource.teams.map((t) => t.name).join(', ')}
+                  </span>
                 </span>
               </>
             )}
+            {(() => {
+              const direct = (resource.managerLinks || [])
+                .map((l) => l.manager)
+                .filter(Boolean);
+              const inherited = (resource.teams || [])
+                .map((t) => t.manager)
+                .filter((m) => m && m.id !== resource.id);
+              const all = [];
+              const seen = new Set();
+              for (const m of [...direct, ...inherited]) {
+                if (!m || seen.has(m.id)) continue;
+                seen.add(m.id);
+                all.push(m);
+              }
+              if (all.length === 0) return null;
+              return (
+                <>
+                  <span className="text-border">|</span>
+                  <span className="font-semibold">
+                    {all.length === 1 ? 'Manager:' : 'Managers:'}{' '}
+                    <span className="text-text-mid">{all.map((m) => m.name).join(', ')}</span>
+                  </span>
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

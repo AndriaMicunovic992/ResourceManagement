@@ -11,7 +11,7 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
   const [expandedRoles, setExpandedRoles] = useState({});
 
   const resources = useMemo(
-    () => (teamId ? allResources.filter((r) => r.teamId === teamId) : allResources),
+    () => (teamId ? allResources.filter((r) => (r.teams || []).some((t) => t.id === teamId)) : allResources),
     [allResources, teamId]
   );
 

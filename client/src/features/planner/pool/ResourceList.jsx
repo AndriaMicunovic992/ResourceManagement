@@ -16,7 +16,8 @@ export default function ResourceList({ resources, filters, heldResource, onHold,
       }
       if (filters.team && filters.team !== 'All') {
         const wantId = teamIdByName.get(filters.team);
-        if (r.teamId !== wantId) return false;
+        if (!wantId) return false;
+        if (!(r.teams || []).some((t) => t.id === wantId)) return false;
       }
       return true;
     });

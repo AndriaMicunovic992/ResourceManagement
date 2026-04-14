@@ -15,7 +15,14 @@ export default function ResourceForm({ initial, onSave, onClose }) {
   const [name, setName] = useState(initial?.name || '');
   const [capacity, setCapacity] = useState(initial?.capacity ?? 1);
   const [capacityHours, setCapacityHours] = useState(fteToHours(initial?.capacity ?? 1));
-  const [teamId, setTeamId] = useState(initial?.teamId || '');
+  const [teamIds, setTeamIds] = useState(
+    Array.isArray(initial?.teams) ? initial.teams.map((t) => t.id) : []
+  );
+  const [directManagerIds, setDirectManagerIds] = useState(
+    Array.isArray(initial?.managerLinks)
+      ? initial.managerLinks.map((l) => l.managerId || l.manager?.id).filter(Boolean)
+      : []
+  );
   const [userId, setUserId] = useState(initial?.userId || '');
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState(
@@ -36,13 +43,37 @@ export default function ResourceForm({ initial, onSave, onClose }) {
     return set;
   }, [resources, initial?.id]);
 
+  const inheritedManagerIds = useMemo(() => {
+    const ids = new Set();
+    const selectedTeams = teams.filter((t) => teamIds.includes(t.id));
+    for (const t of selectedTeams) {
+      if (t.managerId && t.managerId !== initial?.id) ids.add(t.managerId);
+      else if (t.manager?.id && t.manager.id !== initial?.id) ids.add(t.manager.id);
+    }
+    return ids;
+  }, [teams, teamIds, initial?.id]);
+
+  const managerCandidates = useMemo(
+    () => resources.filter((r) => r.id !== initial?.id),
+    [resources, initial?.id]
+  );
+
+  const toggleTeam = (id) => {
+    setTeamIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleManager = (id) => {
+    setDirectManagerIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     const payload = {
       name: name.trim(),
       capacity: parseFloat(capacity),
-      teamId: teamId || null,
+      teamIds,
+      directManagerIds,
       roles,
     };
     if (isAdmin) payload.userId = userId || null;
@@ -78,13 +109,75 @@ export default function ResourceForm({ initial, onSave, onClose }) {
             <span className="text-[10px] text-text-light">hours / month</span>
           </div>
         </Field>
-        <Field label="Team">
-          <select value={teamId} onChange={(e) => setTeamId(e.target.value)}
-            className="w-full px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary bg-white">
-            <option value="">No team</option>
-            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+        <Field label="Teams">
+          {teams.length === 0 ? (
+            <div className="text-xs text-text-light italic">No teams defined yet.</div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {teams.map((t) => {
+                const active = teamIds.includes(t.id);
+                return (
+                  <button
+                    type="button"
+                    key={t.id}
+                    onClick={() => toggleTeam(t.id)}
+                    className={`text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer ${
+                      active
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-text border-border hover:border-primary'
+                    }`}
+                  >
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className="text-[10px] text-text-light mt-1">
+            A person can belong to multiple teams.
+          </div>
         </Field>
+        {isAdmin && (
+          <Field label="Direct managers">
+            {managerCandidates.length === 0 ? (
+              <div className="text-xs text-text-light italic">No other people available.</div>
+            ) : (
+              <div className="max-h-40 overflow-y-auto border border-border rounded-lg p-2 bg-white">
+                <div className="flex flex-wrap gap-1.5">
+                  {managerCandidates.map((r) => {
+                    const active = directManagerIds.includes(r.id);
+                    return (
+                      <button
+                        type="button"
+                        key={r.id}
+                        onClick={() => toggleManager(r.id)}
+                        className={`text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer ${
+                          active
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-text border-border hover:border-primary'
+                        }`}
+                      >
+                        {r.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {inheritedManagerIds.size > 0 && (
+              <div className="text-[10px] text-text-light mt-1">
+                Inherited from selected teams:{' '}
+                {Array.from(inheritedManagerIds)
+                  .map((id) => resources.find((r) => r.id === id)?.name)
+                  .filter(Boolean)
+                  .join(', ')}
+              </div>
+            )}
+            <div className="text-[10px] text-text-light mt-1">
+              A person can have multiple direct managers, in addition to those inherited from teams.
+            </div>
+          </Field>
+        )}
         {isAdmin && (
           <Field label="Linked user account">
             <select value={userId} onChange={(e) => setUserId(e.target.value)}
