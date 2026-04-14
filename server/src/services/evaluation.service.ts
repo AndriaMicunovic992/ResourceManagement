@@ -7,6 +7,7 @@ import {
   userIsResponsibleFor,
   getRequestingResourceId,
 } from './personAccess.service.js';
+import { logInclude } from './log.service.js';
 import type {
   CreateEvaluationInput,
   BatchCreateEvaluationInput,
@@ -301,14 +302,7 @@ export const evaluationService = {
     //   included (regardless of the log's project).
     // - If the evaluation is project-scoped, include logs whose projectId is
     //   null (customer-level logs cascade down) or matches the project.
-    let logs: Array<{
-      id: string;
-      createdAt: Date;
-      kind: string;
-      content: string;
-      customerId: string | null;
-      projectId: string | null;
-    }> = [];
+    let logs: unknown[] = [];
     if (evaluation.customerId) {
       const logsWhere: Prisma.LogWhereInput = {
         orgId,
@@ -321,14 +315,7 @@ export const evaluationService = {
       logs = await prisma.log.findMany({
         where: logsWhere,
         orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          createdAt: true,
-          kind: true,
-          content: true,
-          customerId: true,
-          projectId: true,
-        },
+        include: logInclude,
       });
     }
 
