@@ -6,12 +6,14 @@ import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { ACCENT_COLORS } from '../../../lib/constants';
 import { useData } from '../../../contexts/DataContext';
+import { useVisibility } from '../../../contexts/VisibilityContext';
 
 export default function CustomerHeatmapRow({ customer, index, months, includePotential }) {
   const [expanded, setExpanded] = useState(false);
-  const { projects, needs, assignments, viewableCustomerIds } = useData();
+  const { projects, needs, assignments } = useData();
+  const { canViewCustomer } = useVisibility();
   const navigate = useNavigate();
-  const canOpen = Array.isArray(viewableCustomerIds) && viewableCustomerIds.includes(customer.id);
+  const canOpen = canViewCustomer(customer.id);
   const accent = ACCENT_COLORS[index % ACCENT_COLORS.length];
   const custProjects = useMemo(() => {
     const all = projects.filter((p) => p.customerId === customer.id);

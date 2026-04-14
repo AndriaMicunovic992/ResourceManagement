@@ -16,13 +16,12 @@ export function DataProvider({ children }) {
   const [needs, setNeeds] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [meResource, setMeResource] = useState(null);
-  const [viewableCustomerIds, setViewableCustomerIds] = useState([]);
 
   const reload = useCallback(async () => {
     if (!currentOrg) return;
     setLoading(true);
     try {
-      const [c, p, r, t, s, lc, n, a, me, vc] = await Promise.all([
+      const [c, p, r, t, s, lc, n, a, me] = await Promise.all([
         api.getCustomers(),
         api.getProjects(),
         api.getResources(),
@@ -32,10 +31,8 @@ export function DataProvider({ children }) {
         api.getNeeds(),
         api.getAssignments(),
         api.getMyResource().catch(() => null),
-        api.getViewableCustomerIds().catch(() => ({ ids: [] })),
       ]);
       setCustomers(c); setProjects(p); setResources(r); setTeams(t); setSkills(s); setLogCategories(lc || []); setNeeds(n); setAssignments(a); setMeResource(me);
-      setViewableCustomerIds(Array.isArray(vc?.ids) ? vc.ids : []);
     } catch (e) {
       console.error('Load failed:', e);
     }
@@ -224,7 +221,7 @@ export function DataProvider({ children }) {
   }, []);
 
   const value = {
-    loading, customers, projects, resources, teams, skills, logCategories, needs, assignments, meResource, viewableCustomerIds, reload,
+    loading, customers, projects, resources, teams, skills, logCategories, needs, assignments, meResource, reload,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
     addResource, updateResource, deleteResource,

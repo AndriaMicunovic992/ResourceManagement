@@ -97,11 +97,17 @@ export async function listLogs(
   const where: Prisma.LogWhereInput = { orgId, resourceId };
 
   if (!admin) {
-    // Non-admins can only see their own employee-kind logs on their own resource.
+    // Non-admins viewing their own resource only see their own employee logs
+    // (manager notes stay hidden). Non-admins viewing a visible other person
+    // see all logs — they reached the route by being a manager/responsible.
     const self = await findResourceForUser(orgId, requestingUserId);
-    if (!self || self.id !== resourceId) return [];
-    where.kind = { in: [...EMPLOYEE_LOG_KINDS] };
-    if (filters.kind && isEmployeeKind(filters.kind)) where.kind = filters.kind;
+    const isSelf = self?.id === resourceId;
+    if (isSelf) {
+      where.kind = { in: [...EMPLOYEE_LOG_KINDS] };
+      if (filters.kind && isEmployeeKind(filters.kind)) where.kind = filters.kind;
+    } else if (filters.kind) {
+      where.kind = filters.kind;
+    }
   } else if (filters.kind) {
     where.kind = filters.kind;
   }
@@ -139,12 +145,13 @@ export async function getLog(
   if (!log) throw new NotFoundError('Log not found');
 
   if (!isAdminRole(requestingUserRole)) {
+    // Non-admin viewing self: only their own employee-kind logs. Non-admin
+    // viewing another person's logs: allowed (route has already asserted
+    // visibility via the person gate).
     const self = await findResourceForUser(orgId, requestingUserId);
-    const canSee =
-      self &&
-      self.id === log.resourceId &&
-      isEmployeeKind(log.kind);
-    if (!canSee) throw new NotFoundError('Log not found');
+    if (self?.id === log.resourceId && !isEmployeeKind(log.kind)) {
+      throw new NotFoundError('Log not found');
+    }
   }
   return log;
 }
@@ -160,17 +167,19 @@ export async function createLog(
 
   const admin = isAdminRole(authorRole);
   if (!admin) {
-    // Employees can only log win/down/blocker on their own resource and cannot
-    // attach to a 1:1.
-    if (!isEmployeeKind(data.kind)) {
-      throw new ForbiddenError('You cannot create logs of this kind');
-    }
-    if (data.oneOnOneId) {
-      throw new ForbiddenError('Employee logs cannot be attached to a 1:1');
-    }
+    // Non-admin creating a log on their own profile: only employee-kind
+    // (wins/downs/blockers), no 1:1 attachment. Non-admin creating on
+    // someone else's profile: allowed (route asserted visibility); kind may
+    // be any kind.
     const self = await findResourceForUser(orgId, authorUserId);
-    if (!self || self.id !== resourceId) {
-      throw new ForbiddenError('You can only log against your own profile');
+    const isSelf = self?.id === resourceId;
+    if (isSelf) {
+      if (!isEmployeeKind(data.kind)) {
+        throw new ForbiddenError('You cannot create logs of this kind');
+      }
+      if (data.oneOnOneId) {
+        throw new ForbiddenError('Employee logs cannot be attached to a 1:1');
+      }
     }
   }
 

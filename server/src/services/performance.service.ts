@@ -389,7 +389,11 @@ export const performanceService = {
    * (team / domain / role / seniority). Returns all org resources if no
    * filter is provided.
    */
-  async _resolveFilteredResourceIds(orgId: string, filters: InsightsFilterQuery): Promise<string[]> {
+  async _resolveFilteredResourceIds(
+    orgId: string,
+    filters: InsightsFilterQuery,
+    restrictToIds?: Set<string>
+  ): Promise<string[]> {
     const where: Prisma.ResourceWhereInput = { orgId };
     if (filters.teamId) {
       where.teams = { some: { id: filters.teamId } };
@@ -402,12 +406,19 @@ export const performanceService = {
       if (filters.seniority) roleWhere.seniority = filters.seniority;
       where.roles = { some: roleWhere };
     }
+    if (restrictToIds) {
+      where.id = { in: [...restrictToIds] };
+    }
     const resources = await prisma.resource.findMany({ where, select: { id: true } });
     return resources.map((r) => r.id);
   },
 
-  async _getFilteredEvaluations(orgId: string, filters: InsightsFilterQuery) {
-    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters);
+  async _getFilteredEvaluations(
+    orgId: string,
+    filters: InsightsFilterQuery,
+    restrictToIds?: Set<string>
+  ) {
+    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters, restrictToIds);
     if (resourceIds.length === 0) return [];
     const windowStart = filters.from ? parseDateOnly(filters.from, false) : new Date(0);
     const windowEnd = filters.to
@@ -430,13 +441,14 @@ export const performanceService = {
    */
   async orgSummary(
     orgId: string,
-    filters: InsightsFilterQuery
+    filters: InsightsFilterQuery,
+    restrictToIds?: Set<string>
   ): Promise<{
     peopleIncluded: number;
     evaluationsIncluded: number;
     meanOverall: number | null;
   }> {
-    const evaluations = await this._getFilteredEvaluations(orgId, filters);
+    const evaluations = await this._getFilteredEvaluations(orgId, filters, restrictToIds);
     if (evaluations.length === 0) {
       return { peopleIncluded: 0, evaluationsIncluded: 0, meanOverall: null };
     }
@@ -463,9 +475,10 @@ export const performanceService = {
    */
   async orgDistribution(
     orgId: string,
-    filters: InsightsFilterQuery
+    filters: InsightsFilterQuery,
+    restrictToIds?: Set<string>
   ): Promise<{ bucket: string; lower: number; upper: number; count: number }[]> {
-    const evaluations = await this._getFilteredEvaluations(orgId, filters);
+    const evaluations = await this._getFilteredEvaluations(orgId, filters, restrictToIds);
     // 8 buckets: [1.0,1.5), [1.5,2.0), ..., [4.5,5.0]
     const buckets = [
       { bucket: '1.0–1.5', lower: 1.0, upper: 1.5, count: 0 },
@@ -495,11 +508,12 @@ export const performanceService = {
    */
   async orgCategoryBreakdown(
     orgId: string,
-    filters: InsightsFilterQuery
+    filters: InsightsFilterQuery,
+    restrictToIds?: Set<string>
   ): Promise<
     { grouping: string | null; categoryName: string; averageScore: number; evaluationCount: number }[]
   > {
-    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters);
+    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters, restrictToIds);
     if (resourceIds.length === 0) return [];
     const windowStart = filters.from ? parseDateOnly(filters.from, false) : new Date(0);
     const windowEnd = filters.to
@@ -567,13 +581,14 @@ export const performanceService = {
    */
   async orgCategoryHeatmap(
     orgId: string,
-    filters: InsightsFilterQuery
+    filters: InsightsFilterQuery,
+    restrictToIds?: Set<string>
   ): Promise<{
     domains: string[];
     categories: { grouping: string | null; categoryName: string }[];
     cells: { domain: string; grouping: string | null; categoryName: string; averageScore: number; count: number }[];
   }> {
-    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters);
+    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters, restrictToIds);
     if (resourceIds.length === 0) return { domains: [], categories: [], cells: [] };
     const windowStart = filters.from ? parseDateOnly(filters.from, false) : new Date(0);
     const windowEnd = filters.to
@@ -682,9 +697,10 @@ export const performanceService = {
   async orgTrend(
     orgId: string,
     filters: InsightsFilterQuery,
-    bucket: 'month' | 'quarter'
+    bucket: 'month' | 'quarter',
+    restrictToIds?: Set<string>
   ): Promise<{ bucketStart: string; overall: number; evaluationCount: number; peopleCount: number }[]> {
-    const evaluations = await this._getFilteredEvaluations(orgId, filters);
+    const evaluations = await this._getFilteredEvaluations(orgId, filters, restrictToIds);
     if (evaluations.length === 0) return [];
 
     function bucketKey(d: Date): string {
@@ -729,7 +745,8 @@ export const performanceService = {
    */
   async orgPeopleList(
     orgId: string,
-    filters: InsightsFilterQuery
+    filters: InsightsFilterQuery,
+    restrictToIds?: Set<string>
   ): Promise<
     {
       resourceId: string;
@@ -740,7 +757,7 @@ export const performanceService = {
       evaluationCount: number;
     }[]
   > {
-    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters);
+    const resourceIds = await this._resolveFilteredResourceIds(orgId, filters, restrictToIds);
     if (resourceIds.length === 0) return [];
     const windowStart = filters.from ? parseDateOnly(filters.from, false) : new Date(0);
     const windowEnd = filters.to

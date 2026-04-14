@@ -183,8 +183,10 @@ export const api = {
   getInsightsPerformanceTrend: (params) => apiFetch(_qs('/insights/performance/trend', params)),
   getInsightsPerformancePeople: (params) => apiFetch(_qs('/insights/performance/people', params)),
 
+  // Visibility scope for the current user in the current org.
+  getMyVisibility: () => apiFetch('/me/visibility'),
+
   // Customer detail + performance
-  getViewableCustomerIds: () => apiFetch('/customers/viewable-ids'),
   getCustomerDetail: (id) => apiFetch('/customers/' + id + '/detail'),
   getCustomerActivity: (id, params) => apiFetch(_qs('/customers/' + id + '/activity', params)),
   getCustomerPerformanceOverall: (id, params) =>

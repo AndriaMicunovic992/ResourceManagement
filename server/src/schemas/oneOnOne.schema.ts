@@ -6,6 +6,7 @@ export const createOneOnOneSchema = z.object({
   personalNotes: z.string().max(5000).optional().nullable(),
   careerDevelopment: z.string().max(5000).optional().nullable(),
   managerPersonalNotes: z.string().max(5000).optional().nullable(),
+  privateNote: z.string().max(5000).optional().nullable(),
 });
 
 export const updateOneOnOneSchema = createOneOnOneSchema.partial();

@@ -12,6 +12,7 @@ type OneOnOneRecord = {
   personalNotes: string | null;
   careerDevelopment: string | null;
   managerPersonalNotes: string | null;
+  privateNote: string | null;
   createdAt: Date;
   updatedAt: Date;
   authorUser?: { id: string; name: string; email: string } | null;
@@ -21,26 +22,23 @@ function isAdminRole(role: string): boolean {
   return role === 'admin' || role === 'owner';
 }
 
-function canSeeRecord(
-  userId: string,
-  role: string,
-  record: { authorUserId: string }
-): boolean {
-  if (isAdminRole(role)) return true;
-  if (userId === record.authorUserId) return true;
-  return false;
-}
-
-function stripPrivateFields<T extends { authorUserId: string; managerPersonalNotes: string | null }>(
-  userId: string,
-  record: T
-): T {
+/**
+ * Strip author-only fields from records not authored by the requesting user.
+ * privateNote is only visible to the author. managerPersonalNotes was
+ * already author-only in Step 12 and stays that way.
+ */
+function stripPrivateFields<
+  T extends {
+    authorUserId: string;
+    managerPersonalNotes: string | null;
+    privateNote: string | null;
+  }
+>(userId: string, record: T): T {
   if (userId === record.authorUserId) return record;
-  return { ...record, managerPersonalNotes: null };
+  return { ...record, managerPersonalNotes: null, privateNote: null };
 }
 
 function parseMeetingDate(value: string): Date {
-  // Accept either a full ISO datetime or a YYYY-MM-DD value.
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return new Date(`${value}T00:00:00.000Z`);
   }
@@ -57,12 +55,9 @@ async function ensureResourceInOrg(orgId: string, resourceId: string): Promise<v
 export async function listOneOnOnes(
   orgId: string,
   resourceId: string,
-  requestingUserId: string,
-  requestingUserRole: string
+  requestingUserId: string
 ): Promise<OneOnOneRecord[]> {
   await ensureResourceInOrg(orgId, resourceId);
-
-  if (!isAdminRole(requestingUserRole)) return [];
 
   const records = await prisma.oneOnOne.findMany({
     where: { orgId, resourceId },
@@ -76,18 +71,13 @@ export async function listOneOnOnes(
 export async function getOneOnOne(
   orgId: string,
   id: string,
-  requestingUserId: string,
-  requestingUserRole: string
+  requestingUserId: string
 ): Promise<OneOnOneRecord> {
   const record = await prisma.oneOnOne.findFirst({
     where: { id, orgId },
     include: { authorUser: { select: authorSelect } },
   });
   if (!record) throw new NotFoundError('1:1 meeting not found');
-  // Do not leak existence to users who cannot see the record.
-  if (!canSeeRecord(requestingUserId, requestingUserRole, record)) {
-    throw new NotFoundError('1:1 meeting not found');
-  }
   return stripPrivateFields(requestingUserId, record);
 }
 
@@ -109,6 +99,7 @@ export async function createOneOnOne(
       personalNotes: data.personalNotes ?? null,
       careerDevelopment: data.careerDevelopment ?? null,
       managerPersonalNotes: data.managerPersonalNotes ?? null,
+      privateNote: data.privateNote ?? null,
     },
     include: { authorUser: { select: authorSelect } },
   });
@@ -121,12 +112,15 @@ export async function updateOneOnOne(
   orgId: string,
   id: string,
   requestingUserId: string,
+  requestingUserRole: string,
   data: UpdateOneOnOneInput
 ): Promise<OneOnOneRecord> {
   const existing = await prisma.oneOnOne.findFirst({ where: { id, orgId } });
   if (!existing) throw new NotFoundError('1:1 meeting not found');
-  if (existing.authorUserId !== requestingUserId) {
-    throw new ForbiddenError('Only the author can edit a 1:1 meeting');
+  const isAuthor = existing.authorUserId === requestingUserId;
+  const admin = isAdminRole(requestingUserRole);
+  if (!isAuthor && !admin) {
+    throw new ForbiddenError('Only the author or an admin can edit a 1:1 meeting');
   }
 
   const patch: Record<string, unknown> = {};
@@ -137,6 +131,12 @@ export async function updateOneOnOne(
   if (data.managerPersonalNotes !== undefined) {
     patch.managerPersonalNotes = data.managerPersonalNotes ?? null;
   }
+  // privateNote may only be set by the author. Silently ignore for admins
+  // who are not the author so that an admin edit never clobbers someone
+  // else's private note.
+  if (data.privateNote !== undefined && isAuthor) {
+    patch.privateNote = data.privateNote ?? null;
+  }
 
   const updated = await prisma.oneOnOne.update({
     where: { id },
@@ -144,8 +144,7 @@ export async function updateOneOnOne(
     include: { authorUser: { select: authorSelect } },
   });
 
-  // Only the author can reach this path, so no stripping is required.
-  return updated;
+  return stripPrivateFields(requestingUserId, updated);
 }
 
 export async function deleteOneOnOne(
