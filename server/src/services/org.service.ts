@@ -29,6 +29,8 @@ export const orgService = {
       maxPlanningDate?: string | null;
       performanceTrendDefaultMonths?: number;
       performanceTrendDefaultKind?: string;
+      performanceTrendDefaultFrom?: string | null;
+      performanceTrendDefaultTo?: string | null;
     }
   ) {
     return prisma.organization.update({ where: { id: orgId }, data });
