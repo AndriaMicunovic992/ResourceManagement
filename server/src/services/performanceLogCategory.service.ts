@@ -29,6 +29,7 @@ export const performanceLogCategoryService = {
           orgId,
           name: data.name,
           grouping: data.grouping ?? null,
+          description: data.description ?? null,
         },
       });
     } catch (err) {
@@ -44,6 +45,7 @@ export const performanceLogCategoryService = {
     const patch: Prisma.PerformanceLogCategoryUpdateInput = {};
     if (data.name !== undefined) patch.name = data.name;
     if (data.grouping !== undefined) patch.grouping = data.grouping ?? null;
+    if (data.description !== undefined) patch.description = data.description ?? null;
     try {
       return await prisma.performanceLogCategory.update({ where: { id }, data: patch });
     } catch (err) {

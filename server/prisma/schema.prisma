@@ -295,10 +295,11 @@ model PerformanceLogCategory {
   id        String   @id @default(cuid())
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  grouping  String?
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  grouping    String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   logs Log[]
 
