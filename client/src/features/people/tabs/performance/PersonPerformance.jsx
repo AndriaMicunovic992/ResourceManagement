@@ -144,6 +144,12 @@ export function orgDefaultWindow(org) {
   if (kind === 'calendar_year') {
     return yearRange(new Date().getUTCFullYear());
   }
+  if (kind === 'custom') {
+    return {
+      from: org?.performanceTrendDefaultFrom || '',
+      to: org?.performanceTrendDefaultTo || '',
+    };
+  }
   const months = org?.performanceTrendDefaultMonths ?? 12;
   return { from: monthsAgoDateString(months), to: '' };
 }
@@ -281,8 +287,15 @@ export default function PersonPerformance() {
     if (orgDefaultKind === 'calendar_year') {
       return `Default (${new Date().getUTCFullYear()})`;
     }
+    if (orgDefaultKind === 'custom') {
+      const from = currentOrg?.performanceTrendDefaultFrom;
+      const to = currentOrg?.performanceTrendDefaultTo;
+      if (from && to) return `Default (${from} → ${to})`;
+      if (from) return `Default (from ${from})`;
+      return 'Default (custom)';
+    }
     return `Default (${orgDefaultMonths}m)`;
-  }, [orgDefaultKind, orgDefaultMonths]);
+  }, [orgDefaultKind, orgDefaultMonths, currentOrg]);
 
   // Client-side manager check: is the viewing user a manager of this person?
   const isManager = useMemo(() => {

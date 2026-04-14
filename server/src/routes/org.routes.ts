@@ -25,6 +25,8 @@ export const orgRoutes: FastifyPluginAsync = async (app) => {
       maxPlanningDate?: string | null;
       performanceTrendDefaultMonths?: number;
       performanceTrendDefaultKind?: string;
+      performanceTrendDefaultFrom?: string | null;
+      performanceTrendDefaultTo?: string | null;
     };
     return orgService.updateOrg(req.orgId, data);
   });

@@ -88,6 +88,8 @@ export default function SettingsView() {
   const [perfTrendMonths, setPerfTrendMonths] = useState(
     String(currentOrg?.performanceTrendDefaultMonths ?? 12)
   );
+  const [perfTrendFrom, setPerfTrendFrom] = useState(currentOrg?.performanceTrendDefaultFrom || '');
+  const [perfTrendTo, setPerfTrendTo] = useState(currentOrg?.performanceTrendDefaultTo || '');
   const [perfTrendSaving, setPerfTrendSaving] = useState(false);
   const [perfTrendSuccess, setPerfTrendSuccess] = useState(false);
 
@@ -96,6 +98,8 @@ export default function SettingsView() {
     setMaxDate(currentOrg?.maxPlanningDate || '');
     setPerfTrendKind(currentOrg?.performanceTrendDefaultKind || 'rolling_months');
     setPerfTrendMonths(String(currentOrg?.performanceTrendDefaultMonths ?? 12));
+    setPerfTrendFrom(currentOrg?.performanceTrendDefaultFrom || '');
+    setPerfTrendTo(currentOrg?.performanceTrendDefaultTo || '');
   }, [currentOrg]);
 
   const handleSaveDates = async () => {
@@ -123,6 +127,18 @@ export default function SettingsView() {
         return;
       }
       update.performanceTrendDefaultMonths = n;
+    }
+    if (perfTrendKind === 'custom') {
+      if (!perfTrendFrom) {
+        setError('Custom performance trend needs at least a "From" date');
+        return;
+      }
+      if (perfTrendTo && perfTrendTo < perfTrendFrom) {
+        setError('"To" date must be after "From" date');
+        return;
+      }
+      update.performanceTrendDefaultFrom = perfTrendFrom;
+      update.performanceTrendDefaultTo = perfTrendTo || null;
     }
     setPerfTrendSaving(true);
     setPerfTrendSuccess(false);
@@ -448,6 +464,7 @@ export default function SettingsView() {
                 <option value="calendar_quarter">Current calendar quarter</option>
                 <option value="calendar_half">Current calendar half-year</option>
                 <option value="calendar_year">Current calendar year</option>
+                <option value="custom">Custom (from / to)</option>
               </select>
             </div>
             {perfTrendKind === 'rolling_months' && (
@@ -462,6 +479,31 @@ export default function SettingsView() {
                   className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
                 />
               </div>
+            )}
+            {perfTrendKind === 'custom' && (
+              <>
+                <div className="flex-1 max-w-[170px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">From</label>
+                  <input
+                    type="date"
+                    value={perfTrendFrom}
+                    onChange={(e) => setPerfTrendFrom(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="flex-1 max-w-[170px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
+                    To <span className="text-text-light font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={perfTrendTo}
+                    onChange={(e) => setPerfTrendTo(e.target.value)}
+                    min={perfTrendFrom || undefined}
+                    className="w-full px-2 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                  />
+                </div>
+              </>
             )}
             <Button onClick={handleSavePerfTrend} disabled={perfTrendSaving}>
               {perfTrendSaving ? 'Saving...' : perfTrendSuccess ? 'Saved!' : 'Save'}
