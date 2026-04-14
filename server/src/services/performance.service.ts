@@ -202,7 +202,12 @@ export const performanceService = {
     resourceId: string,
     requestingUserId: string,
     requestingUserRole: string,
-    filters: { customerId?: string | null; projectId?: string | null }
+    filters: {
+      customerId?: string | null;
+      projectId?: string | null;
+      from?: string;
+      to?: string;
+    }
   ): Promise<
     {
       grouping: string | null;
@@ -213,13 +218,24 @@ export const performanceService = {
   > {
     await ensureCanReadPerson(orgId, requestingUserId, requestingUserRole, resourceId);
 
+    const windowStart = filters.from ? parseDateOnly(filters.from, false) : new Date(0);
+    const windowEnd = filters.to
+      ? parseDateOnly(filters.to, true)
+      : new Date('9999-12-31T23:59:59.999Z');
+
     const where: {
       orgId: string;
       resourceId: string;
       state: string;
       customerId?: string;
       projectId?: string | null;
-    } = { orgId, resourceId, state: 'finalized' };
+      periodEnd: { gte: Date; lte: Date };
+    } = {
+      orgId,
+      resourceId,
+      state: 'finalized',
+      periodEnd: { gte: windowStart, lte: windowEnd },
+    };
     if (filters.customerId) where.customerId = filters.customerId;
     if (filters.projectId) where.projectId = filters.projectId;
 
@@ -284,12 +300,22 @@ export const performanceService = {
     resourceId: string,
     requestingUserId: string,
     requestingUserRole: string,
-    bucket: 'month' | 'quarter'
+    bucket: 'month' | 'quarter',
+    fromStr?: string,
+    toStr?: string
   ): Promise<{ bucketStart: string; overall: number; evaluationCount: number }[]> {
     await ensureCanReadPerson(orgId, requestingUserId, requestingUserRole, resourceId);
 
+    const windowStart = fromStr ? parseDateOnly(fromStr, false) : new Date(0);
+    const windowEnd = toStr ? parseDateOnly(toStr, true) : new Date('9999-12-31T23:59:59.999Z');
+
     const evaluations = await prisma.evaluation.findMany({
-      where: { orgId, resourceId, state: 'finalized' },
+      where: {
+        orgId,
+        resourceId,
+        state: 'finalized',
+        periodEnd: { gte: windowStart, lte: windowEnd },
+      },
       orderBy: { periodEnd: 'asc' },
     });
     if (evaluations.length === 0) return [];

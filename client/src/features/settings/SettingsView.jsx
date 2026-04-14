@@ -82,9 +82,16 @@ export default function SettingsView() {
   const [dateSaving, setDateSaving] = useState(false);
   const [dateSuccess, setDateSuccess] = useState(false);
 
+  const [perfTrendMonths, setPerfTrendMonths] = useState(
+    String(currentOrg?.performanceTrendDefaultMonths ?? 12)
+  );
+  const [perfTrendSaving, setPerfTrendSaving] = useState(false);
+  const [perfTrendSuccess, setPerfTrendSuccess] = useState(false);
+
   useEffect(() => {
     setMinDate(currentOrg?.minPlanningDate || '');
     setMaxDate(currentOrg?.maxPlanningDate || '');
+    setPerfTrendMonths(String(currentOrg?.performanceTrendDefaultMonths ?? 12));
   }, [currentOrg]);
 
   const handleSaveDates = async () => {
@@ -101,6 +108,24 @@ export default function SettingsView() {
       setError(err.message || 'Failed to save planning dates');
     }
     setDateSaving(false);
+  };
+
+  const handleSavePerfTrend = async () => {
+    const n = parseInt(perfTrendMonths, 10);
+    if (!Number.isFinite(n) || n < 1 || n > 120) {
+      setError('Performance trend months must be between 1 and 120');
+      return;
+    }
+    setPerfTrendSaving(true);
+    setPerfTrendSuccess(false);
+    try {
+      await updateOrg({ performanceTrendDefaultMonths: n });
+      setPerfTrendSuccess(true);
+      setTimeout(() => setPerfTrendSuccess(false), 2000);
+    } catch (err) {
+      setError(err.message || 'Failed to save performance trend default');
+    }
+    setPerfTrendSaving(false);
   };
 
   const loadMembers = useCallback(async () => {
@@ -392,6 +417,31 @@ export default function SettingsView() {
             </div>
             <Button onClick={handleSaveDates} disabled={dateSaving}>
               {dateSaving ? 'Saving...' : dateSuccess ? 'Saved!' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-3">Performance Trend</h3>
+          <p className="text-[10px] text-text-light mb-3">
+            Default time window (in months, counting back from today) used on the Person Performance tab for the overall grade, trend chart, and category breakdown. Viewers can still override this on the tab.
+          </p>
+          <div className="flex gap-3 items-end">
+            <div className="flex-1 max-w-[160px]">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Default months</label>
+              <input
+                type="number"
+                min={1}
+                max={120}
+                value={perfTrendMonths}
+                onChange={(e) => setPerfTrendMonths(e.target.value)}
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+              />
+            </div>
+            <Button onClick={handleSavePerfTrend} disabled={perfTrendSaving}>
+              {perfTrendSaving ? 'Saving...' : perfTrendSuccess ? 'Saved!' : 'Save'}
             </Button>
           </div>
         </div>

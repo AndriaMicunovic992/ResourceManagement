@@ -63,7 +63,8 @@ function formatRelative(date) {
 export default function PersonOverview() {
   const { resource } = useOutletContext();
   const { assignments, needs, projects, customers, meResource } = useData();
-  const { role } = useOrg();
+  const { role, currentOrg } = useOrg();
+  const orgDefaultMonths = currentOrg?.performanceTrendDefaultMonths ?? 12;
   const { rURealised } = useComputed();
   const navigate = useNavigate();
   const isAdmin = role === 'admin' || role === 'owner';
@@ -128,9 +129,19 @@ export default function PersonOverview() {
       return;
     }
     setPerformanceLoaded(false);
+    // Use the org's default trend window so the Overview card matches the
+    // default view shown on the Performance tab.
+    const now = new Date();
+    const fromDate = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - orgDefaultMonths + 1, 1)
+    );
+    const y = fromDate.getUTCFullYear();
+    const m = String(fromDate.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(fromDate.getUTCDate()).padStart(2, '0');
+    const fromStr = `${y}-${m}-${d}`;
     Promise.all([
-      api.getPerformanceOverall(resource.id).catch(() => null),
-      api.getPerformanceTrend(resource.id, 'month').catch(() => []),
+      api.getPerformanceOverall(resource.id, { from: fromStr }).catch(() => null),
+      api.getPerformanceTrend(resource.id, { bucket: 'month', from: fromStr }).catch(() => []),
     ]).then(([overall, trend]) => {
       if (cancelled) return;
       setPerformanceOverall(overall);
@@ -140,7 +151,7 @@ export default function PersonOverview() {
     return () => {
       cancelled = true;
     };
-  }, [canSeePerformance, resource.id]);
+  }, [canSeePerformance, resource.id, orgDefaultMonths]);
 
   useEffect(() => {
     let cancelled = false;

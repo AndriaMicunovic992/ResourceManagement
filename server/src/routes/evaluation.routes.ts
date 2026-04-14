@@ -100,9 +100,17 @@ export const evaluationRoutes: FastifyPluginAsync = async (app) => {
     { preHandler: requireRole('viewer') },
     async (req) => {
       const { personId } = req.params as { personId: string };
-      const q = req.query as { bucket?: string };
+      const q = req.query as { bucket?: string; from?: string; to?: string };
       const bucket = q.bucket === 'quarter' ? 'quarter' : 'month';
-      return performanceService.trend(req.orgId, personId, req.userId, req.role, bucket);
+      return performanceService.trend(
+        req.orgId,
+        personId,
+        req.userId,
+        req.role,
+        bucket,
+        q.from,
+        q.to
+      );
     }
   );
 
@@ -111,10 +119,17 @@ export const evaluationRoutes: FastifyPluginAsync = async (app) => {
     { preHandler: requireRole('viewer') },
     async (req) => {
       const { personId } = req.params as { personId: string };
-      const q = req.query as { customerId?: string; projectId?: string };
+      const q = req.query as {
+        customerId?: string;
+        projectId?: string;
+        from?: string;
+        to?: string;
+      };
       return performanceService.categoryBreakdown(req.orgId, personId, req.userId, req.role, {
         customerId: q.customerId || null,
         projectId: q.projectId || null,
+        from: q.from,
+        to: q.to,
       });
     }
   );
