@@ -153,4 +153,14 @@ export const api = {
   },
   getPerformanceTrend: (resourceId, bucket) =>
     apiFetch('/people/' + resourceId + '/performance/trend' + (bucket ? '?bucket=' + bucket : '')),
+  getPerformanceCategories: (resourceId, params) => {
+    const query = new URLSearchParams();
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v != null && v !== '') query.set(k, v);
+      }
+    }
+    const qs = query.toString();
+    return apiFetch('/people/' + resourceId + '/performance/categories' + (qs ? '?' + qs : ''));
+  },
 };

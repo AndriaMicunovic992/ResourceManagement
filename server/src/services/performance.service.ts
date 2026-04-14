@@ -120,7 +120,9 @@ export const performanceService = {
     if (!resource) throw new NotFoundError('Resource not found');
 
     const windowStart = fromStr ? parseDateOnly(fromStr, false) : new Date(0);
-    const windowEnd = toStr ? parseDateOnly(toStr, true) : new Date();
+    // Default upper bound is far in the future so finalized evaluations whose
+    // period ends in the future are still counted.
+    const windowEnd = toStr ? parseDateOnly(toStr, true) : new Date('9999-12-31T23:59:59.999Z');
 
     const evaluations = await prisma.evaluation.findMany({
       where: {
@@ -193,6 +195,88 @@ export const performanceService = {
     });
 
     return { overall: round1(overallSum), evaluations: breakdown };
+  },
+
+  async categoryBreakdown(
+    orgId: string,
+    resourceId: string,
+    requestingUserId: string,
+    requestingUserRole: string,
+    filters: { customerId?: string | null; projectId?: string | null }
+  ): Promise<
+    {
+      grouping: string | null;
+      categoryName: string;
+      averageScore: number;
+      evaluationCount: number;
+    }[]
+  > {
+    await ensureCanReadPerson(orgId, requestingUserId, requestingUserRole, resourceId);
+
+    const where: {
+      orgId: string;
+      resourceId: string;
+      state: string;
+      customerId?: string;
+      projectId?: string | null;
+    } = { orgId, resourceId, state: 'finalized' };
+    if (filters.customerId) where.customerId = filters.customerId;
+    if (filters.projectId) where.projectId = filters.projectId;
+
+    const evaluations = await prisma.evaluation.findMany({
+      where,
+      include: {
+        categorySnapshots: true,
+        scores: { select: { categorySnapshotId: true, responsibleScore: true } },
+      },
+    });
+    if (evaluations.length === 0) return [];
+
+    // Aggregate by (grouping, categoryName). Snapshot-level so renames across
+    // time show up as separate rows — matches the "snapshots never re-read"
+    // guarantee the rest of the system relies on.
+    type Bucket = {
+      grouping: string | null;
+      categoryName: string;
+      sortOrder: number;
+      sum: number;
+      count: number;
+    };
+    const buckets = new Map<string, Bucket>();
+    for (const e of evaluations) {
+      for (const snap of e.categorySnapshots) {
+        const score = e.scores.find((s) => s.categorySnapshotId === snap.id);
+        if (!score || score.responsibleScore == null) continue;
+        const key = `${snap.categoryGroupingSnapshot ?? ''}::${snap.categoryNameSnapshot}`;
+        const existing = buckets.get(key);
+        if (existing) {
+          existing.sum += score.responsibleScore;
+          existing.count += 1;
+        } else {
+          buckets.set(key, {
+            grouping: snap.categoryGroupingSnapshot ?? null,
+            categoryName: snap.categoryNameSnapshot,
+            sortOrder: snap.sortOrderSnapshot,
+            sum: score.responsibleScore,
+            count: 1,
+          });
+        }
+      }
+    }
+
+    const sorted = Array.from(buckets.values()).sort((a, b) => {
+      const ga = a.grouping ?? '';
+      const gb = b.grouping ?? '';
+      if (ga !== gb) return ga.localeCompare(gb);
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.categoryName.localeCompare(b.categoryName);
+    });
+    return sorted.map((b) => ({
+      grouping: b.grouping,
+      categoryName: b.categoryName,
+      averageScore: round1(b.sum / b.count),
+      evaluationCount: b.count,
+    }));
   },
 
   async trend(

@@ -177,6 +177,9 @@ export default function PersonPerformance() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedDetail, setSelectedDetail] = useState(null);
+  // Category breakdown scope filter — "" = all, "c:<id>" = customer, "p:<id>" = project
+  const [breakdownScope, setBreakdownScope] = useState('');
+  const [categories, setCategories] = useState([]);
 
   const reloadEvaluations = useCallback(async () => {
     if (!canView) return;
@@ -201,6 +204,19 @@ export default function PersonPerformance() {
     }
   }, [canView, resource.id, trendBucket]);
 
+  const reloadCategories = useCallback(async () => {
+    if (!canView) return;
+    const params = {};
+    if (breakdownScope.startsWith('c:')) params.customerId = breakdownScope.slice(2);
+    else if (breakdownScope.startsWith('p:')) params.projectId = breakdownScope.slice(2);
+    try {
+      const data = await api.getPerformanceCategories(resource.id, params);
+      setCategories(Array.isArray(data) ? data : []);
+    } catch {
+      setCategories([]);
+    }
+  }, [canView, resource.id, breakdownScope]);
+
   useEffect(() => {
     reloadEvaluations();
   }, [reloadEvaluations]);
@@ -208,6 +224,10 @@ export default function PersonPerformance() {
   useEffect(() => {
     reloadTrend();
   }, [reloadTrend]);
+
+  useEffect(() => {
+    reloadCategories();
+  }, [reloadCategories]);
 
   useEffect(() => {
     let cancelled = false;
@@ -231,14 +251,51 @@ export default function PersonPerformance() {
     };
   }, [selectedId]);
 
+  // Distinct scopes present in this person's evaluations, for the breakdown filter.
+  const scopeOptions = useMemo(() => {
+    const opts = [];
+    const customerSeen = new Set();
+    const projectSeen = new Set();
+    for (const ev of evaluations) {
+      if (ev.customerId && !customerSeen.has(ev.customerId)) {
+        customerSeen.add(ev.customerId);
+        opts.push({
+          value: `c:${ev.customerId}`,
+          label: ev.customerNameSnapshot || '—',
+        });
+      }
+      if (ev.projectId && !projectSeen.has(ev.projectId)) {
+        projectSeen.add(ev.projectId);
+        opts.push({
+          value: `p:${ev.projectId}`,
+          label: `${ev.customerNameSnapshot || '—'} · ${ev.projectNameSnapshot || '—'}`,
+        });
+      }
+    }
+    opts.sort((a, b) => a.label.localeCompare(b.label));
+    return opts;
+  }, [evaluations]);
+
+  // Group the breakdown rows by their grouping label for rendering.
+  const categoriesByGrouping = useMemo(() => {
+    const map = new Map();
+    for (const row of categories) {
+      const key = row.grouping || '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    }
+    return Array.from(map.entries()).map(([grouping, rows]) => ({ grouping, rows }));
+  }, [categories]);
+
+  // Group by "round" = shared periodEnd (the batch parameter users pick).
   const grouped = useMemo(() => {
     const map = new Map();
     for (const ev of evaluations) {
-      const key = ev.customerId || 'unknown';
+      const key = ev.periodEnd ? String(ev.periodEnd).slice(0, 10) : 'unknown';
       if (!map.has(key)) {
         map.set(key, {
           key,
-          customerName: ev.customerNameSnapshot || '—',
+          periodEnd: ev.periodEnd,
           items: [],
         });
       }
@@ -246,12 +303,13 @@ export default function PersonPerformance() {
     }
     const groups = Array.from(map.values());
     for (const g of groups) {
-      g.items.sort(
-        (a, b) =>
-          new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime()
+      g.items.sort((a, b) =>
+        (a.customerNameSnapshot || '').localeCompare(b.customerNameSnapshot || '')
       );
     }
-    groups.sort((a, b) => a.customerName.localeCompare(b.customerName));
+    groups.sort(
+      (a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime()
+    );
     return groups;
   }, [evaluations]);
 
@@ -266,8 +324,11 @@ export default function PersonPerformance() {
   const handleDetailChange = (updated) => {
     setEvaluations((prev) => prev.map((e) => (e.id === updated.id ? { ...e, ...updated } : e)));
     setSelectedDetail(updated);
-    // Trend depends on finalized state — refresh when it could have changed.
-    if (updated.state === 'finalized') reloadTrend();
+    // Trend + breakdown depend on finalized state — refresh when it could have changed.
+    if (updated.state === 'finalized') {
+      reloadTrend();
+      reloadCategories();
+    }
   };
 
   const handleDetailDeleted = async (id) => {
@@ -275,6 +336,7 @@ export default function PersonPerformance() {
     setSelectedDetail(null);
     setEvaluations((prev) => prev.filter((e) => e.id !== id));
     reloadTrend();
+    reloadCategories();
   };
 
   if (!canView) {
@@ -311,6 +373,70 @@ export default function PersonPerformance() {
         <TrendChart points={trend} bucket={trendBucket} />
       </div>
 
+      <div className="bg-white rounded-xl border border-border p-4 mb-4">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
+            Category breakdown
+          </div>
+          <select
+            value={breakdownScope}
+            onChange={(e) => setBreakdownScope(e.target.value)}
+            className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+          >
+            <option value="">All scopes combined</option>
+            {scopeOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {categories.length === 0 ? (
+          <div className="text-[11px] text-text-light italic py-2">
+            No finalized scores yet for this scope.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {categoriesByGrouping.map((group) => (
+              <div key={group.grouping || '_'}>
+                {group.grouping && (
+                  <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">
+                    {group.grouping}
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {group.rows.map((row) => {
+                    const pct = Math.max(0, Math.min(100, ((row.averageScore - 1) / 4) * 100));
+                    return (
+                      <div
+                        key={`${group.grouping || ''}::${row.categoryName}`}
+                        className="flex items-center gap-2"
+                      >
+                        <div className="text-xs text-text w-48 shrink-0 truncate">
+                          {row.categoryName}
+                        </div>
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="text-xs font-bold text-primary w-10 text-right shrink-0">
+                          {row.averageScore.toFixed(1)}
+                        </div>
+                        <div className="text-[10px] text-text-light w-12 text-right shrink-0">
+                          n={row.evaluationCount}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-bold text-text">Evaluations</div>
         {canCreate && (
@@ -337,10 +463,36 @@ export default function PersonPerformance() {
         </div>
       ) : (
         <div className="space-y-4">
-          {grouped.map((group) => (
+          {grouped.map((group) => {
+            const roundFinalized = group.items.filter((e) => e.state === 'finalized');
+            const roundAvg =
+              roundFinalized.length > 0
+                ? roundFinalized.reduce(
+                    (acc, e) => acc + (e.overrideFinal ?? e.computedFinal ?? 0),
+                    0
+                  ) / roundFinalized.length
+                : null;
+            return (
             <div key={group.key} className="bg-white rounded-xl border border-border overflow-hidden">
-              <div className="px-4 py-2 border-b border-border bg-primary-bg">
-                <div className="text-sm font-bold text-text">{group.customerName}</div>
+              <div className="px-4 py-2 border-b border-border bg-primary-bg flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-text">
+                    Round · {formatDate(group.periodEnd)}
+                  </div>
+                  <div className="text-[10px] text-text-light mt-0.5">
+                    {group.items.length} evaluation{group.items.length === 1 ? '' : 's'}
+                  </div>
+                </div>
+                {roundAvg != null && (
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-primary leading-none">
+                      {roundAvg.toFixed(1)}
+                    </div>
+                    <div className="text-[9px] text-text-light uppercase tracking-wider">
+                      round avg
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="divide-y divide-border">
                 {group.items.map((ev) => {
@@ -356,7 +508,8 @@ export default function PersonPerformance() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-semibold text-text truncate">
-                          {ev.projectNameSnapshot || 'Whole customer'}
+                          {ev.customerNameSnapshot}
+                          {ev.projectNameSnapshot ? ` · ${ev.projectNameSnapshot}` : ''}
                         </div>
                         <div className="text-[11px] text-text-light mt-0.5">
                           {formatDate(ev.periodStart)} → {formatDate(ev.periodEnd)}
@@ -380,7 +533,8 @@ export default function PersonPerformance() {
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
