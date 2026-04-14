@@ -6,11 +6,24 @@ import type {
   UpdatePerformanceLogCategoryInput,
 } from '../schemas/performanceLogCategory.schema.js';
 
+async function nextSortOrderForGrouping(orgId: string, grouping: string | null): Promise<number> {
+  const existing = await prisma.performanceLogCategory.findFirst({
+    where: { orgId, grouping },
+    orderBy: { sortOrder: 'desc' },
+    select: { sortOrder: true },
+  });
+  return (existing?.sortOrder ?? -1) + 1;
+}
+
 export const performanceLogCategoryService = {
   async list(orgId: string) {
     return prisma.performanceLogCategory.findMany({
       where: { orgId },
-      orderBy: [{ grouping: 'asc' }, { name: 'asc' }],
+      orderBy: [
+        { grouping: { sort: 'asc', nulls: 'last' } },
+        { sortOrder: 'asc' },
+        { name: 'asc' },
+      ],
     });
   },
 
@@ -23,13 +36,18 @@ export const performanceLogCategoryService = {
   },
 
   async create(orgId: string, data: CreatePerformanceLogCategoryInput) {
+    const grouping = data.grouping ?? null;
+    const sortOrder = data.sortOrder ?? (await nextSortOrderForGrouping(orgId, grouping));
     try {
       return await prisma.performanceLogCategory.create({
         data: {
           orgId,
           name: data.name,
-          grouping: data.grouping ?? null,
+          grouping,
           description: data.description ?? null,
+          weight: data.weight ?? 0,
+          active: data.active ?? true,
+          sortOrder,
         },
       });
     } catch (err) {
@@ -46,6 +64,9 @@ export const performanceLogCategoryService = {
     if (data.name !== undefined) patch.name = data.name;
     if (data.grouping !== undefined) patch.grouping = data.grouping ?? null;
     if (data.description !== undefined) patch.description = data.description ?? null;
+    if (data.weight !== undefined) patch.weight = data.weight;
+    if (data.active !== undefined) patch.active = data.active;
+    if (data.sortOrder !== undefined) patch.sortOrder = data.sortOrder;
     try {
       return await prisma.performanceLogCategory.update({ where: { id }, data: patch });
     } catch (err) {

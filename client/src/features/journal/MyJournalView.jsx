@@ -26,7 +26,7 @@ function formatDate(value) {
   });
 }
 
-function LogForm({ initial, customers, projects, groupedCategories, onCancel, onSave }) {
+function LogForm({ initial, customers, projects, logCategories, onCancel, onSave }) {
   const [content, setContent] = useState(initial?.content || '');
   const [kind, setKind] = useState(initial?.kind || 'win');
   const [customerId, setCustomerId] = useState(initial?.customerId || '');
@@ -40,6 +40,24 @@ function LogForm({ initial, customers, projects, groupedCategories, onCancel, on
     if (!customerId) return projects;
     return projects.filter((p) => p.customerId === customerId);
   }, [projects, customerId]);
+
+  const groupedCategories = useMemo(() => {
+    const active = logCategories.filter((c) => c.active !== false);
+    // If we're editing a log whose category is now inactive, keep it visible
+    // in this picker so the user doesn't accidentally clear it.
+    if (initial?.category && initial.category.active === false) {
+      if (!active.some((c) => c.id === initial.category.id)) {
+        active.push(initial.category);
+      }
+    }
+    const groups = new Map();
+    for (const c of active) {
+      const g = c.grouping || '';
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(c);
+    }
+    return Array.from(groups.entries()).map(([grouping, categories]) => ({ grouping, categories }));
+  }, [logCategories, initial?.category]);
 
   const handleCustomerChange = (e) => {
     const newId = e.target.value;
@@ -245,22 +263,6 @@ export default function MyJournalView() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const groupedCategories = useMemo(() => {
-    const groups = {};
-    for (const c of logCategories) {
-      const g = c.grouping || '';
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(c);
-    }
-    return Object.keys(groups)
-      .sort((a, b) => {
-        if (a === '') return 1;
-        if (b === '') return -1;
-        return a.localeCompare(b);
-      })
-      .map((g) => ({ grouping: g, categories: groups[g] }));
-  }, [logCategories]);
-
   useEffect(() => {
     if (!meResource) {
       setLoading(false);
@@ -371,7 +373,7 @@ export default function MyJournalView() {
             initial={null}
             customers={customers}
             projects={projects}
-            groupedCategories={groupedCategories}
+            logCategories={logCategories}
             onCancel={() => setShowForm(false)}
             onSave={handleCreate}
           />
@@ -395,7 +397,7 @@ export default function MyJournalView() {
                 initial={log}
                 customers={customers}
                 projects={projects}
-                groupedCategories={groupedCategories}
+                logCategories={logCategories}
                 onCancel={() => setEditing(null)}
                 onSave={handleUpdate}
               />

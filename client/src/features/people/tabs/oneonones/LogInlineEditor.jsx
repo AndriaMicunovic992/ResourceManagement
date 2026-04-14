@@ -11,21 +11,28 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const groupedCategories = useMemo(() => {
-    const groups = {};
-    for (const c of logCategories) {
-      const g = c.grouping || '';
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(c);
+  const visibleCategories = useMemo(() => {
+    const active = logCategories.filter((c) => c.active !== false);
+    // Keep the currently selected category visible even if it's now inactive,
+    // so saving doesn't accidentally clear the tag.
+    if (initial?.category && initial.category.active === false) {
+      if (!active.some((c) => c.id === initial.category.id)) {
+        return [...active, initial.category];
+      }
     }
-    return Object.keys(groups)
-      .sort((a, b) => {
-        if (a === '') return 1;
-        if (b === '') return -1;
-        return a.localeCompare(b);
-      })
-      .map((g) => ({ grouping: g, categories: groups[g] }));
-  }, [logCategories]);
+    return active;
+  }, [logCategories, initial?.category]);
+
+  const groupedCategories = useMemo(() => {
+    // Preserve the DataContext ordering (grouping/sortOrder/name) by bucketing in order.
+    const groups = new Map();
+    for (const c of visibleCategories) {
+      const g = c.grouping || '';
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(c);
+    }
+    return Array.from(groups.entries()).map(([grouping, categories]) => ({ grouping, categories }));
+  }, [visibleCategories]);
 
   const availableProjects = useMemo(() => {
     if (!projects) return [];
