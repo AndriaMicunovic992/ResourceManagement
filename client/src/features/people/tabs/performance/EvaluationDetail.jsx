@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../../../lib/api';
+import LogCard from '../activity/LogCard';
 
 const STATE_LABELS = {
   draft: 'Draft (employee)',
@@ -293,15 +294,17 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
 
       {!isSubject && eval_.logs && eval_.logs.length > 0 && (
         <div className="mt-3 border-t border-border pt-3">
-          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">
             Activity logs ({eval_.logs.length})
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             {eval_.logs.map((l) => (
-              <div key={l.id} className="text-[11px] text-text">
-                <span className="text-text-light">{formatDate(l.createdAt)}</span> ·{' '}
-                <span className="uppercase font-semibold">{l.kind}</span> · {l.content}
-              </div>
+              <LogCard
+                key={l.id}
+                log={l}
+                currentUserId={currentUserId}
+                resourceId={eval_.resourceId}
+              />
             ))}
           </div>
         </div>

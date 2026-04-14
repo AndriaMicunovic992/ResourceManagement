@@ -23,6 +23,8 @@ const logInclude = {
   category: { select: categorySelect },
 } as const;
 
+export { logInclude };
+
 function isAdminRole(role: string): boolean {
   return role === 'admin' || role === 'owner';
 }
