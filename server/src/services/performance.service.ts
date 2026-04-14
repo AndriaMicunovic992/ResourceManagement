@@ -5,17 +5,17 @@ import { NotFoundError } from '../utils/errors.js';
 import { isAdminRole, userIsManagerOf } from './personAccess.service.js';
 import type { InsightsFilterQuery } from '../schemas/insights.schema.js';
 
-function round1(n: number): number {
+export function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-function dateToYearMonth(d: Date): string {
+export function dateToYearMonth(d: Date): string {
   const y = d.getUTCFullYear();
   const m = d.getUTCMonth() + 1;
   return `${y}-${String(m).padStart(2, '0')}`;
 }
 
-function parseDateOnly(value: string, endOfDay: boolean): Date {
+export function parseDateOnly(value: string, endOfDay: boolean): Date {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     const suffix = endOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
     return new Date(`${value}${suffix}`);
@@ -28,7 +28,7 @@ function parseDateOnly(value: string, endOfDay: boolean): Date {
  * the project (if projectId set) or any project under the customer (if only
  * customerId set), across the months overlapping the window.
  */
-async function allocationForScope(
+export async function allocationForScope(
   resourceId: string,
   customerId: string | null,
   projectId: string | null,
@@ -69,7 +69,7 @@ async function allocationForScope(
 /**
  * Total capacity over the window = capacity * months count.
  */
-async function totalCapacity(resourceId: string, windowStart: Date, windowEnd: Date): Promise<number> {
+export async function totalCapacity(resourceId: string, windowStart: Date, windowEnd: Date): Promise<number> {
   const months = monthRange(dateToYearMonth(windowStart), dateToYearMonth(windowEnd));
   if (months.length === 0) return 0;
   const r = await prisma.resource.findUnique({

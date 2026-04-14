@@ -18,6 +18,12 @@ import PersonOneOnOnes from './features/people/tabs/oneonones/PersonOneOnOnes';
 import PersonActivity from './features/people/tabs/activity/PersonActivity';
 import PersonPerformance from './features/people/tabs/performance/PersonPerformance';
 import MyJournalView from './features/journal/MyJournalView';
+import CustomerPage from './features/customers/CustomerPage';
+import CustomerOverview from './features/customers/tabs/CustomerOverview';
+import CustomerProjects from './features/customers/tabs/CustomerProjects';
+import CustomerPeople from './features/customers/tabs/CustomerPeople';
+import CustomerActivity from './features/customers/tabs/CustomerActivity';
+import CustomerPerformance from './features/customers/tabs/CustomerPerformance';
 
 export default function App() {
   return (
@@ -46,6 +52,13 @@ export default function App() {
               <Route path="oneonones" element={<PersonOneOnOnes />} />
               <Route path="activity" element={<PersonActivity />} />
               <Route path="performance" element={<PersonPerformance />} />
+            </Route>
+            <Route path="/customers/:id" element={<CustomerPage />}>
+              <Route index element={<CustomerOverview />} />
+              <Route path="projects" element={<CustomerProjects />} />
+              <Route path="people" element={<CustomerPeople />} />
+              <Route path="activity" element={<CustomerActivity />} />
+              <Route path="performance" element={<CustomerPerformance />} />
             </Route>
             <Route path="/journal" element={<MyJournalView />} />
             <Route path="/skills" element={<Navigate to="/dashboard" replace />} />

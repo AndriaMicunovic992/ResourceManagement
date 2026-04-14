@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import ResourcePool from './pool/ResourcePool';
 import PlannerToolbar from './toolbar/PlannerToolbar';
 import PlannerGrid from './grid/PlannerGrid';
@@ -22,7 +23,29 @@ export default function PlannerView() {
   const [editModal, setEditModal] = useState(null);
   const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
   const [customerSort, setCustomerSort] = useState('name-asc');
-  const [filterIds, setFilterIds] = useState(new Set());
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filterIds, setFilterIds] = useState(() => {
+    // Seed from ?customerId= / ?projectId= URL params so deep-links from
+    // customer/project pages land with the planner already filtered.
+    const initial = new Set();
+    const customerId = searchParams.get('customerId');
+    const projectId = searchParams.get('projectId');
+    if (customerId) initial.add(`c:${customerId}`);
+    if (projectId) initial.add(`p:${projectId}`);
+    return initial;
+  });
+
+  // Clear the seeded params so the filter stays local state afterwards
+  // (e.g. the user can remove the filter without leaving a stale URL).
+  useEffect(() => {
+    if (searchParams.get('customerId') || searchParams.get('projectId')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('customerId');
+      next.delete('projectId');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Clamp timeRange when org planning limits change
   useEffect(() => {

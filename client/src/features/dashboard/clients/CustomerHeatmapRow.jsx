@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import HeatmapCell from './HeatmapCell';
 import ProjectHeatmapRow from './ProjectHeatmapRow';
 import Avatar from '../../../components/ui/Avatar';
@@ -8,7 +9,9 @@ import { useData } from '../../../contexts/DataContext';
 
 export default function CustomerHeatmapRow({ customer, index, months, includePotential }) {
   const [expanded, setExpanded] = useState(false);
-  const { projects, needs, assignments } = useData();
+  const { projects, needs, assignments, viewableCustomerIds } = useData();
+  const navigate = useNavigate();
+  const canOpen = Array.isArray(viewableCustomerIds) && viewableCustomerIds.includes(customer.id);
   const accent = ACCENT_COLORS[index % ACCENT_COLORS.length];
   const custProjects = useMemo(() => {
     const all = projects.filter((p) => p.customerId === customer.id);
@@ -56,7 +59,19 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
           <Avatar name={customer.name} color={customer.status === 'potential' ? '#9CA3AF' : accent} size={28} className="rounded-lg text-[11px]" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
-              <span className="text-[13px] font-bold text-text truncate">{customer.name}</span>
+              {canOpen ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/customers/${customer.id}`);
+                  }}
+                  className="text-[13px] font-bold text-text truncate bg-transparent border-0 p-0 cursor-pointer hover:text-primary hover:underline text-left"
+                >
+                  {customer.name}
+                </button>
+              ) : (
+                <span className="text-[13px] font-bold text-text truncate">{customer.name}</span>
+              )}
               <StatusBadge status={customer.status} />
             </div>
             <div className="text-[10px] text-text-light">{custProjects.length} projects</div>

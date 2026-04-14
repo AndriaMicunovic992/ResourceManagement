@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { useOrg } from '../../../../contexts/OrgContext';
@@ -179,7 +179,8 @@ export default function PersonPerformance() {
   const { resource } = useOutletContext();
   const { role, currentOrg } = useOrg();
   const { user } = useAuth();
-  const { meResource } = useData();
+  const { meResource, customers } = useData();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = role === 'admin' || role === 'owner';
   const orgDefaultMonths = currentOrg?.performanceTrendDefaultMonths ?? 12;
   const orgDefaultKind = currentOrg?.performanceTrendDefaultKind || 'rolling_months';
@@ -236,7 +237,29 @@ export default function PersonPerformance() {
   const [selectedDetail, setSelectedDetail] = useState(null);
   // Shared scope filter (customer/project) applied to trend, overall, AND
   // category breakdown. "" = all, "c:<id>" = customer, "p:<id>" = project.
-  const [scope, setScope] = useState('');
+  const [scope, setScope] = useState(() => {
+    // Seed from ?customerId=... so deep-links from the customer page land
+    // scoped to that customer. The URL param is cleared after it's consumed.
+    const customerId = searchParams.get('customerId');
+    return customerId ? `c:${customerId}` : '';
+  });
+
+  useEffect(() => {
+    if (searchParams.get('customerId')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('customerId');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Display name for the seeded customer filter banner.
+  const scopedCustomerName = useMemo(() => {
+    if (!scope.startsWith('c:')) return null;
+    const id = scope.slice(2);
+    const c = customers.find((x) => x.id === id);
+    return c?.name ?? null;
+  }, [scope, customers]);
   // Category breakdown for the whole window (used when no trend point is selected).
   const [categories, setCategories] = useState([]);
   // Bucket picks made by clicking data points on the trend chart. Max 2.
@@ -641,6 +664,20 @@ export default function PersonPerformance() {
 
   return (
     <div>
+      {scopedCustomerName && (
+        <div className="flex items-center justify-between gap-3 mb-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+          <div className="text-[12px] text-text-mid">
+            Filtered to customer:{' '}
+            <span className="font-semibold text-text">{scopedCustomerName}</span>
+          </div>
+          <button
+            onClick={() => setScope('')}
+            className="text-[11px] font-semibold text-primary bg-transparent border-0 cursor-pointer hover:underline p-0"
+          >
+            Clear
+          </button>
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-border p-4 mb-4">
         <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <div>
