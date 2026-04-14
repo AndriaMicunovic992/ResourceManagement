@@ -33,6 +33,20 @@ function formatDate(value) {
   });
 }
 
+function toDateInputValue(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function monthsAgoDateString(months) {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months + 1, 1));
+  return toDateInputValue(d);
+}
+
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function formatBucketLabel(bucketStart, bucket) {
@@ -146,10 +160,11 @@ function TrendChart({ points, bucket }) {
 
 export default function PersonPerformance() {
   const { resource } = useOutletContext();
-  const { role } = useOrg();
+  const { role, currentOrg } = useOrg();
   const { user } = useAuth();
   const { meResource } = useData();
   const isAdmin = role === 'admin' || role === 'owner';
+  const orgDefaultMonths = currentOrg?.performanceTrendDefaultMonths ?? 12;
 
   // Client-side manager check: is the viewing user a manager of this person?
   const isManager = useMemo(() => {
@@ -174,12 +189,30 @@ export default function PersonPerformance() {
   const [error, setError] = useState('');
   const [trendBucket, setTrendBucket] = useState('month');
   const [trend, setTrend] = useState([]);
+  const [overall, setOverall] = useState(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedDetail, setSelectedDetail] = useState(null);
   // Category breakdown scope filter — "" = all, "c:<id>" = customer, "p:<id>" = project
   const [breakdownScope, setBreakdownScope] = useState('');
+  // Category breakdown evaluation filter — "" = average across all matching, else specific eval id
+  const [breakdownEvalId, setBreakdownEvalId] = useState('');
   const [categories, setCategories] = useState([]);
+  const [comparison, setComparison] = useState(null); // { current, previous } evaluation details
+  // Period window
+  const [periodPreset, setPeriodPreset] = useState('default');
+  const [periodFrom, setPeriodFrom] = useState('');
+  const [periodTo, setPeriodTo] = useState('');
+
+  // Resolve the period window from the preset (or custom inputs) into from/to.
+  const periodWindow = useMemo(() => {
+    if (periodPreset === 'all') return { from: '', to: '' };
+    if (periodPreset === 'custom') return { from: periodFrom, to: periodTo };
+    const monthsMap = { '3m': 3, '6m': 6, '12m': 12, '24m': 24 };
+    const months =
+      periodPreset === 'default' ? orgDefaultMonths : monthsMap[periodPreset] ?? orgDefaultMonths;
+    return { from: monthsAgoDateString(months), to: '' };
+  }, [periodPreset, periodFrom, periodTo, orgDefaultMonths]);
 
   const reloadEvaluations = useCallback(async () => {
     if (!canView) return;
@@ -197,16 +230,42 @@ export default function PersonPerformance() {
   const reloadTrend = useCallback(async () => {
     if (!canView) return;
     try {
-      const data = await api.getPerformanceTrend(resource.id, trendBucket);
+      const data = await api.getPerformanceTrend(resource.id, {
+        bucket: trendBucket,
+        from: periodWindow.from,
+        to: periodWindow.to,
+      });
       setTrend(Array.isArray(data) ? data : []);
     } catch {
       setTrend([]);
     }
-  }, [canView, resource.id, trendBucket]);
+  }, [canView, resource.id, trendBucket, periodWindow.from, periodWindow.to]);
+
+  const reloadOverall = useCallback(async () => {
+    if (!canView) return;
+    try {
+      const data = await api.getPerformanceOverall(resource.id, {
+        from: periodWindow.from,
+        to: periodWindow.to,
+      });
+      setOverall(data);
+    } catch {
+      setOverall(null);
+    }
+  }, [canView, resource.id, periodWindow.from, periodWindow.to]);
 
   const reloadCategories = useCallback(async () => {
     if (!canView) return;
-    const params = {};
+    // If a single evaluation is selected, skip the aggregate endpoint — we
+    // render a per-category comparison against the previous matching eval.
+    if (breakdownEvalId) {
+      setCategories([]);
+      return;
+    }
+    const params = {
+      from: periodWindow.from,
+      to: periodWindow.to,
+    };
     if (breakdownScope.startsWith('c:')) params.customerId = breakdownScope.slice(2);
     else if (breakdownScope.startsWith('p:')) params.projectId = breakdownScope.slice(2);
     try {
@@ -215,7 +274,7 @@ export default function PersonPerformance() {
     } catch {
       setCategories([]);
     }
-  }, [canView, resource.id, breakdownScope]);
+  }, [canView, resource.id, breakdownScope, breakdownEvalId, periodWindow.from, periodWindow.to]);
 
   useEffect(() => {
     reloadEvaluations();
@@ -226,8 +285,71 @@ export default function PersonPerformance() {
   }, [reloadTrend]);
 
   useEffect(() => {
+    reloadOverall();
+  }, [reloadOverall]);
+
+  useEffect(() => {
     reloadCategories();
   }, [reloadCategories]);
+
+  // Reset the selected evaluation filter if the scope changes such that the
+  // current selection no longer matches.
+  useEffect(() => {
+    if (!breakdownEvalId) return;
+    const ev = evaluations.find((e) => e.id === breakdownEvalId);
+    if (!ev) {
+      setBreakdownEvalId('');
+      return;
+    }
+    if (breakdownScope.startsWith('c:') && ev.customerId !== breakdownScope.slice(2)) {
+      setBreakdownEvalId('');
+    } else if (breakdownScope.startsWith('p:') && ev.projectId !== breakdownScope.slice(2)) {
+      setBreakdownEvalId('');
+    }
+  }, [breakdownScope, breakdownEvalId, evaluations]);
+
+  // Load the comparison pair (current + previous matching) when a single
+  // evaluation is selected in the breakdown filter.
+  useEffect(() => {
+    let cancelled = false;
+    if (!breakdownEvalId) {
+      setComparison(null);
+      return;
+    }
+    const current = evaluations.find((e) => e.id === breakdownEvalId);
+    if (!current) {
+      setComparison(null);
+      return;
+    }
+    const prior = evaluations
+      .filter(
+        (e) =>
+          e.id !== current.id &&
+          e.state === 'finalized' &&
+          e.customerId === current.customerId &&
+          e.projectId === current.projectId &&
+          new Date(e.periodEnd).getTime() < new Date(current.periodEnd).getTime()
+      )
+      .sort((a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime())[0];
+
+    (async () => {
+      try {
+        const currentDetail = await api.getEvaluation(current.id);
+        let previousDetail = null;
+        if (prior) {
+          previousDetail = await api.getEvaluation(prior.id);
+        }
+        if (cancelled) return;
+        setComparison({ current: currentDetail, previous: previousDetail });
+      } catch {
+        if (cancelled) return;
+        setComparison(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [breakdownEvalId, evaluations]);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,6 +397,75 @@ export default function PersonPerformance() {
     opts.sort((a, b) => a.label.localeCompare(b.label));
     return opts;
   }, [evaluations]);
+
+  // Evaluations eligible for the breakdown evaluation filter: finalized and
+  // matching the active scope. Window filter NOT applied here — users can
+  // drill into any single evaluation regardless of the broader period window.
+  const breakdownEvaluationOptions = useMemo(() => {
+    return evaluations
+      .filter((e) => {
+        if (e.state !== 'finalized') return false;
+        if (breakdownScope.startsWith('c:') && e.customerId !== breakdownScope.slice(2)) return false;
+        if (breakdownScope.startsWith('p:') && e.projectId !== breakdownScope.slice(2)) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime())
+      .map((e) => ({
+        id: e.id,
+        label: `${e.customerNameSnapshot}${e.projectNameSnapshot ? ' · ' + e.projectNameSnapshot : ''} — ${formatDate(e.periodEnd)}`,
+      }));
+  }, [evaluations, breakdownScope]);
+
+  // Pairs of (snapshot, score) for the comparison view — joined, grouped,
+  // with per-category delta vs the previous evaluation if present.
+  const comparisonRows = useMemo(() => {
+    if (!comparison?.current) return [];
+    const { current, previous } = comparison;
+    const prevByKey = new Map();
+    if (previous?.categorySnapshots) {
+      for (const snap of previous.categorySnapshots) {
+        const score = previous.scores?.find((s) => s.categorySnapshotId === snap.id);
+        const val = score?.responsibleScore;
+        if (val == null) continue;
+        const key = `${snap.categoryGroupingSnapshot || ''}::${snap.categoryNameSnapshot}`;
+        prevByKey.set(key, val);
+      }
+    }
+    const rows = [];
+    for (const snap of current.categorySnapshots || []) {
+      const score = current.scores?.find((s) => s.categorySnapshotId === snap.id);
+      const val = score?.responsibleScore;
+      if (val == null) continue;
+      const key = `${snap.categoryGroupingSnapshot || ''}::${snap.categoryNameSnapshot}`;
+      const prev = prevByKey.has(key) ? prevByKey.get(key) : null;
+      rows.push({
+        grouping: snap.categoryGroupingSnapshot || null,
+        categoryName: snap.categoryNameSnapshot,
+        sortOrder: snap.sortOrderSnapshot,
+        current: val,
+        previous: prev,
+        delta: prev == null ? null : Math.round((val - prev) * 10) / 10,
+      });
+    }
+    rows.sort((a, b) => {
+      const ga = a.grouping || '';
+      const gb = b.grouping || '';
+      if (ga !== gb) return ga.localeCompare(gb);
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.categoryName.localeCompare(b.categoryName);
+    });
+    return rows;
+  }, [comparison]);
+
+  const comparisonByGrouping = useMemo(() => {
+    const map = new Map();
+    for (const row of comparisonRows) {
+      const key = row.grouping || '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    }
+    return Array.from(map.entries()).map(([grouping, rows]) => ({ grouping, rows }));
+  }, [comparisonRows]);
 
   // Group the breakdown rows by their grouping label for rendering.
   const categoriesByGrouping = useMemo(() => {
@@ -327,6 +518,7 @@ export default function PersonPerformance() {
     // Trend + breakdown depend on finalized state — refresh when it could have changed.
     if (updated.state === 'finalized') {
       reloadTrend();
+      reloadOverall();
       reloadCategories();
     }
   };
@@ -336,6 +528,7 @@ export default function PersonPerformance() {
     setSelectedDetail(null);
     setEvaluations((prev) => prev.filter((e) => e.id !== id));
     reloadTrend();
+    reloadOverall();
     reloadCategories();
   };
 
@@ -350,16 +543,43 @@ export default function PersonPerformance() {
     );
   }
 
-  const latestFinalized = evaluations.find((e) => e.state === 'finalized');
+  const overallValue = overall?.overall;
+  const overallCount = overall?.evaluations?.length ?? 0;
 
   return (
     <div>
       <div className="bg-white rounded-xl border border-border p-4 mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
-            Performance trend
+        <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
+              Performance
+            </div>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <div className="text-2xl font-bold text-primary leading-none">
+                {overallValue != null ? overallValue.toFixed(1) : '—'}
+              </div>
+              <div className="text-[10px] text-text-light">
+                {overallValue != null
+                  ? `overall · ${overallCount} eval${overallCount === 1 ? '' : 's'} in window`
+                  : 'no finalized evaluations in window'}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={periodPreset}
+              onChange={(e) => setPeriodPreset(e.target.value)}
+              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              title="Period window"
+            >
+              <option value="default">Default ({orgDefaultMonths}m)</option>
+              <option value="3m">Last 3 months</option>
+              <option value="6m">Last 6 months</option>
+              <option value="12m">Last 12 months</option>
+              <option value="24m">Last 24 months</option>
+              <option value="all">All time</option>
+              <option value="custom">Custom…</option>
+            </select>
             <select
               value={trendBucket}
               onChange={(e) => setTrendBucket(e.target.value)}
@@ -370,6 +590,24 @@ export default function PersonPerformance() {
             </select>
           </div>
         </div>
+        {periodPreset === 'custom' && (
+          <div className="flex items-center gap-2 mb-2">
+            <label className="text-[10px] font-semibold text-text-mid">From</label>
+            <input
+              type="date"
+              value={periodFrom}
+              onChange={(e) => setPeriodFrom(e.target.value)}
+              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+            />
+            <label className="text-[10px] font-semibold text-text-mid">To</label>
+            <input
+              type="date"
+              value={periodTo}
+              onChange={(e) => setPeriodTo(e.target.value)}
+              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+            />
+          </div>
+        )}
         <TrendChart points={trend} bucket={trendBucket} />
       </div>
 
@@ -378,20 +616,122 @@ export default function PersonPerformance() {
           <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
             Category breakdown
           </div>
-          <select
-            value={breakdownScope}
-            onChange={(e) => setBreakdownScope(e.target.value)}
-            className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
-          >
-            <option value="">All scopes combined</option>
-            {scopeOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={breakdownScope}
+              onChange={(e) => setBreakdownScope(e.target.value)}
+              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+            >
+              <option value="">All scopes combined</option>
+              {scopeOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={breakdownEvalId}
+              onChange={(e) => setBreakdownEvalId(e.target.value)}
+              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              disabled={breakdownEvaluationOptions.length === 0}
+              title="Single evaluation vs. average"
+            >
+              <option value="">Average across all</option>
+              {breakdownEvaluationOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        {categories.length === 0 ? (
+
+        {breakdownEvalId ? (
+          comparison?.current ? (
+            <div>
+              <div className="text-[11px] text-text-light mb-2">
+                Comparing{' '}
+                <strong className="text-text">
+                  {formatDate(comparison.current.periodEnd)}
+                </strong>{' '}
+                vs{' '}
+                {comparison.previous ? (
+                  <strong className="text-text">
+                    {formatDate(comparison.previous.periodEnd)}
+                  </strong>
+                ) : (
+                  <em>no prior evaluation</em>
+                )}
+              </div>
+              {comparisonRows.length === 0 ? (
+                <div className="text-[11px] text-text-light italic py-2">
+                  No responsible scores recorded on this evaluation.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {comparisonByGrouping.map((group) => (
+                    <div key={group.grouping || '_'}>
+                      {group.grouping && (
+                        <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">
+                          {group.grouping}
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        {group.rows.map((row) => {
+                          const pct = Math.max(
+                            0,
+                            Math.min(100, ((row.current - 1) / 4) * 100)
+                          );
+                          const deltaColor =
+                            row.delta == null
+                              ? 'text-text-light'
+                              : row.delta > 0
+                              ? 'text-emerald-600'
+                              : row.delta < 0
+                              ? 'text-danger'
+                              : 'text-text-light';
+                          const deltaLabel =
+                            row.delta == null
+                              ? '—'
+                              : row.delta > 0
+                              ? `+${row.delta.toFixed(1)}`
+                              : row.delta.toFixed(1);
+                          return (
+                            <div
+                              key={`${group.grouping || ''}::${row.categoryName}`}
+                              className="flex items-center gap-2"
+                            >
+                              <div className="text-xs text-text w-48 shrink-0 truncate">
+                                {row.categoryName}
+                              </div>
+                              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary rounded-full"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <div className="text-xs font-bold text-primary w-10 text-right shrink-0">
+                                {row.current.toFixed(1)}
+                              </div>
+                              <div className="text-[10px] text-text-light w-12 text-right shrink-0">
+                                prev {row.previous == null ? '—' : row.previous.toFixed(1)}
+                              </div>
+                              <div className={`text-[11px] font-semibold w-10 text-right shrink-0 ${deltaColor}`}>
+                                {deltaLabel}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-[11px] text-text-light italic py-2">Loading comparison…</div>
+          )
+        ) : categories.length === 0 ? (
           <div className="text-[11px] text-text-light italic py-2">
             No finalized scores yet for this scope.
           </div>

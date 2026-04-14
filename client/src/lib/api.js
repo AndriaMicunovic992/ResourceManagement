@@ -151,8 +151,19 @@ export const api = {
     const qs = query.toString();
     return apiFetch('/people/' + resourceId + '/performance/overall' + (qs ? '?' + qs : ''));
   },
-  getPerformanceTrend: (resourceId, bucket) =>
-    apiFetch('/people/' + resourceId + '/performance/trend' + (bucket ? '?bucket=' + bucket : '')),
+  getPerformanceTrend: (resourceId, params) => {
+    const query = new URLSearchParams();
+    if (typeof params === 'string') {
+      // Back-compat: called as getPerformanceTrend(id, 'quarter')
+      if (params) query.set('bucket', params);
+    } else if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v != null && v !== '') query.set(k, v);
+      }
+    }
+    const qs = query.toString();
+    return apiFetch('/people/' + resourceId + '/performance/trend' + (qs ? '?' + qs : ''));
+  },
   getPerformanceCategories: (resourceId, params) => {
     const query = new URLSearchParams();
     if (params) {

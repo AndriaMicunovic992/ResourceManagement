@@ -19,7 +19,12 @@ export const orgRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.patch('/org', { preHandler: requireRole('admin') }, async (req) => {
-    const data = req.body as { name?: string; minPlanningDate?: string | null; maxPlanningDate?: string | null };
+    const data = req.body as {
+      name?: string;
+      minPlanningDate?: string | null;
+      maxPlanningDate?: string | null;
+      performanceTrendDefaultMonths?: number;
+    };
     return orgService.updateOrg(req.orgId, data);
   });
 

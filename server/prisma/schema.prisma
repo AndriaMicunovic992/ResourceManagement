@@ -13,6 +13,7 @@ model Organization {
   slug            String   @unique
   minPlanningDate String?
   maxPlanningDate String?
+  performanceTrendDefaultMonths Int @default(12)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
