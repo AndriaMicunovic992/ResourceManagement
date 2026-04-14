@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import HoverButtons from '../../../../components/ui/HoverButtons';
 import StatusBadge from '../../../../components/ui/StatusBadge';
 import { isCustomerOk } from '../../../../lib/gridUtils';
@@ -6,7 +7,9 @@ import { ACCENT_COLORS } from '../../../../lib/constants';
 import { useData } from '../../../../contexts/DataContext';
 
 export default function CustomerLabel({ customer, index, onEdit, onDelete, onAddProject, canEdit }) {
-  const { projects, needs, assignments } = useData();
+  const { projects, needs, assignments, viewableCustomerIds } = useData();
+  const navigate = useNavigate();
+  const canOpen = Array.isArray(viewableCustomerIds) && viewableCustomerIds.includes(customer.id);
 
   const ok = useMemo(() => isCustomerOk(customer, projects, needs, assignments), [customer, projects, needs, assignments]);
   const hasNeeds = needs.some((n) => projects.some((p) => p.customerId === customer.id && p.id === n.projectId));
@@ -19,7 +22,19 @@ export default function CustomerLabel({ customer, index, onEdit, onDelete, onAdd
   return (
     <div className="group flex items-center gap-2 px-3.5 h-10" style={{ borderLeft: `4px solid ${borderColor}`, background: bg }}>
       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
-      <span className="text-sm font-bold text-text truncate flex-1">{customer.name}</span>
+      {canOpen ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/customers/${customer.id}`);
+          }}
+          className="text-sm font-bold text-text truncate flex-1 text-left bg-transparent border-0 p-0 cursor-pointer hover:text-primary hover:underline"
+        >
+          {customer.name}
+        </button>
+      ) : (
+        <span className="text-sm font-bold text-text truncate flex-1">{customer.name}</span>
+      )}
       <StatusBadge status={customer.status} />
       <span className="text-[10px] text-text-light font-mono">{projCount}p</span>
       {canEdit && (

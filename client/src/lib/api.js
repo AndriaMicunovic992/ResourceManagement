@@ -182,6 +182,17 @@ export const api = {
   getInsightsPerformanceHeatmap: (params) => apiFetch(_qs('/insights/performance/heatmap', params)),
   getInsightsPerformanceTrend: (params) => apiFetch(_qs('/insights/performance/trend', params)),
   getInsightsPerformancePeople: (params) => apiFetch(_qs('/insights/performance/people', params)),
+
+  // Customer detail + performance
+  getViewableCustomerIds: () => apiFetch('/customers/viewable-ids'),
+  getCustomerDetail: (id) => apiFetch('/customers/' + id + '/detail'),
+  getCustomerActivity: (id, params) => apiFetch(_qs('/customers/' + id + '/activity', params)),
+  getCustomerPerformanceOverall: (id, params) =>
+    apiFetch(_qs('/customers/' + id + '/performance/overall', params)),
+  getCustomerPerformancePerPerson: (id, params) =>
+    apiFetch(_qs('/customers/' + id + '/performance/per-person', params)),
+  getCustomerPerformanceTrend: (id, params) =>
+    apiFetch(_qs('/customers/' + id + '/performance/trend', params)),
 };
 
 function _qs(path, params) {
