@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import CompanySkills from './company/CompanySkills';
-import SkillsMatrix from './matrix/SkillsMatrix';
+import CompanySkills from '../skills/company/CompanySkills';
+import SkillsMatrix from '../skills/matrix/SkillsMatrix';
 
-export default function SkillsView() {
+export default function SkillsSegment() {
   const { resources, skills } = useData();
   const [mode, setMode] = useState('company');
 
@@ -23,7 +23,7 @@ export default function SkillsView() {
   );
 
   return (
-    <div className="max-w-[1400px] mx-auto px-5 py-6">
+    <div>
       <div className="flex items-center justify-between mb-5">
         <div className="flex gap-1">
           <button

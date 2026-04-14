@@ -9,7 +9,6 @@ import AppLayout from './layouts/AppLayout';
 import PlannerView from './features/planner/PlannerView';
 import DashboardView from './features/dashboard/DashboardView';
 import SettingsView from './features/settings/SettingsView';
-import SkillsView from './features/skills/SkillsView';
 import PeopleListView from './features/people/PeopleListView';
 import PersonPage from './features/people/PersonPage';
 import PersonOverview from './features/people/tabs/PersonOverview';
@@ -49,7 +48,7 @@ export default function App() {
               <Route path="performance" element={<PersonPerformance />} />
             </Route>
             <Route path="/journal" element={<MyJournalView />} />
-            <Route path="/skills" element={<SkillsView />} />
+            <Route path="/skills" element={<Navigate to="/dashboard" replace />} />
             <Route path="/settings" element={<SettingsView />} />
           </Route>
         </Routes>
