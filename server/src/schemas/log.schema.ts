@@ -1,7 +1,28 @@
 import { z } from 'zod';
 
-const kindSchema = z.enum(['good', 'bad', 'suggestion', 'observation']);
-const dimensionCodeSchema = z.enum(['D1', 'D2', 'D3', 'D4', 'D5', 'D6']);
+export const LOG_KINDS = [
+  'good',
+  'bad',
+  'suggestion',
+  'observation',
+  'win',
+  'down',
+  'blocker',
+] as const;
+
+export const EMPLOYEE_LOG_KINDS = ['win', 'down', 'blocker'] as const;
+export const ONE_ON_ONE_LOG_KINDS = ['good', 'bad', 'suggestion'] as const;
+
+const kindSchema = z.enum(LOG_KINDS);
+const dimensionCodeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(20)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
+const isOneOnOneKind = (k: string): boolean =>
+  (ONE_ON_ONE_LOG_KINDS as readonly string[]).includes(k);
 
 export const createLogSchema = z
   .object({
@@ -13,7 +34,7 @@ export const createLogSchema = z
     jiraUrl: z.string().url().max(500).optional().nullable(),
     oneOnOneId: z.string().optional().nullable(),
   })
-  .refine((data) => !data.oneOnOneId || data.kind !== 'observation', {
+  .refine((data) => !data.oneOnOneId || isOneOnOneKind(data.kind), {
     message: '1:1 logs must have kind good, bad, or suggestion',
   });
 

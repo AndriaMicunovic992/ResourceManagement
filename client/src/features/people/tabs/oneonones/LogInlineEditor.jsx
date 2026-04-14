@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-
-const DIMENSION_CODES = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6'];
+import { useData } from '../../../../contexts/DataContext';
 
 export default function LogInlineEditor({ initial, customers, projects, onCancel, onSave }) {
+  const { dimensions } = useData();
   const [content, setContent] = useState(initial?.content || '');
   const [customerId, setCustomerId] = useState(initial?.customerId || '');
   const [projectId, setProjectId] = useState(initial?.projectId || '');
@@ -107,9 +107,9 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
           className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
         >
           <option value="">Dimension: None</option>
-          {DIMENSION_CODES.map((code) => (
-            <option key={code} value={code}>
-              {code}
+          {dimensions.map((dim) => (
+            <option key={dim.id} value={dim.code}>
+              {dim.name}
             </option>
           ))}
         </select>

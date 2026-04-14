@@ -33,7 +33,7 @@ function Section({ label, value }) {
   );
 }
 
-function LogEntry({ log, currentUserId, onEdit, onDelete }) {
+function LogEntry({ log, currentUserId, dimensionLabel, onEdit, onDelete }) {
   const isAuthor = log.authorUserId === currentUserId;
   return (
     <div className="border border-border-light rounded-lg p-2.5 bg-white">
@@ -41,7 +41,7 @@ function LogEntry({ log, currentUserId, onEdit, onDelete }) {
       <div className="flex flex-wrap gap-1.5 mb-1.5">
         {log.dimensionCode && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
-            {log.dimensionCode}
+            {dimensionLabel || log.dimensionCode}
           </span>
         )}
         {log.customer && (
@@ -100,7 +100,9 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
   const [addingKind, setAddingKind] = useState(null); // 'good' | 'bad' | 'suggestion' | null
   const [editingLogId, setEditingLogId] = useState(null);
   const { user } = useAuth();
-  const { customers, projects } = useData();
+  const { customers, projects, dimensions } = useData();
+  const dimensionLabelByCode = {};
+  for (const d of dimensions) dimensionLabelByCode[d.code] = d.name;
 
   const author = record.authorUser;
   const authorName = author?.name || author?.email || 'Unknown';
@@ -229,6 +231,7 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
                         key={log.id}
                         log={log}
                         currentUserId={user?.id}
+                        dimensionLabel={dimensionLabelByCode[log.dimensionCode]}
                         onEdit={() => setEditingLogId(log.id)}
                         onDelete={() => handleDeleteLog(log.id)}
                       />

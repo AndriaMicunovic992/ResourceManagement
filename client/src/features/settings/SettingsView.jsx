@@ -10,7 +10,7 @@ const ROLES = ['viewer', 'member', 'admin'];
 
 export default function SettingsView() {
   const { currentOrg, role, updateOrg } = useOrg();
-  const { teams, resources, addTeam, updateTeam, deleteTeam, skills, addSkill, updateSkill, deleteSkill } = useData();
+  const { teams, resources, addTeam, updateTeam, deleteTeam, skills, addSkill, updateSkill, deleteSkill, dimensions, addDimension, updateDimension, deleteDimension } = useData();
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState('');
   const [newRole, setNewRole] = useState('member');
@@ -27,6 +27,14 @@ export default function SettingsView() {
   const [editingSkillId, setEditingSkillId] = useState(null);
   const [editingSkillName, setEditingSkillName] = useState('');
   const [editingSkillCategory, setEditingSkillCategory] = useState('');
+  const [dimError, setDimError] = useState('');
+  const [newDimCode, setNewDimCode] = useState('');
+  const [newDimName, setNewDimName] = useState('');
+  const [newDimDescription, setNewDimDescription] = useState('');
+  const [editingDimId, setEditingDimId] = useState(null);
+  const [editingDimCode, setEditingDimCode] = useState('');
+  const [editingDimName, setEditingDimName] = useState('');
+  const [editingDimDescription, setEditingDimDescription] = useState('');
   const isAdmin = role === 'admin' || role === 'owner';
 
   const skillsByCategory = useMemo(() => {
@@ -213,6 +221,63 @@ export default function SettingsView() {
       setSkillsError(err.message || 'Failed to seed skills');
     } finally {
       setSeedingSkills(false);
+    }
+  };
+
+  const handleAddDimension = async (e) => {
+    e.preventDefault();
+    if (!newDimCode.trim() || !newDimName.trim()) return;
+    setDimError('');
+    try {
+      await addDimension({
+        code: newDimCode.trim(),
+        name: newDimName.trim(),
+        description: newDimDescription.trim() || null,
+        sortOrder: dimensions.length,
+      });
+      setNewDimCode('');
+      setNewDimName('');
+      setNewDimDescription('');
+    } catch (err) {
+      setDimError(err.message || 'Failed to add dimension');
+    }
+  };
+
+  const handleStartEditDimension = (dim) => {
+    setEditingDimId(dim.id);
+    setEditingDimCode(dim.code);
+    setEditingDimName(dim.name);
+    setEditingDimDescription(dim.description || '');
+    setDimError('');
+  };
+
+  const handleCancelEditDimension = () => {
+    setEditingDimId(null);
+    setEditingDimCode('');
+    setEditingDimName('');
+    setEditingDimDescription('');
+  };
+
+  const handleSaveEditDimension = async () => {
+    if (!editingDimCode.trim() || !editingDimName.trim()) return;
+    try {
+      await updateDimension(editingDimId, {
+        code: editingDimCode.trim(),
+        name: editingDimName.trim(),
+        description: editingDimDescription.trim() || null,
+      });
+      handleCancelEditDimension();
+    } catch (err) {
+      setDimError(err.message || 'Failed to update dimension');
+    }
+  };
+
+  const handleDeleteDimension = async (dim) => {
+    if (!confirm('Delete dimension "' + dim.name + '"? Logs tagged with this code will keep the code value.')) return;
+    try {
+      await deleteDimension(dim.id);
+    } catch (err) {
+      setDimError(err.message || 'Failed to delete dimension');
     }
   };
 
@@ -467,6 +532,130 @@ export default function SettingsView() {
               />
             </div>
             <Button type="submit">Add Skill</Button>
+          </form>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-3">Dimensions</h3>
+          <p className="text-[10px] text-text-light mb-3">
+            Dimensions categorise logs along reusable axes (e.g. Technical, Communication, Leadership). Give each a short code and a human-readable name.
+          </p>
+
+          {dimError && (
+            <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{dimError}</div>
+          )}
+
+          <div className="space-y-1 mb-3">
+            {dimensions.map((dim) => {
+              const isEditing = editingDimId === dim.id;
+              return (
+                <div key={dim.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
+                  {isEditing ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editingDimCode}
+                        onChange={(e) => setEditingDimCode(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEditDimension();
+                          if (e.key === 'Escape') handleCancelEditDimension();
+                        }}
+                        autoFocus
+                        placeholder="Code"
+                        className="w-24 px-2 py-1 border border-border rounded text-xs text-text font-mono outline-none focus:border-primary"
+                      />
+                      <input
+                        type="text"
+                        value={editingDimName}
+                        onChange={(e) => setEditingDimName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEditDimension();
+                          if (e.key === 'Escape') handleCancelEditDimension();
+                        }}
+                        placeholder="Name"
+                        className="flex-1 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                      />
+                      <input
+                        type="text"
+                        value={editingDimDescription}
+                        onChange={(e) => setEditingDimDescription(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEditDimension();
+                          if (e.key === 'Escape') handleCancelEditDimension();
+                        }}
+                        placeholder="Description (optional)"
+                        className="flex-1 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                      />
+                      <button
+                        onClick={handleSaveEditDimension}
+                        className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:underline px-1"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancelEditDimension}
+                        className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-text-mid px-1"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-24 text-[10px] font-semibold text-primary font-mono">{dim.code}</span>
+                      <span className="flex-1 text-xs font-semibold text-text">{dim.name}</span>
+                      {dim.description && (
+                        <span className="flex-1 text-[10px] text-text-light truncate">{dim.description}</span>
+                      )}
+                      <button
+                        onClick={() => handleStartEditDimension(dim)}
+                        className="text-[10px] text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary px-1"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDimension(dim)}
+                        className="text-[10px] text-danger bg-transparent border-0 cursor-pointer hover:text-danger/80 px-1"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+            {dimensions.length === 0 && (
+              <p className="text-xs text-text-light py-2">No dimensions yet.</p>
+            )}
+          </div>
+
+          <form onSubmit={handleAddDimension} className="flex gap-2 items-end pt-3 border-t border-border-light">
+            <div className="w-24">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Code</label>
+              <input
+                type="text" value={newDimCode} onChange={(e) => setNewDimCode(e.target.value)}
+                placeholder="TECH" required maxLength={20}
+                className="w-full px-2 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Name</label>
+              <input
+                type="text" value={newDimName} onChange={(e) => setNewDimName(e.target.value)}
+                placeholder="Technical skills" required
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Description</label>
+              <input
+                type="text" value={newDimDescription} onChange={(e) => setNewDimDescription(e.target.value)}
+                placeholder="optional"
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
+              />
+            </div>
+            <Button type="submit">Add</Button>
           </form>
         </div>
       )}

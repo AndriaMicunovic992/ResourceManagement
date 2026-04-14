@@ -8,13 +8,15 @@ import EmptyState from '../../../../components/ui/EmptyState';
 import LogInlineEditor from '../oneonones/LogInlineEditor';
 import NewLogModal from './NewLogModal';
 
-const DIMENSION_CODES = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6'];
 const KINDS = [
   { value: '', label: 'All kinds' },
   { value: 'observation', label: 'Observation' },
   { value: 'good', label: 'Good' },
   { value: 'bad', label: 'Bad' },
   { value: 'suggestion', label: 'Suggestion' },
+  { value: 'win', label: 'Win' },
+  { value: 'down', label: 'Down' },
+  { value: 'blocker', label: 'Blocker' },
 ];
 
 const KIND_COLORS = {
@@ -22,6 +24,9 @@ const KIND_COLORS = {
   bad: 'bg-red-100 text-red-700',
   suggestion: 'bg-blue-100 text-blue-700',
   observation: 'bg-gray-100 text-gray-700',
+  win: 'bg-emerald-100 text-emerald-700',
+  down: 'bg-amber-100 text-amber-700',
+  blocker: 'bg-rose-100 text-rose-700',
 };
 
 function formatDate(value) {
@@ -35,7 +40,7 @@ function formatDate(value) {
   });
 }
 
-function LogCard({ log, currentUserId, resourceId, onEdit, onDelete }) {
+function LogCard({ log, currentUserId, resourceId, dimensionLabel, onEdit, onDelete }) {
   const isAuthor = log.authorUserId === currentUserId;
   return (
     <div className="bg-white rounded-xl border border-border p-4">
@@ -50,7 +55,7 @@ function LogCard({ log, currentUserId, resourceId, onEdit, onDelete }) {
         </span>
         {log.dimensionCode && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
-            {log.dimensionCode}
+            {dimensionLabel || log.dimensionCode}
           </span>
         )}
         {log.customer && (
@@ -112,8 +117,13 @@ export default function PersonActivity() {
   const { resource } = useOutletContext();
   const { role } = useOrg();
   const { user } = useAuth();
-  const { customers, projects } = useData();
+  const { customers, projects, dimensions } = useData();
   const isAdmin = role === 'admin' || role === 'owner';
+  const dimensionLabelByCode = useMemo(() => {
+    const map = {};
+    for (const d of dimensions) map[d.code] = d.name;
+    return map;
+  }, [dimensions]);
 
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -219,9 +229,9 @@ export default function PersonActivity() {
               className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="">All dimensions</option>
-              {DIMENSION_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
+              {dimensions.map((dim) => (
+                <option key={dim.id} value={dim.code}>
+                  {dim.name}
                 </option>
               ))}
             </select>
@@ -301,6 +311,7 @@ export default function PersonActivity() {
                 log={log}
                 currentUserId={user?.id}
                 resourceId={resource.id}
+                dimensionLabel={dimensionLabelByCode[log.dimensionCode]}
                 onEdit={() => setEditingLogId(log.id)}
                 onDelete={() => handleDeleteLog(log.id)}
               />

@@ -1,8 +1,10 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useData } from '../contexts/DataContext';
 
 export default function HeaderTabs() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { meResource } = useData();
 
   const tabs = [
     { path: '/planner', label: 'Planner' },
@@ -10,6 +12,9 @@ export default function HeaderTabs() {
     { path: '/people', label: 'People' },
     { path: '/skills', label: 'Skills' },
   ];
+  if (meResource) {
+    tabs.push({ path: '/journal', label: 'My Journal' });
+  }
 
   return (
     <div className="flex gap-1">

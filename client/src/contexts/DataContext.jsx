@@ -12,17 +12,27 @@ export function DataProvider({ children }) {
   const [resources, setResources] = useState([]);
   const [teams, setTeams] = useState([]);
   const [skills, setSkills] = useState([]);
+  const [dimensions, setDimensions] = useState([]);
   const [needs, setNeeds] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [meResource, setMeResource] = useState(null);
 
   const reload = useCallback(async () => {
     if (!currentOrg) return;
     setLoading(true);
     try {
-      const [c, p, r, t, s, n, a] = await Promise.all([
-        api.getCustomers(), api.getProjects(), api.getResources(), api.getTeams(), api.getSkills(), api.getNeeds(), api.getAssignments(),
+      const [c, p, r, t, s, d, n, a, me] = await Promise.all([
+        api.getCustomers(),
+        api.getProjects(),
+        api.getResources(),
+        api.getTeams(),
+        api.getSkills(),
+        api.getDimensions(),
+        api.getNeeds(),
+        api.getAssignments(),
+        api.getMyResource().catch(() => null),
       ]);
-      setCustomers(c); setProjects(p); setResources(r); setTeams(t); setSkills(s); setNeeds(n); setAssignments(a);
+      setCustomers(c); setProjects(p); setResources(r); setTeams(t); setSkills(s); setDimensions(d || []); setNeeds(n); setAssignments(a); setMeResource(me);
     } catch (e) {
       console.error('Load failed:', e);
     }
@@ -120,6 +130,23 @@ export function DataProvider({ children }) {
     })));
   }, []);
 
+  // Dimension CRUD
+  const sortDimensions = (list) =>
+    [...list].sort((a, b) => (a.sortOrder - b.sortOrder) || a.code.localeCompare(b.code));
+  const addDimension = useCallback(async (data) => {
+    const created = await api.createDimension(data);
+    setDimensions((prev) => sortDimensions([...prev, created]));
+    return created;
+  }, []);
+  const updateDimension = useCallback(async (id, data) => {
+    const updated = await api.updateDimension(id, data);
+    setDimensions((prev) => sortDimensions(prev.map((d) => (d.id === id ? updated : d))));
+  }, []);
+  const deleteDimension = useCallback(async (id) => {
+    await api.deleteDimension(id);
+    setDimensions((prev) => prev.filter((d) => d.id !== id));
+  }, []);
+
   // PersonSkill CRUD
   const upsertPersonSkill = useCallback(async (data) => {
     const result = await api.upsertPersonSkill(data);
@@ -178,12 +205,13 @@ export function DataProvider({ children }) {
   }, []);
 
   const value = {
-    loading, customers, projects, resources, teams, skills, needs, assignments, reload,
+    loading, customers, projects, resources, teams, skills, dimensions, needs, assignments, meResource, reload,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
     addResource, updateResource, deleteResource,
     addTeam, updateTeam, deleteTeam,
     addSkill, updateSkill, deleteSkill,
+    addDimension, updateDimension, deleteDimension,
     upsertPersonSkill, deletePersonSkill,
     addNeed, updateNeed, deleteNeed,
     upsertAssignment, updateAssignment, deleteAssignment,
