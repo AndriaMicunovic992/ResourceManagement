@@ -17,8 +17,8 @@ export default function NewEvaluationModal({ resourceId, onCancel, onCreated }) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Compute the {customer, project} scopes the person is allocated to.
-  const availableScopes = useMemo(() => {
+  // Build a customer → projects hierarchy for the person's allocations.
+  const customerGroups = useMemo(() => {
     const map = new Map();
     const myAssignments = assignments.filter((a) => a.resourceId === resourceId);
     for (const a of myAssignments) {
@@ -28,37 +28,48 @@ export default function NewEvaluationModal({ resourceId, onCancel, onCreated }) 
       if (!project) continue;
       const customer = customers.find((c) => c.id === project.customerId);
       if (!customer) continue;
-      const customerKey = `c:${customer.id}`;
-      if (!map.has(customerKey)) {
-        map.set(customerKey, {
-          key: customerKey,
-          customerId: customer.id,
-          projectId: null,
-          label: `${customer.name} (whole customer)`,
-        });
+      if (!map.has(customer.id)) {
+        map.set(customer.id, { customer, projects: new Map() });
       }
-      const projectKey = `p:${customer.id}:${project.id}`;
-      if (!map.has(projectKey)) {
-        map.set(projectKey, {
-          key: projectKey,
-          customerId: customer.id,
-          projectId: project.id,
-          label: `${customer.name} · ${project.name}`,
-        });
+      const group = map.get(customer.id);
+      if (!group.projects.has(project.id)) {
+        group.projects.set(project.id, project);
       }
     }
-    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(map.values())
+      .map((g) => ({
+        customer: g.customer,
+        projects: Array.from(g.projects.values()).sort((a, b) =>
+          a.name.localeCompare(b.name)
+        ),
+      }))
+      .sort((a, b) => a.customer.name.localeCompare(b.customer.name));
   }, [resourceId, assignments, needs, projects, customers]);
 
-  const toggle = (scope) => {
+  const [expanded, setExpanded] = useState(() => new Set());
+  const toggleExpand = (customerId) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(customerId)) next.delete(customerId);
+      else next.add(customerId);
+      return next;
+    });
+  };
+
+  const isScopeSelected = (customerId, projectId) =>
+    selected.some(
+      (s) => s.customerId === customerId && (s.projectId || null) === (projectId || null)
+    );
+
+  const toggle = (customerId, projectId) => {
     setSelected((prev) => {
       const exists = prev.find(
-        (s) => s.customerId === scope.customerId && (s.projectId || null) === (scope.projectId || null)
+        (s) => s.customerId === customerId && (s.projectId || null) === (projectId || null)
       );
       if (exists) {
         return prev.filter((s) => s !== exists);
       }
-      return [...prev, { customerId: scope.customerId, projectId: scope.projectId }];
+      return [...prev, { customerId, projectId: projectId || null }];
     });
   };
 
@@ -108,28 +119,73 @@ export default function NewEvaluationModal({ resourceId, onCancel, onCreated }) 
           <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
             Scopes
           </label>
-          {availableScopes.length === 0 ? (
+          {customerGroups.length === 0 ? (
             <div className="text-xs text-text-light italic">
               No allocations yet — assign this person to a project first.
             </div>
           ) : (
-            <div className="space-y-1.5 max-h-[280px] overflow-y-auto border border-border rounded p-2">
-              {availableScopes.map((scope) => {
-                const isOn = selected.some(
-                  (s) => s.customerId === scope.customerId && (s.projectId || null) === (scope.projectId || null)
-                );
+            <div className="space-y-0.5 max-h-[320px] overflow-y-auto border border-border rounded p-2">
+              {customerGroups.map((group) => {
+                const isExpanded = expanded.has(group.customer.id);
+                const wholeSelected = isScopeSelected(group.customer.id, null);
+                const selectedProjectCount = group.projects.filter((p) =>
+                  isScopeSelected(group.customer.id, p.id)
+                ).length;
                 return (
-                  <label
-                    key={scope.key}
-                    className="flex items-center gap-2 text-xs text-text cursor-pointer hover:bg-primary-bg rounded px-1.5 py-1"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isOn}
-                      onChange={() => toggle(scope)}
-                    />
-                    {scope.label}
-                  </label>
+                  <div key={group.customer.id}>
+                    <div className="flex items-center gap-1 text-xs text-text hover:bg-primary-bg rounded px-1 py-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(group.customer.id)}
+                        className="w-5 h-5 flex items-center justify-center text-text-light bg-transparent border-0 cursor-pointer hover:text-primary shrink-0"
+                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                      >
+                        {isExpanded ? '▾' : '▸'}
+                      </button>
+                      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={wholeSelected}
+                          onChange={() => toggle(group.customer.id, null)}
+                        />
+                        <span className="font-semibold truncate">{group.customer.name}</span>
+                        <span className="text-[10px] text-text-light">
+                          (whole customer)
+                        </span>
+                        {selectedProjectCount > 0 && !wholeSelected && (
+                          <span className="text-[10px] text-primary font-semibold">
+                            · {selectedProjectCount} project
+                            {selectedProjectCount === 1 ? '' : 's'} selected
+                          </span>
+                        )}
+                      </label>
+                    </div>
+                    {isExpanded && group.projects.length > 0 && (
+                      <div className="ml-6 border-l border-border pl-2 space-y-0.5 py-0.5">
+                        {group.projects.map((project) => {
+                          const isOn = isScopeSelected(group.customer.id, project.id);
+                          return (
+                            <label
+                              key={project.id}
+                              className={`flex items-center gap-2 text-xs cursor-pointer rounded px-1.5 py-1 ${
+                                wholeSelected
+                                  ? 'text-text-light'
+                                  : 'text-text hover:bg-primary-bg'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isOn}
+                                disabled={wholeSelected}
+                                onChange={() => toggle(group.customer.id, project.id)}
+                              />
+                              {project.name}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

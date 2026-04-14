@@ -134,9 +134,9 @@ export const api = {
   updateEvaluationScore: (id, snapshotId, data) =>
     apiFetch('/evaluations/' + id + '/scores/' + snapshotId, { method: 'PATCH', body: JSON.stringify(data) }),
   submitEmployeeEvaluation: (id) =>
-    apiFetch('/evaluations/' + id + '/transitions/submit-employee', { method: 'POST' }),
+    apiFetch('/evaluations/' + id + '/transitions/submit-employee', { method: 'POST', body: JSON.stringify({}) }),
   submitResponsibleEvaluation: (id) =>
-    apiFetch('/evaluations/' + id + '/transitions/submit-responsible', { method: 'POST' }),
+    apiFetch('/evaluations/' + id + '/transitions/submit-responsible', { method: 'POST', body: JSON.stringify({}) }),
   finalizeEvaluation: (id, data) =>
     apiFetch('/evaluations/' + id + '/transitions/finalize', { method: 'POST', body: JSON.stringify(data || {}) }),
   deleteEvaluation: (id) => apiFetch('/evaluations/' + id, { method: 'DELETE' }),
