@@ -410,8 +410,7 @@ export const evaluationService = {
 
     // Build a patch of allowed fields based on (state, role).
     const patch: Prisma.EvaluationScoreUpdateInput = {};
-    const allowEmployee =
-      evaluation.state === 'draft' && (isSubject || admin);
+    const allowEmployee = evaluation.state === 'draft' && isSubject;
     const allowResponsible =
       evaluation.state === 'employee_submitted' && (isResponsible || admin);
     const allowManager =
@@ -495,10 +494,9 @@ export const evaluationService = {
     if (evaluation.state !== 'draft') {
       throw new ForbiddenError('Only draft evaluations can be submitted by the employee');
     }
-    const admin = isAdminRole(requestingUserRole);
     const meId = await getRequestingResourceId(orgId, requestingUserId);
     const isSubject = meId === evaluation.resourceId;
-    if (!admin && !isSubject) {
+    if (!isSubject) {
       throw new ForbiddenError('Only the target person can submit their self-assessment');
     }
     return prisma.evaluation.update({

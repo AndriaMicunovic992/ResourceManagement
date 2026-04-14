@@ -68,7 +68,9 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
   const state = eval_.state;
   const finalized = state === 'finalized';
 
-  const allowEmployeeEdit = state === 'draft' && (isSubject || isAdmin);
+  // Only the subject themselves edits/submits their self-assessment. Admins
+  // can still manage later stages but never impersonate the employee.
+  const allowEmployeeEdit = state === 'draft' && isSubject;
   const allowResponsibleEdit = state === 'employee_submitted' && (isResponsible || isAdmin);
   const allowManagerEdit = state === 'responsible_submitted' && (isManager || isAdmin);
 

@@ -105,4 +105,17 @@ export const evaluationRoutes: FastifyPluginAsync = async (app) => {
       return performanceService.trend(req.orgId, personId, req.userId, req.role, bucket);
     }
   );
+
+  app.get(
+    '/people/:personId/performance/categories',
+    { preHandler: requireRole('viewer') },
+    async (req) => {
+      const { personId } = req.params as { personId: string };
+      const q = req.query as { customerId?: string; projectId?: string };
+      return performanceService.categoryBreakdown(req.orgId, personId, req.userId, req.role, {
+        customerId: q.customerId || null,
+        projectId: q.projectId || null,
+      });
+    }
+  );
 };
