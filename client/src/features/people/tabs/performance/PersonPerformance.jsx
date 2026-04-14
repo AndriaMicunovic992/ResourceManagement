@@ -47,6 +47,107 @@ function monthsAgoDateString(months) {
   return toDateInputValue(d);
 }
 
+function currentQuarter() {
+  const now = new Date();
+  return {
+    year: now.getUTCFullYear(),
+    quarter: Math.floor(now.getUTCMonth() / 3) + 1,
+  };
+}
+
+function currentHalf() {
+  const now = new Date();
+  return {
+    year: now.getUTCFullYear(),
+    half: now.getUTCMonth() < 6 ? 1 : 2,
+  };
+}
+
+function quarterRange(year, quarter) {
+  const startMonth = (quarter - 1) * 3;
+  const from = toDateInputValue(new Date(Date.UTC(year, startMonth, 1)));
+  const to = toDateInputValue(new Date(Date.UTC(year, startMonth + 3, 0)));
+  return { from, to };
+}
+
+function halfRange(year, half) {
+  const startMonth = half === 1 ? 0 : 6;
+  const from = toDateInputValue(new Date(Date.UTC(year, startMonth, 1)));
+  const to = toDateInputValue(new Date(Date.UTC(year, startMonth + 6, 0)));
+  return { from, to };
+}
+
+function yearRange(year) {
+  const from = toDateInputValue(new Date(Date.UTC(year, 0, 1)));
+  const to = toDateInputValue(new Date(Date.UTC(year, 11, 31)));
+  return { from, to };
+}
+
+function quarterOptions(count = 12) {
+  // Current quarter plus the previous `count - 1` quarters.
+  const { year, quarter } = currentQuarter();
+  const options = [];
+  let y = year;
+  let q = quarter;
+  for (let i = 0; i < count; i++) {
+    options.push({ value: `${y}-Q${q}`, year: y, quarter: q, label: `Q${q} ${y}` });
+    q -= 1;
+    if (q === 0) {
+      q = 4;
+      y -= 1;
+    }
+  }
+  return options;
+}
+
+function halfOptions(count = 8) {
+  const { year, half } = currentHalf();
+  const options = [];
+  let y = year;
+  let h = half;
+  for (let i = 0; i < count; i++) {
+    options.push({ value: `${y}-H${h}`, year: y, half: h, label: `H${h} ${y}` });
+    h -= 1;
+    if (h === 0) {
+      h = 2;
+      y -= 1;
+    }
+  }
+  return options;
+}
+
+function yearOptions(count = 6) {
+  const now = new Date().getUTCFullYear();
+  const options = [];
+  for (let i = 0; i < count; i++) {
+    const y = now - i;
+    options.push({ value: `${y}`, year: y, label: `${y}` });
+  }
+  return options;
+}
+
+/**
+ * Compute a { from, to } window from the org default settings. Used by the
+ * Performance tab's "Default" preset and by PersonOverview to keep both
+ * views aligned.
+ */
+export function orgDefaultWindow(org) {
+  const kind = org?.performanceTrendDefaultKind || 'rolling_months';
+  if (kind === 'calendar_quarter') {
+    const { year, quarter } = currentQuarter();
+    return quarterRange(year, quarter);
+  }
+  if (kind === 'calendar_half') {
+    const { year, half } = currentHalf();
+    return halfRange(year, half);
+  }
+  if (kind === 'calendar_year') {
+    return yearRange(new Date().getUTCFullYear());
+  }
+  const months = org?.performanceTrendDefaultMonths ?? 12;
+  return { from: monthsAgoDateString(months), to: '' };
+}
+
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function formatBucketLabel(bucketStart, bucket) {
@@ -165,6 +266,23 @@ export default function PersonPerformance() {
   const { meResource } = useData();
   const isAdmin = role === 'admin' || role === 'owner';
   const orgDefaultMonths = currentOrg?.performanceTrendDefaultMonths ?? 12;
+  const orgDefaultKind = currentOrg?.performanceTrendDefaultKind || 'rolling_months';
+
+  // Human label for the "Default" option based on the org's default kind.
+  const orgDefaultLabel = useMemo(() => {
+    if (orgDefaultKind === 'calendar_quarter') {
+      const { year, quarter } = currentQuarter();
+      return `Default (Q${quarter} ${year})`;
+    }
+    if (orgDefaultKind === 'calendar_half') {
+      const { year, half } = currentHalf();
+      return `Default (H${half} ${year})`;
+    }
+    if (orgDefaultKind === 'calendar_year') {
+      return `Default (${new Date().getUTCFullYear()})`;
+    }
+    return `Default (${orgDefaultMonths}m)`;
+  }, [orgDefaultKind, orgDefaultMonths]);
 
   // Client-side manager check: is the viewing user a manager of this person?
   const isManager = useMemo(() => {
@@ -203,16 +321,57 @@ export default function PersonPerformance() {
   const [periodPreset, setPeriodPreset] = useState('default');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
+  // When a calendar-* preset is selected, this holds the specific period
+  // (e.g., "2025-Q4", "2025-H2", "2025").
+  const [calendarQuarter, setCalendarQuarter] = useState(() => {
+    const { year, quarter } = currentQuarter();
+    return `${year}-Q${quarter}`;
+  });
+  const [calendarHalf, setCalendarHalf] = useState(() => {
+    const { year, half } = currentHalf();
+    return `${year}-H${half}`;
+  });
+  const [calendarYear, setCalendarYear] = useState(
+    () => `${new Date().getUTCFullYear()}`
+  );
+
+  const quarterOpts = useMemo(() => quarterOptions(12), []);
+  const halfOpts = useMemo(() => halfOptions(8), []);
+  const yearOpts = useMemo(() => yearOptions(6), []);
 
   // Resolve the period window from the preset (or custom inputs) into from/to.
   const periodWindow = useMemo(() => {
     if (periodPreset === 'all') return { from: '', to: '' };
     if (periodPreset === 'custom') return { from: periodFrom, to: periodTo };
+    if (periodPreset === 'default') return orgDefaultWindow(currentOrg);
+    if (periodPreset === 'calendar_quarter') {
+      const m = calendarQuarter.match(/^(\d{4})-Q([1-4])$/);
+      if (!m) return { from: '', to: '' };
+      return quarterRange(parseInt(m[1], 10), parseInt(m[2], 10));
+    }
+    if (periodPreset === 'calendar_half') {
+      const m = calendarHalf.match(/^(\d{4})-H([12])$/);
+      if (!m) return { from: '', to: '' };
+      return halfRange(parseInt(m[1], 10), parseInt(m[2], 10));
+    }
+    if (periodPreset === 'calendar_year') {
+      const y = parseInt(calendarYear, 10);
+      if (!Number.isFinite(y)) return { from: '', to: '' };
+      return yearRange(y);
+    }
     const monthsMap = { '3m': 3, '6m': 6, '12m': 12, '24m': 24 };
-    const months =
-      periodPreset === 'default' ? orgDefaultMonths : monthsMap[periodPreset] ?? orgDefaultMonths;
+    const months = monthsMap[periodPreset] ?? orgDefaultMonths;
     return { from: monthsAgoDateString(months), to: '' };
-  }, [periodPreset, periodFrom, periodTo, orgDefaultMonths]);
+  }, [
+    periodPreset,
+    periodFrom,
+    periodTo,
+    currentOrg,
+    orgDefaultMonths,
+    calendarQuarter,
+    calendarHalf,
+    calendarYear,
+  ]);
 
   const reloadEvaluations = useCallback(async () => {
     if (!canView) return;
@@ -572,14 +731,56 @@ export default function PersonPerformance() {
               className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
               title="Period window"
             >
-              <option value="default">Default ({orgDefaultMonths}m)</option>
+              <option value="default">{orgDefaultLabel}</option>
               <option value="3m">Last 3 months</option>
               <option value="6m">Last 6 months</option>
               <option value="12m">Last 12 months</option>
               <option value="24m">Last 24 months</option>
+              <option value="calendar_quarter">Calendar quarter…</option>
+              <option value="calendar_half">Calendar half-year…</option>
+              <option value="calendar_year">Calendar year…</option>
               <option value="all">All time</option>
               <option value="custom">Custom…</option>
             </select>
+            {periodPreset === 'calendar_quarter' && (
+              <select
+                value={calendarQuarter}
+                onChange={(e) => setCalendarQuarter(e.target.value)}
+                className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              >
+                {quarterOpts.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {periodPreset === 'calendar_half' && (
+              <select
+                value={calendarHalf}
+                onChange={(e) => setCalendarHalf(e.target.value)}
+                className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              >
+                {halfOpts.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {periodPreset === 'calendar_year' && (
+              <select
+                value={calendarYear}
+                onChange={(e) => setCalendarYear(e.target.value)}
+                className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              >
+                {yearOpts.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            )}
             <select
               value={trendBucket}
               onChange={(e) => setTrendBucket(e.target.value)}

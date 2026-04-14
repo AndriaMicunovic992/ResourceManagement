@@ -82,6 +82,9 @@ export default function SettingsView() {
   const [dateSaving, setDateSaving] = useState(false);
   const [dateSuccess, setDateSuccess] = useState(false);
 
+  const [perfTrendKind, setPerfTrendKind] = useState(
+    currentOrg?.performanceTrendDefaultKind || 'rolling_months'
+  );
   const [perfTrendMonths, setPerfTrendMonths] = useState(
     String(currentOrg?.performanceTrendDefaultMonths ?? 12)
   );
@@ -91,6 +94,7 @@ export default function SettingsView() {
   useEffect(() => {
     setMinDate(currentOrg?.minPlanningDate || '');
     setMaxDate(currentOrg?.maxPlanningDate || '');
+    setPerfTrendKind(currentOrg?.performanceTrendDefaultKind || 'rolling_months');
     setPerfTrendMonths(String(currentOrg?.performanceTrendDefaultMonths ?? 12));
   }, [currentOrg]);
 
@@ -111,15 +115,19 @@ export default function SettingsView() {
   };
 
   const handleSavePerfTrend = async () => {
-    const n = parseInt(perfTrendMonths, 10);
-    if (!Number.isFinite(n) || n < 1 || n > 120) {
-      setError('Performance trend months must be between 1 and 120');
-      return;
+    const update = { performanceTrendDefaultKind: perfTrendKind };
+    if (perfTrendKind === 'rolling_months') {
+      const n = parseInt(perfTrendMonths, 10);
+      if (!Number.isFinite(n) || n < 1 || n > 120) {
+        setError('Performance trend months must be between 1 and 120');
+        return;
+      }
+      update.performanceTrendDefaultMonths = n;
     }
     setPerfTrendSaving(true);
     setPerfTrendSuccess(false);
     try {
-      await updateOrg({ performanceTrendDefaultMonths: n });
+      await updateOrg(update);
       setPerfTrendSuccess(true);
       setTimeout(() => setPerfTrendSuccess(false), 2000);
     } catch (err) {
@@ -426,20 +434,35 @@ export default function SettingsView() {
         <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Performance Trend</h3>
           <p className="text-[10px] text-text-light mb-3">
-            Default time window (in months, counting back from today) used on the Person Performance tab for the overall grade, trend chart, and category breakdown. Viewers can still override this on the tab.
+            Default time window used on the Person Performance tab for the overall grade, trend chart, and category breakdown. Choose a rolling window or a calendar-aligned period. Viewers can still override this on the tab.
           </p>
-          <div className="flex gap-3 items-end">
-            <div className="flex-1 max-w-[160px]">
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">Default months</label>
-              <input
-                type="number"
-                min={1}
-                max={120}
-                value={perfTrendMonths}
-                onChange={(e) => setPerfTrendMonths(e.target.value)}
-                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
-              />
+          <div className="flex gap-3 items-end flex-wrap">
+            <div className="flex-1 min-w-[180px] max-w-[240px]">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Default type</label>
+              <select
+                value={perfTrendKind}
+                onChange={(e) => setPerfTrendKind(e.target.value)}
+                className="w-full px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
+              >
+                <option value="rolling_months">Rolling months</option>
+                <option value="calendar_quarter">Current calendar quarter</option>
+                <option value="calendar_half">Current calendar half-year</option>
+                <option value="calendar_year">Current calendar year</option>
+              </select>
             </div>
+            {perfTrendKind === 'rolling_months' && (
+              <div className="flex-1 max-w-[140px]">
+                <label className="block text-[10px] font-semibold text-text-mid mb-1">Months</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={perfTrendMonths}
+                  onChange={(e) => setPerfTrendMonths(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                />
+              </div>
+            )}
             <Button onClick={handleSavePerfTrend} disabled={perfTrendSaving}>
               {perfTrendSaving ? 'Saving...' : perfTrendSuccess ? 'Saved!' : 'Save'}
             </Button>
