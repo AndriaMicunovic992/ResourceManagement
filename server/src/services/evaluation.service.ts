@@ -292,17 +292,16 @@ export const evaluationService = {
       throw new NotFoundError('Evaluation not found');
     }
 
-    const logs = await prisma.log.findMany({
-      where: { orgId, evaluationId: id },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, createdAt: true, kind: true, content: true, customerId: true, projectId: true },
-    });
-
-    // For responsible / manager / admin viewers, also surface activity logs
-    // recorded AFTER the evaluation was finalized, within the same scope. These
-    // are not tied to the evaluation (tying only covers the period window) but
-    // provide context about what has happened since.
-    let postFinalizationLogs: Array<{
+    // Scope-matched activity logs for this evaluation, visible to managers,
+    // responsibles and admins regardless of state. Matching rules:
+    // - Same person (resourceId)
+    // - log.customerId must equal evaluation.customerId (logs without a
+    //   customer are excluded — they aren't scoped to this evaluation).
+    // - If the evaluation is customer-only, any log under that customer is
+    //   included (regardless of the log's project).
+    // - If the evaluation is project-scoped, include logs whose projectId is
+    //   null (customer-level logs cascade down) or matches the project.
+    let logs: Array<{
       id: string;
       createdAt: Date;
       kind: string;
@@ -310,29 +309,30 @@ export const evaluationService = {
       customerId: string | null;
       projectId: string | null;
     }> = [];
-    if (evaluation.state === 'finalized' && evaluation.finalizedAt) {
-      const postWhere: Prisma.LogWhereInput = {
+    if (evaluation.customerId) {
+      const logsWhere: Prisma.LogWhereInput = {
         orgId,
         resourceId: evaluation.resourceId,
-        createdAt: { gt: evaluation.finalizedAt },
+        customerId: evaluation.customerId,
       };
-      if (evaluation.customerId) {
-        postWhere.OR = [{ customerId: evaluation.customerId }, { customerId: null }];
-      }
       if (evaluation.projectId) {
-        const projectClause: Prisma.LogWhereInput = {
-          OR: [{ projectId: evaluation.projectId }, { projectId: null }],
-        };
-        postWhere.AND = [...(Array.isArray(postWhere.AND) ? postWhere.AND : []), projectClause];
+        logsWhere.OR = [{ projectId: null }, { projectId: evaluation.projectId }];
       }
-      postFinalizationLogs = await prisma.log.findMany({
-        where: postWhere,
+      logs = await prisma.log.findMany({
+        where: logsWhere,
         orderBy: { createdAt: 'desc' },
-        select: { id: true, createdAt: true, kind: true, content: true, customerId: true, projectId: true },
+        select: {
+          id: true,
+          createdAt: true,
+          kind: true,
+          content: true,
+          customerId: true,
+          projectId: true,
+        },
       });
     }
 
-    return { ...evaluation, logs, postFinalizationLogs, _viewerKind: kind };
+    return { ...evaluation, logs, _viewerKind: kind };
   },
 
   async createOne(
