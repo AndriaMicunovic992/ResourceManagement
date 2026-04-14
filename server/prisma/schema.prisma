@@ -29,6 +29,7 @@ model Organization {
   logs        Log[]
   performanceLogCategories PerformanceLogCategory[]
   personManagers PersonManager[]
+  evaluations Evaluation[]
 }
 
 model User {
@@ -43,6 +44,8 @@ model User {
   authoredOneOnOnes  OneOnOne[]  @relation("AuthoredOneOnOnes")
   authoredLogs       Log[]       @relation("AuthoredLogs")
   resources          Resource[]  @relation("UserResources")
+  createdEvaluations   Evaluation[] @relation("EvaluationCreator")
+  finalizedEvaluations Evaluation[] @relation("EvaluationFinalizer")
 }
 
 model OrgMember {
@@ -68,10 +71,15 @@ model Customer {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  projects Project[]
-  logs     Log[]
+  responsiblePersonId String?
+  responsiblePerson   Resource? @relation("CustomerResponsible", fields: [responsiblePersonId], references: [id], onDelete: SetNull)
+
+  projects    Project[]
+  logs        Log[]
+  evaluations Evaluation[]
 
   @@index([orgId])
+  @@index([responsiblePersonId])
 }
 
 model Project {
@@ -92,8 +100,9 @@ model Project {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  needs Need[]
-  logs  Log[]
+  needs       Need[]
+  logs        Log[]
+  evaluations Evaluation[]
 
   @@index([orgId])
   @@index([customerId])
@@ -119,10 +128,12 @@ model Resource {
   personSkills PersonSkill[]
   oneOnOnes   OneOnOne[]
   logs        Log[]
-  responsibleProjects Project[] @relation("ProjectResponsible")
+  responsibleProjects  Project[]  @relation("ProjectResponsible")
+  responsibleCustomers Customer[] @relation("CustomerResponsible")
   managedTeams Team[] @relation("TeamManager")
   managerLinks       PersonManager[] @relation("PersonSide")
   managedPersonLinks PersonManager[] @relation("ManagerSide")
+  evaluations        Evaluation[] @relation("EvaluationSubject")
 
   @@unique([orgId, userId])
   @@index([orgId])
@@ -301,6 +312,8 @@ model Log {
   jiraUrl         String?
   oneOnOneId      String?
   oneOnOne        OneOnOne? @relation(fields: [oneOnOneId], references: [id], onDelete: Cascade)
+  evaluationId    String?
+  evaluation      Evaluation? @relation("EvaluationLogs", fields: [evaluationId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -309,6 +322,7 @@ model Log {
   @@index([authorUserId])
   @@index([oneOnOneId])
   @@index([categoryId])
+  @@index([evaluationId])
 }
 
 model PerformanceLogCategory {
@@ -324,8 +338,90 @@ model PerformanceLogCategory {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  logs Log[]
+  logs                Log[]
+  evaluationSnapshots EvaluationCategorySnapshot[]
 
   @@unique([orgId, grouping, name])
   @@index([orgId])
+}
+
+model Evaluation {
+  id                  String   @id @default(cuid())
+  orgId               String
+  org                 Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  resourceId          String
+  resource            Resource @relation("EvaluationSubject", fields: [resourceId], references: [id], onDelete: Cascade)
+
+  customerId          String?
+  customer            Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerNameSnapshot String
+  projectId           String?
+  project             Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectNameSnapshot String?
+
+  periodStart         DateTime
+  periodEnd           DateTime
+
+  state               String    @default("draft")
+  createdByUserId     String
+  createdByUser       User      @relation("EvaluationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  computedFinal       Float?
+  overrideFinal       Float?
+  overrideReason      String?
+
+  finalizedAt         DateTime?
+  finalizedByUserId   String?
+  finalizedByUser     User?     @relation("EvaluationFinalizer", fields: [finalizedByUserId], references: [id], onDelete: Restrict)
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  scores              EvaluationScore[]
+  categorySnapshots   EvaluationCategorySnapshot[]
+  logs                Log[]     @relation("EvaluationLogs")
+
+  @@index([orgId])
+  @@index([resourceId])
+  @@index([customerId])
+  @@index([projectId])
+  @@index([state])
+}
+
+model EvaluationCategorySnapshot {
+  id             String   @id @default(cuid())
+  evaluationId   String
+  evaluation     Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  categoryId     String?
+  category       PerformanceLogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryNameSnapshot     String
+  categoryGroupingSnapshot String?
+  weightSnapshot           Float
+  sortOrderSnapshot        Int
+  createdAt      DateTime @default(now())
+
+  scores         EvaluationScore[]
+
+  @@unique([evaluationId, categoryNameSnapshot, categoryGroupingSnapshot])
+  @@index([evaluationId])
+}
+
+model EvaluationScore {
+  id                 String   @id @default(cuid())
+  evaluationId       String
+  evaluation         Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  categorySnapshotId String
+  categorySnapshot   EvaluationCategorySnapshot @relation(fields: [categorySnapshotId], references: [id], onDelete: Cascade)
+
+  employeeScore      Float?
+  employeeComment    String?
+  responsibleScore   Float?
+  responsibleComment String?
+  managerComment     String?
+
+  updatedAt          DateTime @updatedAt
+
+  @@unique([evaluationId, categorySnapshotId])
+  @@index([evaluationId])
 }

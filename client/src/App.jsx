@@ -17,6 +17,7 @@ import PersonAllocation from './features/people/tabs/PersonAllocation';
 import PersonSkills from './features/people/tabs/PersonSkills';
 import PersonOneOnOnes from './features/people/tabs/oneonones/PersonOneOnOnes';
 import PersonActivity from './features/people/tabs/activity/PersonActivity';
+import PersonPerformance from './features/people/tabs/performance/PersonPerformance';
 import MyJournalView from './features/journal/MyJournalView';
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
               <Route path="skills" element={<PersonSkills />} />
               <Route path="oneonones" element={<PersonOneOnOnes />} />
               <Route path="activity" element={<PersonActivity />} />
+              <Route path="performance" element={<PersonPerformance />} />
             </Route>
             <Route path="/journal" element={<MyJournalView />} />
             <Route path="/skills" element={<SkillsView />} />

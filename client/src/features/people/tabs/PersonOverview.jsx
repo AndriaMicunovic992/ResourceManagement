@@ -7,6 +7,28 @@ import { useComputed } from '../../../hooks/useComputed';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
 import { api } from '../../../lib/api';
 
+function PerformanceSparkline({ points }) {
+  const valid = points.filter((p) => p.overall != null);
+  if (valid.length < 2) return null;
+  const width = 180;
+  const height = 40;
+  const minY = 1;
+  const maxY = 5;
+  const stepX = width / (valid.length - 1);
+  const path = valid
+    .map((p, i) => {
+      const x = i * stepX;
+      const y = height - ((p.overall - minY) / (maxY - minY)) * height;
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[40px]">
+      <path d={path} fill="none" stroke="#6366f1" strokeWidth="2" />
+    </svg>
+  );
+}
+
 const KIND_COLORS = {
   good: 'bg-green-100 text-green-700',
   bad: 'bg-red-100 text-red-700',
@@ -40,16 +62,33 @@ function formatRelative(date) {
 
 export default function PersonOverview() {
   const { resource } = useOutletContext();
-  const { assignments, needs, projects, customers } = useData();
+  const { assignments, needs, projects, customers, meResource } = useData();
   const { role } = useOrg();
   const { rURealised } = useComputed();
   const navigate = useNavigate();
   const isAdmin = role === 'admin' || role === 'owner';
 
+  const isManager = useMemo(() => {
+    if (!meResource) return false;
+    const direct = Array.isArray(resource.managerLinks)
+      ? resource.managerLinks.some(
+          (l) => (l.managerId || l.manager?.id) === meResource.id
+        )
+      : false;
+    const viaTeam = Array.isArray(resource.teams)
+      ? resource.teams.some((t) => t.managerId === meResource.id)
+      : false;
+    return direct || viaTeam;
+  }, [resource, meResource]);
+  const canSeePerformance = isAdmin || isManager || meResource?.id === resource.id;
+
   const [lastOneOnOne, setLastOneOnOne] = useState(null);
   const [oneOnOneLoaded, setOneOnOneLoaded] = useState(false);
   const [recentLogs, setRecentLogs] = useState([]);
   const [recentLogsLoaded, setRecentLogsLoaded] = useState(false);
+  const [performanceOverall, setPerformanceOverall] = useState(null);
+  const [performanceTrend, setPerformanceTrend] = useState([]);
+  const [performanceLoaded, setPerformanceLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +118,29 @@ export default function PersonOverview() {
       cancelled = true;
     };
   }, [isAdmin, resource.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!canSeePerformance) {
+      setPerformanceOverall(null);
+      setPerformanceTrend([]);
+      setPerformanceLoaded(true);
+      return;
+    }
+    setPerformanceLoaded(false);
+    Promise.all([
+      api.getPerformanceOverall(resource.id).catch(() => null),
+      api.getPerformanceTrend(resource.id, 'month').catch(() => []),
+    ]).then(([overall, trend]) => {
+      if (cancelled) return;
+      setPerformanceOverall(overall);
+      setPerformanceTrend(Array.isArray(trend) ? trend : []);
+      setPerformanceLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [canSeePerformance, resource.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,6 +220,39 @@ export default function PersonOverview() {
         <StatCard icon="🏢" value={stats.customers} label="Customers" color="#F97316" />
         <StatCard icon="🎯" value={stats.skills} label="Skills" color="#8B5CF6" />
       </div>
+
+      {canSeePerformance && performanceLoaded && (
+        <div
+          onClick={() => navigate(`/people/${resource.id}/performance`)}
+          className="bg-white rounded-xl border border-border p-4 mb-4 cursor-pointer hover:bg-primary-bg/40"
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
+              Performance
+            </div>
+            <div className="text-[10px] text-text-light">
+              {performanceOverall?.evaluations?.length
+                ? `${performanceOverall.evaluations.length} finalized`
+                : 'No finalized evaluations'}
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="shrink-0">
+              {performanceOverall?.overall != null ? (
+                <div className="text-3xl font-bold text-primary leading-none">
+                  {performanceOverall.overall.toFixed(1)}
+                </div>
+              ) : (
+                <div className="text-2xl font-bold text-text-light leading-none">—</div>
+              )}
+              <div className="text-[10px] text-text-light mt-1">Overall (weighted)</div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <PerformanceSparkline points={performanceTrend} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {isAdmin && oneOnOneLoaded && (
         <div className="bg-white rounded-xl border border-border p-4 mb-4">
