@@ -5,10 +5,9 @@ export default function HeaderTabs() {
   const location = useLocation();
 
   const tabs = [
+    { path: '/people', label: 'People' },
     { path: '/planner', label: 'Planner' },
     { path: '/dashboard', label: 'Insights' },
-    { path: '/people', label: 'People' },
-    { path: '/skills', label: 'Skills' },
   ];
 
   return (
