@@ -9,7 +9,7 @@ export default function StatsCards({ months, includePotential, teamId }) {
 
   const stats = useMemo(() => {
     const monthSet = new Set(months);
-    const teamResources = teamId ? resources.filter((r) => r.teamId === teamId) : resources;
+    const teamResources = teamId ? resources.filter((r) => (r.teams || []).some((t) => t.id === teamId)) : resources;
 
     // Active projects that overlap with the selected time range
     const activeProjects = projects.filter((p) => {

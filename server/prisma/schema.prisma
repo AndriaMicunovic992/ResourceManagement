@@ -28,6 +28,7 @@ model Organization {
   oneOnOnes   OneOnOne[]
   logs        Log[]
   performanceLogCategories PerformanceLogCategory[]
+  personManagers PersonManager[]
 }
 
 model User {
@@ -108,8 +109,7 @@ model Resource {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  teamId String?
-  team   Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  teams Team[] @relation("ResourceTeams")
 
   userId String?
   user   User?   @relation("UserResources", fields: [userId], references: [id], onDelete: SetNull)
@@ -120,10 +120,12 @@ model Resource {
   oneOnOnes   OneOnOne[]
   logs        Log[]
   responsibleProjects Project[] @relation("ProjectResponsible")
+  managedTeams Team[] @relation("TeamManager")
+  managerLinks       PersonManager[] @relation("PersonSide")
+  managedPersonLinks PersonManager[] @relation("ManagerSide")
 
   @@unique([orgId, userId])
   @@index([orgId])
-  @@index([teamId])
   @@index([userId])
 }
 
@@ -137,9 +139,27 @@ model Team {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  resources Resource[]
+  resources Resource[] @relation("ResourceTeams")
+
+  managerId String?
+  manager   Resource? @relation("TeamManager", fields: [managerId], references: [id], onDelete: SetNull)
 
   @@unique([orgId, name])
+  @@index([orgId])
+  @@index([managerId])
+}
+
+model PersonManager {
+  personId  String
+  person    Resource @relation("PersonSide", fields: [personId], references: [id], onDelete: Cascade)
+  managerId String
+  manager   Resource @relation("ManagerSide", fields: [managerId], references: [id], onDelete: Cascade)
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([personId, managerId])
+  @@index([managerId])
   @@index([orgId])
 }
 

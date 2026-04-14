@@ -10,7 +10,7 @@ export default function DomainCard({ domain, months, includePotential, teamId })
   const d = DOMAINS[domain];
 
   const { count, utilPct, usedFte, totalFte } = useMemo(() => {
-    const scoped = teamId ? resources.filter((r) => r.teamId === teamId) : resources;
+    const scoped = teamId ? resources.filter((r) => (r.teams || []).some((t) => t.id === teamId)) : resources;
     const domResources = scoped.filter((r) => r.roles?.some((rl) => rl.domain === domain));
     const count = domResources.length;
     const rUsed = includePotential ? rU : rURealised;

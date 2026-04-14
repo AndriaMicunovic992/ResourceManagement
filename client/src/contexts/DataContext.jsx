@@ -108,7 +108,12 @@ export function DataProvider({ children }) {
   const deleteTeam = useCallback(async (id) => {
     await api.deleteTeam(id);
     setTeams((prev) => prev.filter((t) => t.id !== id));
-    setResources((prev) => prev.map((r) => (r.teamId === id ? { ...r, teamId: null, team: null } : r)));
+    setResources((prev) =>
+      prev.map((r) => ({
+        ...r,
+        teams: Array.isArray(r.teams) ? r.teams.filter((t) => t.id !== id) : r.teams,
+      }))
+    );
   }, []);
 
   // Skill CRUD
