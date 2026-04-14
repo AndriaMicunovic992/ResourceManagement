@@ -291,6 +291,25 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
         </tbody>
       </table>
 
+      {!isSubject &&
+        finalized &&
+        eval_.postFinalizationLogs &&
+        eval_.postFinalizationLogs.length > 0 && (
+          <div className="mt-3 border-t border-border pt-3">
+            <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1.5">
+              Activity since finalization ({eval_.postFinalizationLogs.length})
+            </div>
+            <div className="space-y-1">
+              {eval_.postFinalizationLogs.map((l) => (
+                <div key={l.id} className="text-[11px] text-text">
+                  <span className="text-text-light">{formatDate(l.createdAt)}</span> ·{' '}
+                  <span className="uppercase font-semibold">{l.kind}</span> · {l.content}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       {!subjectFinalizedView && (
         <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
           <div className="text-[11px] text-text-light">
@@ -379,6 +398,7 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
           </div>
         </div>
       )}
+
     </div>
   );
 }

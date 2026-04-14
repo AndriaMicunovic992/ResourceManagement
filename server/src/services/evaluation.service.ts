@@ -297,7 +297,42 @@ export const evaluationService = {
       orderBy: { createdAt: 'desc' },
       select: { id: true, createdAt: true, kind: true, content: true, customerId: true, projectId: true },
     });
-    return { ...evaluation, logs, _viewerKind: kind };
+
+    // For responsible / manager / admin viewers, also surface activity logs
+    // recorded AFTER the evaluation was finalized, within the same scope. These
+    // are not tied to the evaluation (tying only covers the period window) but
+    // provide context about what has happened since.
+    let postFinalizationLogs: Array<{
+      id: string;
+      createdAt: Date;
+      kind: string;
+      content: string;
+      customerId: string | null;
+      projectId: string | null;
+    }> = [];
+    if (evaluation.state === 'finalized' && evaluation.finalizedAt) {
+      const postWhere: Prisma.LogWhereInput = {
+        orgId,
+        resourceId: evaluation.resourceId,
+        createdAt: { gt: evaluation.finalizedAt },
+      };
+      if (evaluation.customerId) {
+        postWhere.OR = [{ customerId: evaluation.customerId }, { customerId: null }];
+      }
+      if (evaluation.projectId) {
+        const projectClause: Prisma.LogWhereInput = {
+          OR: [{ projectId: evaluation.projectId }, { projectId: null }],
+        };
+        postWhere.AND = [...(Array.isArray(postWhere.AND) ? postWhere.AND : []), projectClause];
+      }
+      postFinalizationLogs = await prisma.log.findMany({
+        where: postWhere,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, createdAt: true, kind: true, content: true, customerId: true, projectId: true },
+      });
+    }
+
+    return { ...evaluation, logs, postFinalizationLogs, _viewerKind: kind };
   },
 
   async createOne(
