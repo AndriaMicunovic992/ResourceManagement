@@ -174,4 +174,23 @@ export const api = {
     const qs = query.toString();
     return apiFetch('/people/' + resourceId + '/performance/categories' + (qs ? '?' + qs : ''));
   },
+
+  // Org-wide performance insights (admin only)
+  getInsightsPerformanceSummary: (params) => apiFetch(_qs('/insights/performance/summary', params)),
+  getInsightsPerformanceDistribution: (params) => apiFetch(_qs('/insights/performance/distribution', params)),
+  getInsightsPerformanceCategories: (params) => apiFetch(_qs('/insights/performance/categories', params)),
+  getInsightsPerformanceHeatmap: (params) => apiFetch(_qs('/insights/performance/heatmap', params)),
+  getInsightsPerformanceTrend: (params) => apiFetch(_qs('/insights/performance/trend', params)),
+  getInsightsPerformancePeople: (params) => apiFetch(_qs('/insights/performance/people', params)),
 };
+
+function _qs(path, params) {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v != null && v !== '') query.set(k, v);
+    }
+  }
+  const qs = query.toString();
+  return path + (qs ? '?' + qs : '');
+}
