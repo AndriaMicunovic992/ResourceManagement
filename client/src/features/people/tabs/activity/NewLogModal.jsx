@@ -34,19 +34,14 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
   }, [projects, customerId]);
 
   const groupedCategories = useMemo(() => {
-    const groups = {};
-    for (const c of logCategories) {
+    const active = logCategories.filter((c) => c.active !== false);
+    const groups = new Map();
+    for (const c of active) {
       const g = c.grouping || '';
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(c);
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(c);
     }
-    return Object.keys(groups)
-      .sort((a, b) => {
-        if (a === '') return 1;
-        if (b === '') return -1;
-        return a.localeCompare(b);
-      })
-      .map((g) => ({ grouping: g, categories: groups[g] }));
+    return Array.from(groups.entries()).map(([grouping, categories]) => ({ grouping, categories }));
   }, [logCategories]);
 
   const kindOptions = perspective === 'employee' ? EMPLOYEE_KINDS : OBSERVER_KINDS;

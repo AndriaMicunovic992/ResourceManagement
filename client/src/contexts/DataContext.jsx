@@ -136,11 +136,17 @@ export function DataProvider({ children }) {
   }, []);
 
   // Performance log category CRUD
+  // Sort: grouping ASC (NULLS LAST), then sortOrder ASC, then name ASC
   const sortLogCategories = (list) =>
     [...list].sort((a, b) => {
-      const ga = a.grouping || '';
-      const gb = b.grouping || '';
-      if (ga !== gb) return ga.localeCompare(gb);
+      const ga = a.grouping;
+      const gb = b.grouping;
+      if (ga == null && gb != null) return 1;
+      if (gb == null && ga != null) return -1;
+      if ((ga || '') !== (gb || '')) return (ga || '').localeCompare(gb || '');
+      const sa = a.sortOrder ?? 0;
+      const sb = b.sortOrder ?? 0;
+      if (sa !== sb) return sa - sb;
       return a.name.localeCompare(b.name);
     });
   const addLogCategory = useCallback(async (data) => {
