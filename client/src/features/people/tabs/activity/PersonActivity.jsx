@@ -86,6 +86,14 @@ function LogCard({ log, currentUserId, resourceId, onEdit, onDelete }) {
             💬 From 1:1 on {formatDate(log.oneOnOne.meetingDate)}
           </Link>
         )}
+        {log.evaluationId && (
+          <Link
+            to={`/people/${resourceId}/performance`}
+            className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 no-underline"
+          >
+            📊 Tied to evaluation
+          </Link>
+        )}
       </div>
       <div className="flex items-center justify-between gap-2">
         <div className="text-[11px] text-text-light">

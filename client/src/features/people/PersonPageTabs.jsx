@@ -1,9 +1,31 @@
+import { useMemo } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useOrg } from '../../contexts/OrgContext';
+import { useData } from '../../contexts/DataContext';
 
 export default function PersonPageTabs({ resourceId }) {
   const { role } = useOrg();
+  const { resources, meResource } = useData();
   const isAdmin = role === 'admin' || role === 'owner';
+
+  const { isManager, isSelf } = useMemo(() => {
+    const person = resources.find((r) => r.id === resourceId);
+    if (!person || !meResource) return { isManager: false, isSelf: false };
+    const direct = Array.isArray(person.managerLinks)
+      ? person.managerLinks.some(
+          (l) => (l.managerId || l.manager?.id) === meResource.id
+        )
+      : false;
+    const viaTeam = Array.isArray(person.teams)
+      ? person.teams.some((t) => t.managerId === meResource.id)
+      : false;
+    return {
+      isManager: direct || viaTeam,
+      isSelf: meResource.id === person.id,
+    };
+  }, [resources, resourceId, meResource]);
+
+  const canSeePerformance = isAdmin || isManager || isSelf;
 
   const tabs = [
     { to: `/people/${resourceId}`, label: 'Overview', end: true },
@@ -13,6 +35,9 @@ export default function PersonPageTabs({ resourceId }) {
   if (isAdmin) {
     tabs.push({ to: `/people/${resourceId}/oneonones`, label: '1:1s', end: false });
     tabs.push({ to: `/people/${resourceId}/activity`, label: 'Activity', end: false });
+  }
+  if (canSeePerformance) {
+    tabs.push({ to: `/people/${resourceId}/performance`, label: 'Performance', end: false });
   }
 
   return (

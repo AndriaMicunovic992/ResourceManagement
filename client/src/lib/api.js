@@ -116,4 +116,41 @@ export const api = {
   upsertAssignment: (data) => apiFetch('/assignments', { method: 'POST', body: JSON.stringify(data) }),
   updateAssignment: (id, data) => apiFetch('/assignments/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteAssignment: (id) => apiFetch('/assignments/' + id, { method: 'DELETE' }),
+
+  // Evaluations
+  listEvaluations: (params) => {
+    const query = new URLSearchParams();
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v != null && v !== '') query.set(k, v);
+      }
+    }
+    const qs = query.toString();
+    return apiFetch('/evaluations' + (qs ? '?' + qs : ''));
+  },
+  getEvaluation: (id) => apiFetch('/evaluations/' + id),
+  createEvaluation: (data) => apiFetch('/evaluations', { method: 'POST', body: JSON.stringify(data) }),
+  createEvaluationBatch: (data) => apiFetch('/evaluations/batch', { method: 'POST', body: JSON.stringify(data) }),
+  updateEvaluationScore: (id, snapshotId, data) =>
+    apiFetch('/evaluations/' + id + '/scores/' + snapshotId, { method: 'PATCH', body: JSON.stringify(data) }),
+  submitEmployeeEvaluation: (id) =>
+    apiFetch('/evaluations/' + id + '/transitions/submit-employee', { method: 'POST' }),
+  submitResponsibleEvaluation: (id) =>
+    apiFetch('/evaluations/' + id + '/transitions/submit-responsible', { method: 'POST' }),
+  finalizeEvaluation: (id, data) =>
+    apiFetch('/evaluations/' + id + '/transitions/finalize', { method: 'POST', body: JSON.stringify(data || {}) }),
+  deleteEvaluation: (id) => apiFetch('/evaluations/' + id, { method: 'DELETE' }),
+
+  getPerformanceOverall: (resourceId, params) => {
+    const query = new URLSearchParams();
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v != null && v !== '') query.set(k, v);
+      }
+    }
+    const qs = query.toString();
+    return apiFetch('/people/' + resourceId + '/performance/overall' + (qs ? '?' + qs : ''));
+  },
+  getPerformanceTrend: (resourceId, bucket) =>
+    apiFetch('/people/' + resourceId + '/performance/trend' + (bucket ? '?bucket=' + bucket : '')),
 };
