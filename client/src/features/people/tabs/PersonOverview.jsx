@@ -10,7 +10,7 @@ import { api } from '../../../lib/api';
 const KIND_COLORS = {
   good: 'bg-green-100 text-green-700',
   bad: 'bg-red-100 text-red-700',
-  suggestion: 'bg-blue-100 text-blue-700',
+  incident: 'bg-orange-100 text-orange-700',
   observation: 'bg-gray-100 text-gray-700',
   win: 'bg-emerald-100 text-emerald-700',
   down: 'bg-amber-100 text-amber-700',

@@ -4,10 +4,16 @@ import { useAuth } from '../../../../contexts/AuthContext';
 import { useData } from '../../../../contexts/DataContext';
 import LogInlineEditor from './LogInlineEditor';
 
-const KIND_SECTIONS = [
+const OBSERVER_SECTIONS = [
   { kind: 'good', label: 'Good sides' },
   { kind: 'bad', label: 'Bad sides' },
-  { kind: 'suggestion', label: 'Suggestions' },
+  { kind: 'incident', label: 'Incidents' },
+];
+
+const EMPLOYEE_SECTIONS = [
+  { kind: 'win', label: 'Wins' },
+  { kind: 'down', label: 'Downs' },
+  { kind: 'blocker', label: 'Blockers' },
 ];
 
 function formatDate(value) {
@@ -97,7 +103,7 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
   const [logs, setLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState('');
-  const [addingKind, setAddingKind] = useState(null); // 'good' | 'bad' | 'suggestion' | null
+  const [addingKind, setAddingKind] = useState(null);
   const [editingLogId, setEditingLogId] = useState(null);
   const { user } = useAuth();
   const { customers, projects } = useData();
@@ -131,7 +137,10 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
   const byKind = {
     good: logs.filter((l) => l.kind === 'good'),
     bad: logs.filter((l) => l.kind === 'bad'),
-    suggestion: logs.filter((l) => l.kind === 'suggestion'),
+    incident: logs.filter((l) => l.kind === 'incident'),
+    win: logs.filter((l) => l.kind === 'win'),
+    down: logs.filter((l) => l.kind === 'down'),
+    blocker: logs.filter((l) => l.kind === 'blocker'),
   };
 
   const handleCreateLog = async (data) => {
@@ -202,61 +211,131 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
             <div className="text-xs text-danger bg-danger-bg p-2 rounded">{logsError}</div>
           )}
 
-          {KIND_SECTIONS.map(({ kind, label }) => (
-            <div key={kind}>
-              <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1.5">
-                {label}
-              </div>
-              {logsLoading ? (
-                <div className="text-[11px] text-text-light italic">Loading…</div>
-              ) : (
-                <div className="space-y-1.5">
-                  {byKind[kind].length === 0 && addingKind !== kind && (
-                    <div className="text-[11px] text-text-light italic">No entries.</div>
-                  )}
-                  {byKind[kind].map((log) =>
-                    editingLogId === log.id ? (
-                      <LogInlineEditor
-                        key={log.id}
-                        initial={log}
-                        customers={customers}
-                        projects={projects}
-                        onCancel={() => setEditingLogId(null)}
-                        onSave={(data) => handleUpdateLog(log.id, data)}
-                      />
-                    ) : (
-                      <LogEntry
-                        key={log.id}
-                        log={log}
-                        currentUserId={user?.id}
-                        onEdit={() => setEditingLogId(log.id)}
-                        onDelete={() => handleDeleteLog(log.id)}
-                      />
-                    )
-                  )}
-                  {addingKind === kind ? (
-                    <LogInlineEditor
-                      initial={null}
-                      customers={customers}
-                      projects={projects}
-                      onCancel={() => setAddingKind(null)}
-                      onSave={handleCreateLog}
-                    />
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-text-mid font-bold mb-2">
+              Manager / customer perspective
+            </div>
+            <div className="space-y-3">
+              {OBSERVER_SECTIONS.map(({ kind, label }) => (
+                <div key={kind}>
+                  <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1.5">
+                    {label}
+                  </div>
+                  {logsLoading ? (
+                    <div className="text-[11px] text-text-light italic">Loading…</div>
                   ) : (
-                    <button
-                      onClick={() => {
-                        setEditingLogId(null);
-                        setAddingKind(kind);
-                      }}
-                      className="text-[11px] font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
-                    >
-                      + Add
-                    </button>
+                    <div className="space-y-1.5">
+                      {byKind[kind].length === 0 && addingKind !== kind && (
+                        <div className="text-[11px] text-text-light italic">No entries.</div>
+                      )}
+                      {byKind[kind].map((log) =>
+                        editingLogId === log.id ? (
+                          <LogInlineEditor
+                            key={log.id}
+                            initial={log}
+                            customers={customers}
+                            projects={projects}
+                            onCancel={() => setEditingLogId(null)}
+                            onSave={(data) => handleUpdateLog(log.id, data)}
+                          />
+                        ) : (
+                          <LogEntry
+                            key={log.id}
+                            log={log}
+                            currentUserId={user?.id}
+                            onEdit={() => setEditingLogId(log.id)}
+                            onDelete={() => handleDeleteLog(log.id)}
+                          />
+                        )
+                      )}
+                      {addingKind === kind ? (
+                        <LogInlineEditor
+                          initial={null}
+                          customers={customers}
+                          projects={projects}
+                          onCancel={() => setAddingKind(null)}
+                          onSave={handleCreateLog}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditingLogId(null);
+                            setAddingKind(kind);
+                          }}
+                          className="text-[11px] font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-text-mid font-bold mb-2">
+              Employee perspective
+            </div>
+            <div className="space-y-3">
+              {EMPLOYEE_SECTIONS.map(({ kind, label }) => (
+                <div key={kind}>
+                  <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1.5">
+                    {label}
+                  </div>
+                  {logsLoading ? (
+                    <div className="text-[11px] text-text-light italic">Loading…</div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {byKind[kind].length === 0 && addingKind !== kind && (
+                        <div className="text-[11px] text-text-light italic">No entries.</div>
+                      )}
+                      {byKind[kind].map((log) =>
+                        editingLogId === log.id ? (
+                          <LogInlineEditor
+                            key={log.id}
+                            initial={log}
+                            customers={customers}
+                            projects={projects}
+                            onCancel={() => setEditingLogId(null)}
+                            onSave={(data) => handleUpdateLog(log.id, data)}
+                          />
+                        ) : (
+                          <LogEntry
+                            key={log.id}
+                            log={log}
+                            currentUserId={user?.id}
+                            onEdit={() => setEditingLogId(log.id)}
+                            onDelete={() => handleDeleteLog(log.id)}
+                          />
+                        )
+                      )}
+                      {addingKind === kind ? (
+                        <LogInlineEditor
+                          initial={null}
+                          customers={customers}
+                          projects={projects}
+                          onCancel={() => setAddingKind(null)}
+                          onSave={handleCreateLog}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditingLogId(null);
+                            setAddingKind(kind);
+                          }}
+                          className="text-[11px] font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
 
           {hasPrivate && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">

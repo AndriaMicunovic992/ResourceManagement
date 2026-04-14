@@ -9,7 +9,6 @@ export default function HeaderTabs() {
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/people', label: 'People' },
     { path: '/skills', label: 'Skills' },
-    { path: '/journal', label: 'My Journal' },
   ];
 
   return (

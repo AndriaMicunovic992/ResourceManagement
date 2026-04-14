@@ -3,16 +3,23 @@ import Modal from '../../../../components/ui/Modal';
 import { api } from '../../../../lib/api';
 import { useData } from '../../../../contexts/DataContext';
 
-const KINDS = [
+const OBSERVER_KINDS = [
   { value: 'observation', label: 'Observation' },
   { value: 'good', label: 'Good' },
   { value: 'bad', label: 'Bad' },
-  { value: 'suggestion', label: 'Suggestion' },
+  { value: 'incident', label: 'Incident' },
+];
+
+const EMPLOYEE_KINDS = [
+  { value: 'win', label: 'Win' },
+  { value: 'down', label: 'Down' },
+  { value: 'blocker', label: 'Blocker' },
 ];
 
 export default function NewLogModal({ resourceId, onCancel, onCreated }) {
   const { customers, projects, logCategories } = useData();
   const [content, setContent] = useState('');
+  const [perspective, setPerspective] = useState('observer');
   const [kind, setKind] = useState('observation');
   const [customerId, setCustomerId] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -41,6 +48,13 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
       })
       .map((g) => ({ grouping: g, categories: groups[g] }));
   }, [logCategories]);
+
+  const kindOptions = perspective === 'employee' ? EMPLOYEE_KINDS : OBSERVER_KINDS;
+
+  const handlePerspectiveChange = (next) => {
+    setPerspective(next);
+    setKind(next === 'employee' ? 'win' : 'observation');
+  };
 
   const handleCustomerChange = (e) => {
     const newId = e.target.value;
@@ -84,6 +98,36 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
 
         <div>
           <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
+            Logged from
+          </label>
+          <div className="inline-flex rounded-lg border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => handlePerspectiveChange('observer')}
+              className={`px-3 py-1.5 text-xs font-semibold border-0 cursor-pointer ${
+                perspective === 'observer'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-text-mid hover:bg-primary-bg'
+              }`}
+            >
+              Manager / customer perspective
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePerspectiveChange('employee')}
+              className={`px-3 py-1.5 text-xs font-semibold border-0 border-l border-border cursor-pointer ${
+                perspective === 'employee'
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-text-mid hover:bg-primary-bg'
+              }`}
+            >
+              Employee perspective
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
             Content
           </label>
           <textarea
@@ -106,7 +150,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
               onChange={(e) => setKind(e.target.value)}
               className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
             >
-              {KINDS.map((k) => (
+              {kindOptions.map((k) => (
                 <option key={k.value} value={k.value}>
                   {k.label}
                 </option>
