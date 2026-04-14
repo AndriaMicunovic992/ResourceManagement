@@ -12,7 +12,7 @@ export function DataProvider({ children }) {
   const [resources, setResources] = useState([]);
   const [teams, setTeams] = useState([]);
   const [skills, setSkills] = useState([]);
-  const [dimensions, setDimensions] = useState([]);
+  const [logCategories, setLogCategories] = useState([]);
   const [needs, setNeeds] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [meResource, setMeResource] = useState(null);
@@ -21,18 +21,18 @@ export function DataProvider({ children }) {
     if (!currentOrg) return;
     setLoading(true);
     try {
-      const [c, p, r, t, s, d, n, a, me] = await Promise.all([
+      const [c, p, r, t, s, lc, n, a, me] = await Promise.all([
         api.getCustomers(),
         api.getProjects(),
         api.getResources(),
         api.getTeams(),
         api.getSkills(),
-        api.getDimensions(),
+        api.getLogCategories(),
         api.getNeeds(),
         api.getAssignments(),
         api.getMyResource().catch(() => null),
       ]);
-      setCustomers(c); setProjects(p); setResources(r); setTeams(t); setSkills(s); setDimensions(d || []); setNeeds(n); setAssignments(a); setMeResource(me);
+      setCustomers(c); setProjects(p); setResources(r); setTeams(t); setSkills(s); setLogCategories(lc || []); setNeeds(n); setAssignments(a); setMeResource(me);
     } catch (e) {
       console.error('Load failed:', e);
     }
@@ -130,21 +130,26 @@ export function DataProvider({ children }) {
     })));
   }, []);
 
-  // Dimension CRUD
-  const sortDimensions = (list) =>
-    [...list].sort((a, b) => (a.sortOrder - b.sortOrder) || a.code.localeCompare(b.code));
-  const addDimension = useCallback(async (data) => {
-    const created = await api.createDimension(data);
-    setDimensions((prev) => sortDimensions([...prev, created]));
+  // Performance log category CRUD
+  const sortLogCategories = (list) =>
+    [...list].sort((a, b) => {
+      const ga = a.grouping || '';
+      const gb = b.grouping || '';
+      if (ga !== gb) return ga.localeCompare(gb);
+      return a.name.localeCompare(b.name);
+    });
+  const addLogCategory = useCallback(async (data) => {
+    const created = await api.createLogCategory(data);
+    setLogCategories((prev) => sortLogCategories([...prev, created]));
     return created;
   }, []);
-  const updateDimension = useCallback(async (id, data) => {
-    const updated = await api.updateDimension(id, data);
-    setDimensions((prev) => sortDimensions(prev.map((d) => (d.id === id ? updated : d))));
+  const updateLogCategory = useCallback(async (id, data) => {
+    const updated = await api.updateLogCategory(id, data);
+    setLogCategories((prev) => sortLogCategories(prev.map((c) => (c.id === id ? updated : c))));
   }, []);
-  const deleteDimension = useCallback(async (id) => {
-    await api.deleteDimension(id);
-    setDimensions((prev) => prev.filter((d) => d.id !== id));
+  const deleteLogCategory = useCallback(async (id) => {
+    await api.deleteLogCategory(id);
+    setLogCategories((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
   // PersonSkill CRUD
@@ -205,13 +210,13 @@ export function DataProvider({ children }) {
   }, []);
 
   const value = {
-    loading, customers, projects, resources, teams, skills, dimensions, needs, assignments, meResource, reload,
+    loading, customers, projects, resources, teams, skills, logCategories, needs, assignments, meResource, reload,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
     addResource, updateResource, deleteResource,
     addTeam, updateTeam, deleteTeam,
     addSkill, updateSkill, deleteSkill,
-    addDimension, updateDimension, deleteDimension,
+    addLogCategory, updateLogCategory, deleteLogCategory,
     upsertPersonSkill, deletePersonSkill,
     addNeed, updateNeed, deleteNeed,
     upsertAssignment, updateAssignment, deleteAssignment,

@@ -26,13 +26,13 @@ function formatDate(value) {
   });
 }
 
-function LogForm({ initial, customers, projects, dimensions, onCancel, onSave }) {
+function LogForm({ initial, customers, projects, groupedCategories, onCancel, onSave }) {
   const [content, setContent] = useState(initial?.content || '');
   const [kind, setKind] = useState(initial?.kind || 'win');
   const [customerId, setCustomerId] = useState(initial?.customerId || '');
   const [projectId, setProjectId] = useState(initial?.projectId || '');
   const [jiraUrl, setJiraUrl] = useState(initial?.jiraUrl || '');
-  const [dimensionCode, setDimensionCode] = useState(initial?.dimensionCode || '');
+  const [categoryId, setCategoryId] = useState(initial?.categoryId || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -65,7 +65,7 @@ function LogForm({ initial, customers, projects, dimensions, onCancel, onSave })
         customerId: customerId || null,
         projectId: projectId || null,
         jiraUrl: jiraUrl.trim() || null,
-        dimensionCode: dimensionCode || null,
+        categoryId: categoryId || null,
       });
     } catch (err) {
       setError(err.message || 'Failed to save');
@@ -103,15 +103,23 @@ function LogForm({ initial, customers, projects, dimensions, onCancel, onSave })
           ))}
         </select>
         <select
-          value={dimensionCode}
-          onChange={(e) => setDimensionCode(e.target.value)}
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
           className="px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
         >
-          <option value="">Dimension: None</option>
-          {dimensions.map((d) => (
-            <option key={d.id} value={d.code}>
-              {d.name}
-            </option>
+          <option value="">Category: None</option>
+          {groupedCategories.map((group) => (
+            group.grouping ? (
+              <optgroup key={group.grouping} label={group.grouping}>
+                {group.categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </optgroup>
+            ) : (
+              group.categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))
+            )
           ))}
         </select>
         <select
@@ -168,7 +176,7 @@ function LogForm({ initial, customers, projects, dimensions, onCancel, onSave })
   );
 }
 
-function LogCard({ log, dimensionLabel, onEdit, onDelete }) {
+function LogCard({ log, onEdit, onDelete }) {
   return (
     <div className="bg-white rounded-xl border border-border p-4">
       <div className="text-sm text-text whitespace-pre-wrap mb-2">{log.content}</div>
@@ -180,9 +188,9 @@ function LogCard({ log, dimensionLabel, onEdit, onDelete }) {
         >
           {log.kind}
         </span>
-        {log.dimensionCode && (
+        {log.category && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
-            {dimensionLabel || log.dimensionCode}
+            {log.category.grouping ? `${log.category.grouping} · ${log.category.name}` : log.category.name}
           </span>
         )}
         {log.customer && (
@@ -228,7 +236,7 @@ function LogCard({ log, dimensionLabel, onEdit, onDelete }) {
 }
 
 export default function MyJournalView() {
-  const { meResource, customers, projects, dimensions } = useData();
+  const { meResource, customers, projects, logCategories } = useData();
 
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -237,11 +245,21 @@ export default function MyJournalView() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const dimensionLabelByCode = useMemo(() => {
-    const map = {};
-    for (const d of dimensions) map[d.code] = d.name;
-    return map;
-  }, [dimensions]);
+  const groupedCategories = useMemo(() => {
+    const groups = {};
+    for (const c of logCategories) {
+      const g = c.grouping || '';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(c);
+    }
+    return Object.keys(groups)
+      .sort((a, b) => {
+        if (a === '') return 1;
+        if (b === '') return -1;
+        return a.localeCompare(b);
+      })
+      .map((g) => ({ grouping: g, categories: groups[g] }));
+  }, [logCategories]);
 
   useEffect(() => {
     if (!meResource) {
@@ -353,7 +371,7 @@ export default function MyJournalView() {
             initial={null}
             customers={customers}
             projects={projects}
-            dimensions={dimensions}
+            groupedCategories={groupedCategories}
             onCancel={() => setShowForm(false)}
             onSave={handleCreate}
           />
@@ -377,7 +395,7 @@ export default function MyJournalView() {
                 initial={log}
                 customers={customers}
                 projects={projects}
-                dimensions={dimensions}
+                groupedCategories={groupedCategories}
                 onCancel={() => setEditing(null)}
                 onSave={handleUpdate}
               />
@@ -385,7 +403,6 @@ export default function MyJournalView() {
               <LogCard
                 key={log.id}
                 log={log}
-                dimensionLabel={dimensionLabelByCode[log.dimensionCode]}
                 onEdit={() => setEditing(log)}
                 onDelete={() => handleDelete(log)}
               />

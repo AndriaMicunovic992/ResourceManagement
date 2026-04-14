@@ -65,11 +65,11 @@ export const api = {
   // Me
   getMyResource: () => apiFetch('/me/resource'),
 
-  // Dimensions
-  getDimensions: () => apiFetch('/dimensions'),
-  createDimension: (data) => apiFetch('/dimensions', { method: 'POST', body: JSON.stringify(data) }),
-  updateDimension: (id, data) => apiFetch('/dimensions/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
-  deleteDimension: (id) => apiFetch('/dimensions/' + id, { method: 'DELETE' }),
+  // Performance Log Categories
+  getLogCategories: () => apiFetch('/log-categories'),
+  createLogCategory: (data) => apiFetch('/log-categories', { method: 'POST', body: JSON.stringify(data) }),
+  updateLogCategory: (id, data) => apiFetch('/log-categories/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteLogCategory: (id) => apiFetch('/log-categories/' + id, { method: 'DELETE' }),
 
   // Skills
   getSkills: () => apiFetch('/skills'),

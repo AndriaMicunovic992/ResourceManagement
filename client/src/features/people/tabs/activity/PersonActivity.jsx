@@ -40,7 +40,7 @@ function formatDate(value) {
   });
 }
 
-function LogCard({ log, currentUserId, resourceId, dimensionLabel, onEdit, onDelete }) {
+function LogCard({ log, currentUserId, resourceId, onEdit, onDelete }) {
   const isAuthor = log.authorUserId === currentUserId;
   return (
     <div className="bg-white rounded-xl border border-border p-4">
@@ -53,9 +53,9 @@ function LogCard({ log, currentUserId, resourceId, dimensionLabel, onEdit, onDel
         >
           {log.kind}
         </span>
-        {log.dimensionCode && (
+        {log.category && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
-            {dimensionLabel || log.dimensionCode}
+            {log.category.grouping ? `${log.category.grouping} · ${log.category.name}` : log.category.name}
           </span>
         )}
         {log.customer && (
@@ -117,13 +117,24 @@ export default function PersonActivity() {
   const { resource } = useOutletContext();
   const { role } = useOrg();
   const { user } = useAuth();
-  const { customers, projects, dimensions } = useData();
+  const { customers, projects, logCategories } = useData();
   const isAdmin = role === 'admin' || role === 'owner';
-  const dimensionLabelByCode = useMemo(() => {
-    const map = {};
-    for (const d of dimensions) map[d.code] = d.name;
-    return map;
-  }, [dimensions]);
+
+  const groupedCategories = useMemo(() => {
+    const groups = {};
+    for (const c of logCategories) {
+      const g = c.grouping || '';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(c);
+    }
+    return Object.keys(groups)
+      .sort((a, b) => {
+        if (a === '') return 1;
+        if (b === '') return -1;
+        return a.localeCompare(b);
+      })
+      .map((g) => ({ grouping: g, categories: groups[g] }));
+  }, [logCategories]);
 
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -132,7 +143,7 @@ export default function PersonActivity() {
   const [editingLogId, setEditingLogId] = useState(null);
 
   const [filterKind, setFilterKind] = useState('');
-  const [filterDimension, setFilterDimension] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterProject, setFilterProject] = useState('');
   const [filterFrom, setFilterFrom] = useState('');
@@ -141,13 +152,13 @@ export default function PersonActivity() {
   const filters = useMemo(
     () => ({
       kind: filterKind,
-      dimensionCode: filterDimension,
+      categoryId: filterCategory,
       customerId: filterCustomer,
       projectId: filterProject,
       from: filterFrom,
       to: filterTo,
     }),
-    [filterKind, filterDimension, filterCustomer, filterProject, filterFrom, filterTo]
+    [filterKind, filterCategory, filterCustomer, filterProject, filterFrom, filterTo]
   );
 
   useEffect(() => {
@@ -224,15 +235,23 @@ export default function PersonActivity() {
               ))}
             </select>
             <select
-              value={filterDimension}
-              onChange={(e) => setFilterDimension(e.target.value)}
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
               className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
             >
-              <option value="">All dimensions</option>
-              {dimensions.map((dim) => (
-                <option key={dim.id} value={dim.code}>
-                  {dim.name}
-                </option>
+              <option value="">All categories</option>
+              {groupedCategories.map((group) => (
+                group.grouping ? (
+                  <optgroup key={group.grouping} label={group.grouping}>
+                    {group.categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  group.categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))
+                )
               ))}
             </select>
             <select
@@ -311,7 +330,6 @@ export default function PersonActivity() {
                 log={log}
                 currentUserId={user?.id}
                 resourceId={resource.id}
-                dimensionLabel={dimensionLabelByCode[log.dimensionCode]}
                 onEdit={() => setEditingLogId(log.id)}
                 onDelete={() => handleDeleteLog(log.id)}
               />

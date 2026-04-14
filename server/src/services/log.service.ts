@@ -13,11 +13,14 @@ const projectSelect = { id: true, name: true } as const;
 const authorSelect = { id: true, name: true, email: true } as const;
 const oneOnOneSelect = { id: true, meetingDate: true } as const;
 
+const categorySelect = { id: true, name: true, grouping: true } as const;
+
 const logInclude = {
   customer: { select: customerSelect },
   project: { select: projectSelect },
   authorUser: { select: authorSelect },
   oneOnOne: { select: oneOnOneSelect },
+  category: { select: categorySelect },
 } as const;
 
 function isAdminRole(role: string): boolean {
@@ -64,9 +67,11 @@ async function ensureOneOnOneForResource(
   if (!oneOnOne) throw new NotFoundError('1:1 meeting not found');
 }
 
-async function ensureDimensionCodeInOrg(orgId: string, code: string): Promise<void> {
-  const dim = await prisma.dimension.findFirst({ where: { orgId, code } });
-  if (!dim) throw new NotFoundError('Dimension not found');
+async function ensureCategoryInOrg(orgId: string, categoryId: string): Promise<void> {
+  const category = await prisma.performanceLogCategory.findFirst({
+    where: { id: categoryId, orgId },
+  });
+  if (!category) throw new NotFoundError('Category not found');
 }
 
 function parseBoundaryDate(value: string, endOfDay: boolean): Date {
@@ -99,7 +104,7 @@ export async function listLogs(
     where.kind = filters.kind;
   }
 
-  if (filters.dimensionCode) where.dimensionCode = filters.dimensionCode;
+  if (filters.categoryId) where.categoryId = filters.categoryId;
   if (filters.customerId) where.customerId = filters.customerId;
   if (filters.projectId) where.projectId = filters.projectId;
   if (filters.oneOnOneId) where.oneOnOneId = filters.oneOnOneId;
@@ -170,7 +175,7 @@ export async function createLog(
   if (data.customerId) await ensureCustomerInOrg(orgId, data.customerId);
   if (data.projectId) await ensureProjectInOrg(orgId, data.projectId);
   if (data.oneOnOneId) await ensureOneOnOneForResource(orgId, data.oneOnOneId, resourceId);
-  if (data.dimensionCode) await ensureDimensionCodeInOrg(orgId, data.dimensionCode);
+  if (data.categoryId) await ensureCategoryInOrg(orgId, data.categoryId);
 
   return prisma.log.create({
     data: {
@@ -179,7 +184,7 @@ export async function createLog(
       authorUserId,
       content: data.content,
       kind: data.kind,
-      dimensionCode: data.dimensionCode ?? null,
+      categoryId: data.categoryId ?? null,
       customerId: data.customerId ?? null,
       projectId: data.projectId ?? null,
       jiraUrl: data.jiraUrl ?? null,
@@ -215,9 +220,13 @@ export async function updateLog(
   const patch: Prisma.LogUpdateInput = {};
   if (data.content !== undefined) patch.content = data.content;
   if (data.kind !== undefined) patch.kind = data.kind;
-  if (data.dimensionCode !== undefined) {
-    if (data.dimensionCode) await ensureDimensionCodeInOrg(orgId, data.dimensionCode);
-    patch.dimensionCode = data.dimensionCode ?? null;
+  if (data.categoryId !== undefined) {
+    if (data.categoryId) {
+      await ensureCategoryInOrg(orgId, data.categoryId);
+      patch.category = { connect: { id: data.categoryId } };
+    } else {
+      patch.category = { disconnect: true };
+    }
   }
   if (data.jiraUrl !== undefined) patch.jiraUrl = data.jiraUrl ?? null;
 

@@ -2,14 +2,30 @@ import { useMemo, useState } from 'react';
 import { useData } from '../../../../contexts/DataContext';
 
 export default function LogInlineEditor({ initial, customers, projects, onCancel, onSave }) {
-  const { dimensions } = useData();
+  const { logCategories } = useData();
   const [content, setContent] = useState(initial?.content || '');
   const [customerId, setCustomerId] = useState(initial?.customerId || '');
   const [projectId, setProjectId] = useState(initial?.projectId || '');
   const [jiraUrl, setJiraUrl] = useState(initial?.jiraUrl || '');
-  const [dimensionCode, setDimensionCode] = useState(initial?.dimensionCode || '');
+  const [categoryId, setCategoryId] = useState(initial?.categoryId || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const groupedCategories = useMemo(() => {
+    const groups = {};
+    for (const c of logCategories) {
+      const g = c.grouping || '';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(c);
+    }
+    return Object.keys(groups)
+      .sort((a, b) => {
+        if (a === '') return 1;
+        if (b === '') return -1;
+        return a.localeCompare(b);
+      })
+      .map((g) => ({ grouping: g, categories: groups[g] }));
+  }, [logCategories]);
 
   const availableProjects = useMemo(() => {
     if (!projects) return [];
@@ -31,7 +47,7 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
         customerId: customerId || null,
         projectId: projectId || null,
         jiraUrl: jiraUrl.trim() || null,
-        dimensionCode: dimensionCode || null,
+        categoryId: categoryId || null,
       });
     } catch (err) {
       setError(err.message || 'Failed to save log');
@@ -102,15 +118,23 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
           className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
         />
         <select
-          value={dimensionCode}
-          onChange={(e) => setDimensionCode(e.target.value)}
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
           className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
         >
-          <option value="">Dimension: None</option>
-          {dimensions.map((dim) => (
-            <option key={dim.id} value={dim.code}>
-              {dim.name}
-            </option>
+          <option value="">Category: None</option>
+          {groupedCategories.map((group) => (
+            group.grouping ? (
+              <optgroup key={group.grouping} label={group.grouping}>
+                {group.categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </optgroup>
+            ) : (
+              group.categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))
+            )
           ))}
         </select>
       </div>

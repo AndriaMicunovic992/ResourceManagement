@@ -11,13 +11,13 @@ const KINDS = [
 ];
 
 export default function NewLogModal({ resourceId, onCancel, onCreated }) {
-  const { customers, projects, dimensions } = useData();
+  const { customers, projects, logCategories } = useData();
   const [content, setContent] = useState('');
   const [kind, setKind] = useState('observation');
   const [customerId, setCustomerId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [jiraUrl, setJiraUrl] = useState('');
-  const [dimensionCode, setDimensionCode] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -25,6 +25,22 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
     if (!customerId) return projects;
     return projects.filter((p) => p.customerId === customerId);
   }, [projects, customerId]);
+
+  const groupedCategories = useMemo(() => {
+    const groups = {};
+    for (const c of logCategories) {
+      const g = c.grouping || '';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(c);
+    }
+    return Object.keys(groups)
+      .sort((a, b) => {
+        if (a === '') return 1;
+        if (b === '') return -1;
+        return a.localeCompare(b);
+      })
+      .map((g) => ({ grouping: g, categories: groups[g] }));
+  }, [logCategories]);
 
   const handleCustomerChange = (e) => {
     const newId = e.target.value;
@@ -50,7 +66,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
         customerId: customerId || null,
         projectId: projectId || null,
         jiraUrl: jiraUrl.trim() || null,
-        dimensionCode: dimensionCode || null,
+        categoryId: categoryId || null,
       });
       onCreated(created);
     } catch (err) {
@@ -99,18 +115,26 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
-              Dimension
+              Category
             </label>
             <select
-              value={dimensionCode}
-              onChange={(e) => setDimensionCode(e.target.value)}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
               className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="">None</option>
-              {dimensions.map((dim) => (
-                <option key={dim.id} value={dim.code}>
-                  {dim.name}
-                </option>
+              {groupedCategories.map((group) => (
+                group.grouping ? (
+                  <optgroup key={group.grouping} label={group.grouping}>
+                    {group.categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  group.categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))
+                )
               ))}
             </select>
           </div>
