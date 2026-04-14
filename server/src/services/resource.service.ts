@@ -66,7 +66,7 @@ export const resourceService = {
 
   async update(orgId: string, id: string, data: UpdateResourceInput) {
     await this.getById(orgId, id);
-    const { roles, userId, ...rest } = data;
+    const { roles, userId, teamId, ...rest } = data;
 
     if (userId) await ensureUserInOrg(orgId, userId);
 
@@ -80,6 +80,9 @@ export const resourceService = {
     const patch: Prisma.ResourceUpdateInput = { ...rest };
     if (userId !== undefined) {
       patch.user = userId ? { connect: { id: userId } } : { disconnect: true };
+    }
+    if (teamId !== undefined) {
+      patch.team = teamId ? { connect: { id: teamId } } : { disconnect: true };
     }
 
     try {

@@ -30,9 +30,11 @@ export default function SettingsView() {
   const [catError, setCatError] = useState('');
   const [newCatGrouping, setNewCatGrouping] = useState('');
   const [newCatName, setNewCatName] = useState('');
+  const [newCatDescription, setNewCatDescription] = useState('');
   const [editingCatId, setEditingCatId] = useState(null);
   const [editingCatGrouping, setEditingCatGrouping] = useState('');
   const [editingCatName, setEditingCatName] = useState('');
+  const [editingCatDescription, setEditingCatDescription] = useState('');
 
   const groupedLogCategories = useMemo(() => {
     const groups = {};
@@ -248,9 +250,11 @@ export default function SettingsView() {
       await addLogCategory({
         name: newCatName.trim(),
         grouping: newCatGrouping.trim() || null,
+        description: newCatDescription.trim() || null,
       });
       setNewCatName('');
       setNewCatGrouping('');
+      setNewCatDescription('');
     } catch (err) {
       setCatError(err.message || 'Failed to add category');
     }
@@ -260,6 +264,7 @@ export default function SettingsView() {
     setEditingCatId(cat.id);
     setEditingCatName(cat.name);
     setEditingCatGrouping(cat.grouping || '');
+    setEditingCatDescription(cat.description || '');
     setCatError('');
   };
 
@@ -267,6 +272,7 @@ export default function SettingsView() {
     setEditingCatId(null);
     setEditingCatName('');
     setEditingCatGrouping('');
+    setEditingCatDescription('');
   };
 
   const handleSaveEditCategory = async () => {
@@ -275,6 +281,7 @@ export default function SettingsView() {
       await updateLogCategory(editingCatId, {
         name: editingCatName.trim(),
         grouping: editingCatGrouping.trim() || null,
+        description: editingCatDescription.trim() || null,
       });
       handleCancelEditCategory();
     } catch (err) {
@@ -567,48 +574,67 @@ export default function SettingsView() {
                   {group.categories.map((cat) => {
                     const isEditing = editingCatId === cat.id;
                     return (
-                      <div key={cat.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
+                      <div key={cat.id} className="py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
                         {isEditing ? (
-                          <>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editingCatGrouping}
+                                onChange={(e) => setEditingCatGrouping(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveEditCategory();
+                                  if (e.key === 'Escape') handleCancelEditCategory();
+                                }}
+                                placeholder="Grouping (optional)"
+                                className="w-40 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                              />
+                              <input
+                                type="text"
+                                value={editingCatName}
+                                onChange={(e) => setEditingCatName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveEditCategory();
+                                  if (e.key === 'Escape') handleCancelEditCategory();
+                                }}
+                                autoFocus
+                                placeholder="Category name"
+                                className="flex-1 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                              />
+                              <button
+                                onClick={handleSaveEditCategory}
+                                className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:underline px-1"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={handleCancelEditCategory}
+                                className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-text-mid px-1"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                             <input
                               type="text"
-                              value={editingCatGrouping}
-                              onChange={(e) => setEditingCatGrouping(e.target.value)}
+                              value={editingCatDescription}
+                              onChange={(e) => setEditingCatDescription(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleSaveEditCategory();
                                 if (e.key === 'Escape') handleCancelEditCategory();
                               }}
-                              placeholder="Grouping (optional)"
-                              className="w-40 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                              placeholder="Description (optional)"
+                              maxLength={500}
+                              className="w-full px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
                             />
-                            <input
-                              type="text"
-                              value={editingCatName}
-                              onChange={(e) => setEditingCatName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveEditCategory();
-                                if (e.key === 'Escape') handleCancelEditCategory();
-                              }}
-                              autoFocus
-                              placeholder="Category name"
-                              className="flex-1 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
-                            />
-                            <button
-                              onClick={handleSaveEditCategory}
-                              className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:underline px-1"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={handleCancelEditCategory}
-                              className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-text-mid px-1"
-                            >
-                              Cancel
-                            </button>
-                          </>
+                          </div>
                         ) : (
-                          <>
-                            <span className="flex-1 text-xs font-semibold text-text">{cat.name}</span>
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-semibold text-text">{cat.name}</div>
+                              {cat.description && (
+                                <div className="text-[10px] text-text-light mt-0.5">{cat.description}</div>
+                              )}
+                            </div>
                             <button
                               onClick={() => handleStartEditCategory(cat)}
                               className="text-[10px] text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary px-1"
@@ -621,7 +647,7 @@ export default function SettingsView() {
                             >
                               Delete
                             </button>
-                          </>
+                          </div>
                         )}
                       </div>
                     );
@@ -634,24 +660,35 @@ export default function SettingsView() {
             )}
           </div>
 
-          <form onSubmit={handleAddCategory} className="flex gap-2 items-end pt-3 border-t border-border-light">
-            <div className="w-40">
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">Grouping</label>
+          <form onSubmit={handleAddCategory} className="space-y-2 pt-3 border-t border-border-light">
+            <div className="flex gap-2 items-end">
+              <div className="w-40">
+                <label className="block text-[10px] font-semibold text-text-mid mb-1">Grouping</label>
+                <input
+                  type="text" value={newCatGrouping} onChange={(e) => setNewCatGrouping(e.target.value)}
+                  placeholder="optional"
+                  className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] font-semibold text-text-mid mb-1">Category</label>
+                <input
+                  type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="e.g. Technical skills" required
+                  className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
+                />
+              </div>
+              <Button type="submit">Add</Button>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Description</label>
               <input
-                type="text" value={newCatGrouping} onChange={(e) => setNewCatGrouping(e.target.value)}
-                placeholder="optional"
+                type="text" value={newCatDescription} onChange={(e) => setNewCatDescription(e.target.value)}
+                placeholder="optional — what this category captures"
+                maxLength={500}
                 className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
               />
             </div>
-            <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">Category</label>
-              <input
-                type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
-                placeholder="e.g. Technical skills" required
-                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
-              />
-            </div>
-            <Button type="submit">Add</Button>
           </form>
         </div>
       )}
