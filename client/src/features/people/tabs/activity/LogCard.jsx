@@ -10,6 +10,10 @@ const KIND_COLORS = {
   blocker: 'bg-rose-100 text-rose-700',
 };
 
+// Employee-reported kinds (the subject logging their own wins/downs/blockers).
+// Anything else is an observer entry (manager / admin / responsible).
+const EMPLOYEE_KINDS = new Set(['win', 'down', 'blocker']);
+
 function formatDate(value) {
   if (!value) return '';
   const d = new Date(value);
@@ -24,10 +28,20 @@ function formatDate(value) {
 export default function LogCard({ log, currentUserId, resourceId, onEdit, onDelete }) {
   const isAuthor = log.authorUserId === currentUserId;
   const showActions = isAuthor && (onEdit || onDelete);
+  const isEmployeeInput = EMPLOYEE_KINDS.has(log.kind);
+  const sourceBorder = isEmployeeInput ? 'border-l-blue-400' : 'border-l-purple-400';
+  const sourceBadge = isEmployeeInput
+    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+    : 'bg-purple-50 text-purple-700 border border-purple-200';
+  const sourceLabel = isEmployeeInput ? 'Employee' : 'Manager';
   return (
-    <div className="bg-white rounded-xl border border-border p-4">
-      <div className="text-sm text-text whitespace-pre-wrap mb-2">{log.content}</div>
+    <div className={`bg-white rounded-xl border border-border border-l-4 ${sourceBorder} p-4`}>
       <div className="flex flex-wrap gap-1.5 mb-2">
+        <span
+          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${sourceBadge}`}
+        >
+          {sourceLabel} input
+        </span>
         <span
           className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${
             KIND_COLORS[log.kind] || KIND_COLORS.observation
@@ -35,6 +49,9 @@ export default function LogCard({ log, currentUserId, resourceId, onEdit, onDele
         >
           {log.kind}
         </span>
+      </div>
+      <div className="text-sm text-text whitespace-pre-wrap mb-2">{log.content}</div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
         {log.category && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
             {log.category.grouping
