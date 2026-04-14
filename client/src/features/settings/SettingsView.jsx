@@ -10,7 +10,7 @@ const ROLES = ['viewer', 'member', 'admin'];
 
 export default function SettingsView() {
   const { currentOrg, role, updateOrg } = useOrg();
-  const { teams, resources, addTeam, updateTeam, deleteTeam, skills, addSkill, updateSkill, deleteSkill, dimensions, addDimension, updateDimension, deleteDimension } = useData();
+  const { teams, resources, addTeam, updateTeam, deleteTeam, skills, addSkill, updateSkill, deleteSkill, logCategories, addLogCategory, updateLogCategory, deleteLogCategory } = useData();
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState('');
   const [newRole, setNewRole] = useState('member');
@@ -27,14 +27,30 @@ export default function SettingsView() {
   const [editingSkillId, setEditingSkillId] = useState(null);
   const [editingSkillName, setEditingSkillName] = useState('');
   const [editingSkillCategory, setEditingSkillCategory] = useState('');
-  const [dimError, setDimError] = useState('');
-  const [newDimCode, setNewDimCode] = useState('');
-  const [newDimName, setNewDimName] = useState('');
-  const [newDimDescription, setNewDimDescription] = useState('');
-  const [editingDimId, setEditingDimId] = useState(null);
-  const [editingDimCode, setEditingDimCode] = useState('');
-  const [editingDimName, setEditingDimName] = useState('');
-  const [editingDimDescription, setEditingDimDescription] = useState('');
+  const [catError, setCatError] = useState('');
+  const [newCatGrouping, setNewCatGrouping] = useState('');
+  const [newCatName, setNewCatName] = useState('');
+  const [editingCatId, setEditingCatId] = useState(null);
+  const [editingCatGrouping, setEditingCatGrouping] = useState('');
+  const [editingCatName, setEditingCatName] = useState('');
+
+  const groupedLogCategories = useMemo(() => {
+    const groups = {};
+    for (const c of logCategories) {
+      const g = c.grouping || '';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(c);
+    }
+    for (const g of Object.keys(groups)) {
+      groups[g].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    const sorted = Object.keys(groups).sort((a, b) => {
+      if (a === '') return 1;
+      if (b === '') return -1;
+      return a.localeCompare(b);
+    });
+    return sorted.map((g) => ({ grouping: g, categories: groups[g] }));
+  }, [logCategories]);
   const isAdmin = role === 'admin' || role === 'owner';
 
   const skillsByCategory = useMemo(() => {
@@ -224,60 +240,54 @@ export default function SettingsView() {
     }
   };
 
-  const handleAddDimension = async (e) => {
+  const handleAddCategory = async (e) => {
     e.preventDefault();
-    if (!newDimCode.trim() || !newDimName.trim()) return;
-    setDimError('');
+    if (!newCatName.trim()) return;
+    setCatError('');
     try {
-      await addDimension({
-        code: newDimCode.trim(),
-        name: newDimName.trim(),
-        description: newDimDescription.trim() || null,
-        sortOrder: dimensions.length,
+      await addLogCategory({
+        name: newCatName.trim(),
+        grouping: newCatGrouping.trim() || null,
       });
-      setNewDimCode('');
-      setNewDimName('');
-      setNewDimDescription('');
+      setNewCatName('');
+      setNewCatGrouping('');
     } catch (err) {
-      setDimError(err.message || 'Failed to add dimension');
+      setCatError(err.message || 'Failed to add category');
     }
   };
 
-  const handleStartEditDimension = (dim) => {
-    setEditingDimId(dim.id);
-    setEditingDimCode(dim.code);
-    setEditingDimName(dim.name);
-    setEditingDimDescription(dim.description || '');
-    setDimError('');
+  const handleStartEditCategory = (cat) => {
+    setEditingCatId(cat.id);
+    setEditingCatName(cat.name);
+    setEditingCatGrouping(cat.grouping || '');
+    setCatError('');
   };
 
-  const handleCancelEditDimension = () => {
-    setEditingDimId(null);
-    setEditingDimCode('');
-    setEditingDimName('');
-    setEditingDimDescription('');
+  const handleCancelEditCategory = () => {
+    setEditingCatId(null);
+    setEditingCatName('');
+    setEditingCatGrouping('');
   };
 
-  const handleSaveEditDimension = async () => {
-    if (!editingDimCode.trim() || !editingDimName.trim()) return;
+  const handleSaveEditCategory = async () => {
+    if (!editingCatName.trim()) return;
     try {
-      await updateDimension(editingDimId, {
-        code: editingDimCode.trim(),
-        name: editingDimName.trim(),
-        description: editingDimDescription.trim() || null,
+      await updateLogCategory(editingCatId, {
+        name: editingCatName.trim(),
+        grouping: editingCatGrouping.trim() || null,
       });
-      handleCancelEditDimension();
+      handleCancelEditCategory();
     } catch (err) {
-      setDimError(err.message || 'Failed to update dimension');
+      setCatError(err.message || 'Failed to update category');
     }
   };
 
-  const handleDeleteDimension = async (dim) => {
-    if (!confirm('Delete dimension "' + dim.name + '"? Logs tagged with this code will keep the code value.')) return;
+  const handleDeleteCategory = async (cat) => {
+    if (!confirm('Delete category "' + cat.name + '"? Logs tagged with this category will be unlinked.')) return;
     try {
-      await deleteDimension(dim.id);
+      await deleteLogCategory(cat.id);
     } catch (err) {
-      setDimError(err.message || 'Failed to delete dimension');
+      setCatError(err.message || 'Failed to delete category');
     }
   };
 
@@ -538,120 +548,106 @@ export default function SettingsView() {
 
       {isAdmin && (
         <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
-          <h3 className="text-sm font-bold text-text mb-3">Dimensions</h3>
+          <h3 className="text-sm font-bold text-text mb-3">Performance log categories</h3>
           <p className="text-[10px] text-text-light mb-3">
-            Dimensions categorise logs along reusable axes (e.g. Technical, Communication, Leadership). Give each a short code and a human-readable name.
+            Categories tag performance logs so you can group and filter them. Optionally use a grouping (e.g. "Technical", "Soft skills") to organise related categories together.
           </p>
 
-          {dimError && (
-            <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{dimError}</div>
+          {catError && (
+            <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{catError}</div>
           )}
 
-          <div className="space-y-1 mb-3">
-            {dimensions.map((dim) => {
-              const isEditing = editingDimId === dim.id;
-              return (
-                <div key={dim.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
-                  {isEditing ? (
-                    <>
-                      <input
-                        type="text"
-                        value={editingDimCode}
-                        onChange={(e) => setEditingDimCode(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveEditDimension();
-                          if (e.key === 'Escape') handleCancelEditDimension();
-                        }}
-                        autoFocus
-                        placeholder="Code"
-                        className="w-24 px-2 py-1 border border-border rounded text-xs text-text font-mono outline-none focus:border-primary"
-                      />
-                      <input
-                        type="text"
-                        value={editingDimName}
-                        onChange={(e) => setEditingDimName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveEditDimension();
-                          if (e.key === 'Escape') handleCancelEditDimension();
-                        }}
-                        placeholder="Name"
-                        className="flex-1 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
-                      />
-                      <input
-                        type="text"
-                        value={editingDimDescription}
-                        onChange={(e) => setEditingDimDescription(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveEditDimension();
-                          if (e.key === 'Escape') handleCancelEditDimension();
-                        }}
-                        placeholder="Description (optional)"
-                        className="flex-1 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
-                      />
-                      <button
-                        onClick={handleSaveEditDimension}
-                        className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:underline px-1"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelEditDimension}
-                        className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-text-mid px-1"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-24 text-[10px] font-semibold text-primary font-mono">{dim.code}</span>
-                      <span className="flex-1 text-xs font-semibold text-text">{dim.name}</span>
-                      {dim.description && (
-                        <span className="flex-1 text-[10px] text-text-light truncate">{dim.description}</span>
-                      )}
-                      <button
-                        onClick={() => handleStartEditDimension(dim)}
-                        className="text-[10px] text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary px-1"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDimension(dim)}
-                        className="text-[10px] text-danger bg-transparent border-0 cursor-pointer hover:text-danger/80 px-1"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
+          <div className="space-y-3 mb-3">
+            {groupedLogCategories.map((group) => (
+              <div key={group.grouping || '__none__'}>
+                <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">
+                  {group.grouping || 'Ungrouped'}
                 </div>
-              );
-            })}
-            {dimensions.length === 0 && (
-              <p className="text-xs text-text-light py-2">No dimensions yet.</p>
+                <div className="space-y-1">
+                  {group.categories.map((cat) => {
+                    const isEditing = editingCatId === cat.id;
+                    return (
+                      <div key={cat.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
+                        {isEditing ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editingCatGrouping}
+                              onChange={(e) => setEditingCatGrouping(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveEditCategory();
+                                if (e.key === 'Escape') handleCancelEditCategory();
+                              }}
+                              placeholder="Grouping (optional)"
+                              className="w-40 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                            />
+                            <input
+                              type="text"
+                              value={editingCatName}
+                              onChange={(e) => setEditingCatName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveEditCategory();
+                                if (e.key === 'Escape') handleCancelEditCategory();
+                              }}
+                              autoFocus
+                              placeholder="Category name"
+                              className="flex-1 px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                            />
+                            <button
+                              onClick={handleSaveEditCategory}
+                              className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:underline px-1"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={handleCancelEditCategory}
+                              className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-text-mid px-1"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex-1 text-xs font-semibold text-text">{cat.name}</span>
+                            <button
+                              onClick={() => handleStartEditCategory(cat)}
+                              className="text-[10px] text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary px-1"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategory(cat)}
+                              className="text-[10px] text-danger bg-transparent border-0 cursor-pointer hover:text-danger/80 px-1"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {logCategories.length === 0 && (
+              <p className="text-xs text-text-light py-2">No categories yet.</p>
             )}
           </div>
 
-          <form onSubmit={handleAddDimension} className="flex gap-2 items-end pt-3 border-t border-border-light">
-            <div className="w-24">
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">Code</label>
+          <form onSubmit={handleAddCategory} className="flex gap-2 items-end pt-3 border-t border-border-light">
+            <div className="w-40">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Grouping</label>
               <input
-                type="text" value={newDimCode} onChange={(e) => setNewDimCode(e.target.value)}
-                placeholder="TECH" required maxLength={20}
-                className="w-full px-2 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">Name</label>
-              <input
-                type="text" value={newDimName} onChange={(e) => setNewDimName(e.target.value)}
-                placeholder="Technical skills" required
+                type="text" value={newCatGrouping} onChange={(e) => setNewCatGrouping(e.target.value)}
+                placeholder="optional"
                 className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
               />
             </div>
             <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">Description</label>
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Category</label>
               <input
-                type="text" value={newDimDescription} onChange={(e) => setNewDimDescription(e.target.value)}
-                placeholder="optional"
+                type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="e.g. Technical skills" required
                 className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
               />
             </div>

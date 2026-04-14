@@ -27,7 +27,7 @@ model Organization {
   assignments Assignment[]
   oneOnOnes   OneOnOne[]
   logs        Log[]
-  dimensions  Dimension[]
+  performanceLogCategories PerformanceLogCategory[]
 }
 
 model User {
@@ -272,7 +272,8 @@ model Log {
   authorUser      User     @relation("AuthoredLogs", fields: [authorUserId], references: [id], onDelete: Restrict)
   content         String
   kind            String
-  dimensionCode   String?
+  categoryId      String?
+  category        PerformanceLogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   customerId      String?
   customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   projectId       String?
@@ -287,21 +288,20 @@ model Log {
   @@index([resourceId])
   @@index([authorUserId])
   @@index([oneOnOneId])
-  @@index([dimensionCode])
+  @@index([categoryId])
 }
 
-model Dimension {
-  id          String   @id @default(cuid())
-  orgId       String
-  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  code        String
-  name        String
-  description String?
-  sortOrder   Int      @default(0)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model PerformanceLogCategory {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  grouping  String?
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([orgId, code])
+  logs Log[]
+
+  @@unique([orgId, grouping, name])
   @@index([orgId])
 }

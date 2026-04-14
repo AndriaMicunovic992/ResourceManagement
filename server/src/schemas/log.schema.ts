@@ -14,12 +14,6 @@ export const EMPLOYEE_LOG_KINDS = ['win', 'down', 'blocker'] as const;
 export const ONE_ON_ONE_LOG_KINDS = ['good', 'bad', 'suggestion'] as const;
 
 const kindSchema = z.enum(LOG_KINDS);
-const dimensionCodeSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(20)
-  .regex(/^[A-Za-z0-9_-]+$/);
 
 const isOneOnOneKind = (k: string): boolean =>
   (ONE_ON_ONE_LOG_KINDS as readonly string[]).includes(k);
@@ -28,7 +22,7 @@ export const createLogSchema = z
   .object({
     content: z.string().trim().min(1).max(5000),
     kind: kindSchema,
-    dimensionCode: dimensionCodeSchema.optional().nullable(),
+    categoryId: z.string().optional().nullable(),
     customerId: z.string().optional().nullable(),
     projectId: z.string().optional().nullable(),
     jiraUrl: z.string().url().max(500).optional().nullable(),
@@ -41,7 +35,7 @@ export const createLogSchema = z
 export const updateLogSchema = z.object({
   content: z.string().trim().min(1).max(5000).optional(),
   kind: kindSchema.optional(),
-  dimensionCode: dimensionCodeSchema.optional().nullable(),
+  categoryId: z.string().optional().nullable(),
   customerId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
   jiraUrl: z.string().url().max(500).optional().nullable(),
@@ -49,7 +43,7 @@ export const updateLogSchema = z.object({
 
 export const listLogsQuerySchema = z.object({
   kind: kindSchema.optional(),
-  dimensionCode: dimensionCodeSchema.optional(),
+  categoryId: z.string().optional(),
   customerId: z.string().optional(),
   projectId: z.string().optional(),
   oneOnOneId: z.string().optional(),
