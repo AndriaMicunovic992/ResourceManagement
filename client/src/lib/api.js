@@ -64,6 +64,7 @@ export const api = {
 
   // Me
   getMyResource: () => apiFetch('/me/resource'),
+  getMyAllocations: () => apiFetch('/me/allocations'),
 
   // Performance Log Categories
   getLogCategories: () => apiFetch('/log-categories'),

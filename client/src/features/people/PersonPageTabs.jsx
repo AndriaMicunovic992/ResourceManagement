@@ -4,7 +4,8 @@ import { NavLink } from 'react-router-dom';
  * Tabs for the person detail page. viewMode controls which tabs render:
  *   - 'admin'   → everything
  *   - 'manager' → everything (same as admin; backend enforces fine-grained access)
- *   - 'self'    → Overview + restricted Performance only (acts like viewer)
+ *   - 'self'    → Overview + Allocation + Skills + (restricted) 1:1s + Performance
+ *                 (no Activity)
  *   - 'denied'  → nothing (PersonPage should not render at all)
  */
 export default function PersonPageTabs({ resourceId, viewMode }) {
@@ -12,12 +13,12 @@ export default function PersonPageTabs({ resourceId, viewMode }) {
 
   const tabs = [
     { to: `/people/${resourceId}`, label: 'Overview', end: true },
+    { to: `/people/${resourceId}/allocation`, label: 'Allocation', end: false },
+    { to: `/people/${resourceId}/skills`, label: 'Skills', end: false },
+    { to: `/people/${resourceId}/oneonones`, label: '1:1s', end: false },
   ];
 
   if (viewMode !== 'self') {
-    tabs.push({ to: `/people/${resourceId}/allocation`, label: 'Allocation', end: false });
-    tabs.push({ to: `/people/${resourceId}/skills`, label: 'Skills', end: false });
-    tabs.push({ to: `/people/${resourceId}/oneonones`, label: '1:1s', end: false });
     tabs.push({ to: `/people/${resourceId}/activity`, label: 'Activity', end: false });
   }
 

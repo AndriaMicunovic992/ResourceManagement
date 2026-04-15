@@ -93,7 +93,9 @@ export async function computeVisibility(
     };
   }
 
-  // Viewer: only themself.
+  // Viewer: only themself. Their allocation display uses a dedicated
+  // /me/allocations endpoint so we don't have to broaden customer/project
+  // visibility just to render project names.
   if (role === 'viewer') {
     const visiblePersonIds = new Set<string>();
     if (selfResourceId) visiblePersonIds.add(selfResourceId);

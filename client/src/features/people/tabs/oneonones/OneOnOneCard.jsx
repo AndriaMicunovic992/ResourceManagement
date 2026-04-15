@@ -99,7 +99,7 @@ function LogEntry({ log, currentUserId, onEdit, onDelete }) {
   );
 }
 
-export default function OneOnOneCard({ record, onEdit, onDelete }) {
+export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = false }) {
   const [expanded, setExpanded] = useState(false);
   const [logs, setLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -188,32 +188,35 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
             <div className="text-[11px] text-text-light truncate">by {authorName}</div>
           </div>
         </div>
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={onEdit}
-            className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
-          >
-            Edit
-          </button>
-          <button
-            onClick={onDelete}
-            className="text-xs font-semibold text-danger bg-transparent border border-danger rounded px-2 py-1 cursor-pointer hover:bg-danger hover:text-white"
-          >
-            Delete
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={onEdit}
+              className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
+            >
+              Edit
+            </button>
+            <button
+              onClick={onDelete}
+              className="text-xs font-semibold text-danger bg-transparent border border-danger rounded px-2 py-1 cursor-pointer hover:bg-danger hover:text-white"
+            >
+              Delete
+            </button>
+          </div>
+        )}
       </div>
 
       {expanded && (
         <div className="px-4 pb-4 pt-1 border-t border-border-light space-y-4">
           <Section label="General status" value={record.generalStatus} />
-          <Section label="Personal notes" value={record.personalNotes} />
+          {!readOnly && <Section label="Personal notes" value={record.personalNotes} />}
           <Section label="Career development" value={record.careerDevelopment} />
 
           {logsError && (
             <div className="text-xs text-danger bg-danger-bg p-2 rounded">{logsError}</div>
           )}
 
+          {!readOnly && (
           <div>
             <div className="text-[10px] uppercase tracking-wider text-text-mid font-bold mb-2">
               Manager / customer perspective
@@ -276,6 +279,7 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
               ))}
             </div>
           </div>
+          )}
 
           <div>
             <div className="text-[10px] uppercase tracking-wider text-text-mid font-bold mb-2">

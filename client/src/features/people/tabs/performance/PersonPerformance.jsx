@@ -819,8 +819,6 @@ export default function PersonPerformance() {
         )}
       </div>
 
-      {!isSelfView && (
-      <>
       <div className="bg-white rounded-xl border border-border p-4 mb-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div>
@@ -1076,10 +1074,8 @@ export default function PersonPerformance() {
           })}
         </div>
       )}
-      </>
-      )}
 
-      {!isSelfView && showNewModal && (
+      {showNewModal && (
         <NewEvaluationModal
           resourceId={resource.id}
           onCancel={() => setShowNewModal(false)}
