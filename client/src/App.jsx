@@ -44,6 +44,19 @@ function LandingRedirect() {
   return <Navigate to="/people" replace />;
 }
 
+/**
+ * Wraps the /people list view so viewers are bounced straight to their own
+ * profile instead of a list they aren't allowed to browse.
+ */
+function PeopleListRoute() {
+  const { loading, role, selfResourceId } = useVisibility();
+  if (loading) return null;
+  if (role === 'viewer' && selfResourceId) {
+    return <Navigate to={`/people/${selfResourceId}`} replace />;
+  }
+  return <PeopleListView />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -65,7 +78,7 @@ export default function App() {
             <Route path="/" element={<LandingRedirect />} />
             <Route path="/planner" element={<PlannerView />} />
             <Route path="/dashboard" element={<DashboardView />} />
-            <Route path="/people" element={<PeopleListView />} />
+            <Route path="/people" element={<PeopleListRoute />} />
             <Route path="/people/:id" element={<PersonPage />}>
               <Route index element={<PersonOverview />} />
               <Route path="allocation" element={<PersonAllocation />} />

@@ -17,7 +17,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/planner');
+      // Let LandingRedirect route by role (admin→planner, member→people,
+      // viewer→their own person page).
+      navigate('/');
     } catch (err) {
       setError(err.message || 'Login failed');
     }
