@@ -819,8 +819,6 @@ export default function PersonPerformance() {
         )}
       </div>
 
-      {!isSelfView && (
-      <>
       <div className="bg-white rounded-xl border border-border p-4 mb-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div>
@@ -964,6 +962,8 @@ export default function PersonPerformance() {
         )}
       </div>
 
+      {!isSelfView && (
+      <>
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-bold text-text">Evaluations</div>
         {canCreate && (

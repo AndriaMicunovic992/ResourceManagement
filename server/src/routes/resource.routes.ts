@@ -7,6 +7,7 @@ import {
   assertNoViewerResources,
 } from '../services/visibility.service.js';
 import { NotFoundError } from '../utils/errors.js';
+import { prisma } from '../db/prisma.js';
 
 export const resourceRoutes: FastifyPluginAsync = async (app) => {
   app.get('/resources', async (req) => {
@@ -25,6 +26,50 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/me/resource', async (req) => {
     return resourceService.getByUserId(req.orgId, req.userId);
+  });
+
+  /**
+   * Returns the current user's own assignments, enriched with the minimal
+   * need/project/customer info needed to render the allocation view. This
+   * avoids broadening customer/project visibility for viewers and members
+   * who happen to be assigned to something they don't otherwise own.
+   */
+  app.get('/me/allocations', async (req) => {
+    const selfId = req.visibility.selfResourceId;
+    if (!selfId) return { resource: null, assignments: [] };
+
+    const resource = await prisma.resource.findFirst({
+      where: { id: selfId, orgId: req.orgId },
+      select: { id: true, name: true, capacity: true },
+    });
+    if (!resource) return { resource: null, assignments: [] };
+
+    const assignments = await prisma.assignment.findMany({
+      where: { orgId: req.orgId, resourceId: selfId },
+      select: {
+        id: true,
+        monthAllocations: true,
+        need: {
+          select: {
+            id: true,
+            domain: true,
+            role: true,
+            seniority: true,
+            status: true,
+            project: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                customer: { select: { id: true, name: true, status: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return { resource, assignments };
   });
 
   app.get('/me/visibility', async (req) => {
