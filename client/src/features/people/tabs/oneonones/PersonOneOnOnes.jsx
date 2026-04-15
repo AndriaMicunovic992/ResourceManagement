@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { useOrg } from '../../../../contexts/OrgContext';
 import { api } from '../../../../lib/api';
 import EmptyState from '../../../../components/ui/EmptyState';
 import OneOnOneList from './OneOnOneList';
 import OneOnOneForm from './OneOnOneForm';
 
 export default function PersonOneOnOnes() {
-  const { resource } = useOutletContext();
-  const { role } = useOrg();
-  const isAdmin = role === 'admin' || role === 'owner';
+  const { resource, viewMode } = useOutletContext();
+  const isSelfView = viewMode === 'self';
 
   const [oneOnOnes, setOneOnOnes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,23 +28,8 @@ export default function PersonOneOnOnes() {
   }, [resource.id]);
 
   useEffect(() => {
-    if (!isAdmin) {
-      setLoading(false);
-      return;
-    }
     load();
-  }, [isAdmin, load]);
-
-  if (!isAdmin) {
-    return (
-      <div className="bg-white rounded-xl border border-border p-10 text-center">
-        <div className="text-4xl mb-3">🔒</div>
-        <div className="text-sm text-text-mid">
-          Access restricted — 1:1 meetings are visible to admins only.
-        </div>
-      </div>
-    );
-  }
+  }, [load]);
 
   const editing =
     editingId && editingId !== 'new'
@@ -82,12 +65,14 @@ export default function PersonOneOnOnes() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-bold text-text m-0">1:1 Meetings</h2>
-        <button
-          onClick={handleCreate}
-          className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90"
-        >
-          + New 1:1
-        </button>
+        {!isSelfView && (
+          <button
+            onClick={handleCreate}
+            className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90"
+          >
+            + New 1:1
+          </button>
+        )}
       </div>
 
       {error && (
@@ -107,10 +92,11 @@ export default function PersonOneOnOnes() {
           oneOnOnes={oneOnOnes}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          readOnly={isSelfView}
         />
       )}
 
-      {editingId && (
+      {editingId && !isSelfView && (
         <OneOnOneForm
           initial={editing}
           onCancel={handleCancel}

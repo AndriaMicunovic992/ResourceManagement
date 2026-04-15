@@ -962,8 +962,6 @@ export default function PersonPerformance() {
         )}
       </div>
 
-      {!isSelfView && (
-      <>
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-bold text-text">Evaluations</div>
         {canCreate && (
@@ -1076,10 +1074,8 @@ export default function PersonPerformance() {
           })}
         </div>
       )}
-      </>
-      )}
 
-      {!isSelfView && showNewModal && (
+      {showNewModal && (
         <NewEvaluationModal
           resourceId={resource.id}
           onCancel={() => setShowNewModal(false)}
