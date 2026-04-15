@@ -176,7 +176,8 @@ function bucketRange(bucketStart, bucket) {
 }
 
 export default function PersonPerformance() {
-  const { resource } = useOutletContext();
+  const { resource, viewMode } = useOutletContext();
+  const isSelfView = viewMode === 'self';
   const { role, currentOrg } = useOrg();
   const { user } = useAuth();
   const { meResource, customers } = useData();
@@ -818,6 +819,8 @@ export default function PersonPerformance() {
         )}
       </div>
 
+      {!isSelfView && (
+      <>
       <div className="bg-white rounded-xl border border-border p-4 mb-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div>
@@ -1073,8 +1076,10 @@ export default function PersonPerformance() {
           })}
         </div>
       )}
+      </>
+      )}
 
-      {showNewModal && (
+      {!isSelfView && showNewModal && (
         <NewEvaluationModal
           resourceId={resource.id}
           onCancel={() => setShowNewModal(false)}

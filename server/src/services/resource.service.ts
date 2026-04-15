@@ -3,18 +3,30 @@ import { prisma } from '../db/prisma.js';
 import { ConflictError, NotFoundError } from '../utils/errors.js';
 import type { CreateResourceInput, UpdateResourceInput } from '../schemas/resource.schema.js';
 
-const resourceInclude = {
-  roles: true,
-  assignments: true,
-  teams: true,
-  personSkills: true,
-  user: { select: { id: true, name: true, email: true } },
-  managerLinks: {
-    include: {
-      manager: { select: { id: true, name: true } },
+function makeResourceInclude(orgId: string) {
+  return {
+    roles: true,
+    assignments: true,
+    teams: true,
+    personSkills: true,
+    user: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        memberships: {
+          where: { orgId },
+          select: { role: true },
+        },
+      },
     },
-  },
-} as const;
+    managerLinks: {
+      include: {
+        manager: { select: { id: true, name: true } },
+      },
+    },
+  } as const;
+}
 
 async function ensureUserInOrg(orgId: string, userId: string): Promise<void> {
   const member = await prisma.orgMember.findFirst({
@@ -51,7 +63,7 @@ export const resourceService = {
   async list(orgId: string) {
     return prisma.resource.findMany({
       where: { orgId },
-      include: resourceInclude,
+      include: makeResourceInclude(orgId),
       orderBy: { createdAt: 'asc' },
     });
   },
@@ -59,7 +71,7 @@ export const resourceService = {
   async getById(orgId: string, id: string) {
     const resource = await prisma.resource.findFirst({
       where: { id, orgId },
-      include: resourceInclude,
+      include: makeResourceInclude(orgId),
     });
     if (!resource) throw new NotFoundError('Resource not found');
     return resource;
@@ -68,7 +80,7 @@ export const resourceService = {
   async getByUserId(orgId: string, userId: string) {
     return prisma.resource.findFirst({
       where: { orgId, userId },
-      include: resourceInclude,
+      include: makeResourceInclude(orgId),
     });
   },
 
@@ -85,7 +97,7 @@ export const resourceService = {
           roles: { create: roles },
           teams: teamIds && teamIds.length > 0 ? { connect: teamIds.map((id) => ({ id })) } : undefined,
         },
-        include: resourceInclude,
+        include: makeResourceInclude(orgId),
       });
       if (directManagerIds && directManagerIds.length > 0) {
         await setDirectManagers(orgId, created.id, directManagerIds);

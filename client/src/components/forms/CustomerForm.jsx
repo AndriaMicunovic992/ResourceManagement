@@ -13,7 +13,12 @@ export default function CustomerForm({ initial, onSave, onClose }) {
     initial?.responsiblePersonId || ''
   );
 
-  const sortedResources = [...resources].sort((a, b) => a.name.localeCompare(b.name));
+  // Viewers cannot be set as responsible persons — the backend rejects them.
+  const isViewerResource = (r) => r.user?.memberships?.[0]?.role === 'viewer';
+  const eligibleResources = resources.filter(
+    (r) => !isViewerResource(r) || r.id === initial?.responsiblePersonId,
+  );
+  const sortedResources = [...eligibleResources].sort((a, b) => a.name.localeCompare(b.name));
 
   const handleSubmit = (e) => {
     e.preventDefault();

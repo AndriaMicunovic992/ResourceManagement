@@ -112,6 +112,7 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
   const author = record.authorUser;
   const authorName = author?.name || author?.email || 'Unknown';
   const hasPrivate = record.managerPersonalNotes != null && record.managerPersonalNotes !== '';
+  const hasPrivateNote = record.privateNote != null && record.privateNote !== '';
 
   useEffect(() => {
     if (!expanded) return;
@@ -349,6 +350,20 @@ export default function OneOnOneCard({ record, onEdit, onDelete }) {
               </div>
               <div className="text-xs text-text whitespace-pre-wrap">
                 {record.managerPersonalNotes}
+              </div>
+            </div>
+          )}
+
+          {hasPrivateNote && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-amber-700">🔒</span>
+                <div className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold">
+                  Private note (author only)
+                </div>
+              </div>
+              <div className="text-xs text-text whitespace-pre-wrap">
+                {record.privateNote}
               </div>
             </div>
           )}

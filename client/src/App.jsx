@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { useVisibility } from './contexts/VisibilityContext';
 import { OrgProvider } from './contexts/OrgContext';
+import { VisibilityProvider } from './contexts/VisibilityContext';
 import { DataProvider } from './contexts/DataContext';
 import ProtectedRoute from './features/auth/ProtectedRoute';
 import LoginPage from './features/auth/LoginPage';
@@ -25,6 +27,23 @@ import CustomerPeople from './features/customers/tabs/CustomerPeople';
 import CustomerActivity from './features/customers/tabs/CustomerActivity';
 import CustomerPerformance from './features/customers/tabs/CustomerPerformance';
 
+/**
+ * Landing redirect: role-aware.
+ *   - admin/owner  → /planner
+ *   - member       → /people
+ *   - viewer       → their own person page (or /people if no resource yet)
+ */
+function LandingRedirect() {
+  const { loading, isAdmin, role, selfResourceId } = useVisibility();
+  if (loading) return null;
+  if (isAdmin) return <Navigate to="/planner" replace />;
+  if (role === 'viewer') {
+    if (selfResourceId) return <Navigate to={`/people/${selfResourceId}`} replace />;
+    return <Navigate to="/people" replace />;
+  }
+  return <Navigate to="/people" replace />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -35,13 +54,15 @@ export default function App() {
           <Route element={
             <ProtectedRoute>
               <OrgProvider>
-                <DataProvider>
-                  <AppLayout />
-                </DataProvider>
+                <VisibilityProvider>
+                  <DataProvider>
+                    <AppLayout />
+                  </DataProvider>
+                </VisibilityProvider>
               </OrgProvider>
             </ProtectedRoute>
           }>
-            <Route path="/" element={<Navigate to="/planner" replace />} />
+            <Route path="/" element={<LandingRedirect />} />
             <Route path="/planner" element={<PlannerView />} />
             <Route path="/dashboard" element={<DashboardView />} />
             <Route path="/people" element={<PeopleListView />} />

@@ -3,10 +3,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma.js';
 import { customerService } from '../services/customer.service.js';
 import { customerPerformanceService } from '../services/customerPerformance.service.js';
-import {
-  canViewCustomer,
-  listViewableCustomerIds,
-} from '../services/customerAccess.service.js';
+import { canViewCustomer } from '../services/customerAccess.service.js';
+import { assertNoViewerResources } from '../services/visibility.service.js';
 import { createCustomerSchema, updateCustomerSchema } from '../schemas/customer.schema.js';
 import {
   customerDetailQuerySchema,
@@ -27,23 +25,14 @@ function parseBoundaryDate(value: string, endOfDay: boolean): Date {
 
 export const customerRoutes: FastifyPluginAsync = async (app) => {
   app.get('/customers', async (req) => {
-    return customerService.list(req.orgId);
+    const list = await customerService.list(req.orgId);
+    if (req.visibility.isAdmin) return list;
+    return list.filter((c) => req.visibility.visibleCustomerIds.has(c.id));
   });
 
-  // The set of customer ids the requesting user is allowed to drill into.
-  // Used client-side to decide whether to render customer names as links or
-  // plain text, so we intentionally return just the ids.
-  app.get('/customers/viewable-ids', async (req) => {
-    const ids = await listViewableCustomerIds(req.orgId, req.userId, req.role);
-    return { ids };
-  });
-
-  // Customer detail — header info plus the responsible person's display name.
-  // Access is gated: non-viewers get a 404 to hide existence.
   app.get('/customers/:id/detail', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const ok = await canViewCustomer(req.orgId, id, req.userId, req.role);
-    if (!ok) {
+    if (!canViewCustomer(req.visibility, id)) {
       return reply.status(404).send({ error: 'Customer not found' });
     }
     const customer = await prisma.customer.findFirst({
@@ -69,13 +58,9 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
     return { customer, responsiblePerson };
   });
 
-  // Activity logs scoped to a customer. Tie rules match the evaluation
-  // engine: a log applies to the customer if its customerId matches, OR its
-  // customerId is null and it belongs to a project under this customer.
   app.get('/customers/:id/activity', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const ok = await canViewCustomer(req.orgId, id, req.userId, req.role);
-    if (!ok) {
+    if (!canViewCustomer(req.visibility, id)) {
       return reply.status(404).send({ error: 'Customer not found' });
     }
     const filters = listLogsQuerySchema.parse(req.query);
@@ -114,8 +99,7 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/customers/:id/performance/overall', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const ok = await canViewCustomer(req.orgId, id, req.userId, req.role);
-    if (!ok) {
+    if (!canViewCustomer(req.visibility, id)) {
       return reply.status(404).send({ error: 'Customer not found' });
     }
     const filters = customerDetailQuerySchema.parse(req.query);
@@ -131,8 +115,7 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/customers/:id/performance/per-person', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const ok = await canViewCustomer(req.orgId, id, req.userId, req.role);
-    if (!ok) {
+    if (!canViewCustomer(req.visibility, id)) {
       return reply.status(404).send({ error: 'Customer not found' });
     }
     const filters = customerDetailQuerySchema.parse(req.query);
@@ -148,8 +131,7 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/customers/:id/performance/trend', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const ok = await canViewCustomer(req.orgId, id, req.userId, req.role);
-    if (!ok) {
+    if (!canViewCustomer(req.visibility, id)) {
       return reply.status(404).send({ error: 'Customer not found' });
     }
     const query = customerTrendQuerySchema.parse(req.query);
@@ -169,18 +151,24 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
-  app.post('/customers', { preHandler: requireRole('member') }, async (req) => {
+  app.post('/customers', { preHandler: requireRole('admin') }, async (req) => {
     const data = createCustomerSchema.parse(req.body);
+    if (data.responsiblePersonId) {
+      await assertNoViewerResources(req.orgId, [data.responsiblePersonId]);
+    }
     return customerService.create(req.orgId, data);
   });
 
-  app.patch('/customers/:id', { preHandler: requireRole('member') }, async (req) => {
+  app.patch('/customers/:id', { preHandler: requireRole('admin') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updateCustomerSchema.parse(req.body);
+    if (data.responsiblePersonId) {
+      await assertNoViewerResources(req.orgId, [data.responsiblePersonId]);
+    }
     return customerService.update(req.orgId, id, data);
   });
 
-  app.delete('/customers/:id', { preHandler: requireRole('member') }, async (req, reply) => {
+  app.delete('/customers/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await customerService.delete(req.orgId, id);
     return reply.status(204).send();

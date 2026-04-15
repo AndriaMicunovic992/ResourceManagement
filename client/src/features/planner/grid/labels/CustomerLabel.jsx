@@ -5,11 +5,13 @@ import StatusBadge from '../../../../components/ui/StatusBadge';
 import { isCustomerOk } from '../../../../lib/gridUtils';
 import { ACCENT_COLORS } from '../../../../lib/constants';
 import { useData } from '../../../../contexts/DataContext';
+import { useVisibility } from '../../../../contexts/VisibilityContext';
 
 export default function CustomerLabel({ customer, index, onEdit, onDelete, onAddProject, canEdit }) {
-  const { projects, needs, assignments, viewableCustomerIds } = useData();
+  const { projects, needs, assignments } = useData();
+  const { canViewCustomer } = useVisibility();
   const navigate = useNavigate();
-  const canOpen = Array.isArray(viewableCustomerIds) && viewableCustomerIds.includes(customer.id);
+  const canOpen = canViewCustomer(customer.id);
 
   const ok = useMemo(() => isCustomerOk(customer, projects, needs, assignments), [customer, projects, needs, assignments]);
   const hasNeeds = needs.some((n) => projects.some((p) => p.customerId === customer.id && p.id === n.projectId));

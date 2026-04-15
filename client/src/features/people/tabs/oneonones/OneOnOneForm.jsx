@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Modal from '../../../../components/ui/Modal';
+import { useAuth } from '../../../../contexts/AuthContext';
 
 function toDateInputValue(value) {
   if (!value) return new Date().toISOString().slice(0, 10);
@@ -15,7 +16,11 @@ const TEXTAREA_FIELDS = [
 ];
 
 export default function OneOnOneForm({ initial, onCancel, onSave }) {
+  const { user } = useAuth();
   const isEdit = !!initial;
+  // On create, the current user will become the author, so they can always
+  // set the private fields. On edit, only the original author can.
+  const isAuthor = !isEdit || (user?.id && initial?.authorUserId === user.id);
   const [meetingDate, setMeetingDate] = useState(toDateInputValue(initial?.meetingDate));
   const [fields, setFields] = useState(() => {
     const base = {};
@@ -25,6 +30,7 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
   const [managerPersonalNotes, setManagerPersonalNotes] = useState(
     initial?.managerPersonalNotes || ''
   );
+  const [privateNote, setPrivateNote] = useState(initial?.privateNote || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -45,9 +51,12 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
       for (const f of TEXTAREA_FIELDS) {
         payload[f.key] = fields[f.key].trim() ? fields[f.key] : null;
       }
-      payload.managerPersonalNotes = managerPersonalNotes.trim()
-        ? managerPersonalNotes
-        : null;
+      if (isAuthor) {
+        payload.managerPersonalNotes = managerPersonalNotes.trim()
+          ? managerPersonalNotes
+          : null;
+        payload.privateNote = privateNote.trim() ? privateNote : null;
+      }
       await onSave(payload);
     } catch (err) {
       setError(err.message || 'Failed to save 1:1 meeting');
@@ -90,24 +99,47 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
           </div>
         ))}
 
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-amber-700">🔒</span>
-            <label className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold">
-              My personal notes (private to me)
-            </label>
+        {isAuthor && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-amber-700">🔒</span>
+              <label className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold">
+                My personal notes (private to me)
+              </label>
+            </div>
+            <div className="text-[10px] text-amber-800/80 mb-1">
+              Only you can see this. Other admins will not.
+            </div>
+            <textarea
+              value={managerPersonalNotes}
+              onChange={(e) => setManagerPersonalNotes(e.target.value)}
+              rows={3}
+              maxLength={5000}
+              className="w-full px-2 py-1.5 border border-amber-300 rounded text-xs text-text outline-none focus:border-amber-500 bg-white resize-y"
+            />
           </div>
-          <div className="text-[10px] text-amber-800/80 mb-1">
-            Only you can see this. Other admins will not.
+        )}
+
+        {isAuthor && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-amber-700">🔒</span>
+              <label className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold">
+                Private note (author only)
+              </label>
+            </div>
+            <div className="text-[10px] text-amber-800/80 mb-1">
+              A second private field, only visible to you.
+            </div>
+            <textarea
+              value={privateNote}
+              onChange={(e) => setPrivateNote(e.target.value)}
+              rows={3}
+              maxLength={5000}
+              className="w-full px-2 py-1.5 border border-amber-300 rounded text-xs text-text outline-none focus:border-amber-500 bg-white resize-y"
+            />
           </div>
-          <textarea
-            value={managerPersonalNotes}
-            onChange={(e) => setManagerPersonalNotes(e.target.value)}
-            rows={3}
-            maxLength={5000}
-            className="w-full px-2 py-1.5 border border-amber-300 rounded text-xs text-text outline-none focus:border-amber-500 bg-white resize-y"
-          />
-        </div>
+        )}
 
         <div className="flex items-center justify-end gap-2 pt-2">
           <button

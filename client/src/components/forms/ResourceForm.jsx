@@ -53,8 +53,14 @@ export default function ResourceForm({ initial, onSave, onClose }) {
     return ids;
   }, [teams, teamIds, initial?.id]);
 
+  // Viewers cannot be assigned as direct managers — the backend rejects them.
   const managerCandidates = useMemo(
-    () => resources.filter((r) => r.id !== initial?.id),
+    () =>
+      resources.filter(
+        (r) =>
+          r.id !== initial?.id &&
+          r.user?.memberships?.[0]?.role !== 'viewer',
+      ),
     [resources, initial?.id]
   );
 

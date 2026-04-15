@@ -1,10 +1,12 @@
 import fp from 'fastify-plugin';
 import { prisma } from '../db/prisma.js';
+import { computeVisibility } from '../services/visibility.service.js';
 
 export default fp(async (app) => {
   app.decorateRequest('userId', '');
   app.decorateRequest('orgId', '');
   app.decorateRequest('role', '');
+  app.decorateRequest('visibility', null);
 
   app.addHook('onRequest', async (req, reply) => {
     if (
@@ -31,5 +33,14 @@ export default fp(async (app) => {
     } catch {
       return reply.status(401).send({ error: 'Invalid token' });
     }
+  });
+
+  // Populate visibility scope once per authenticated request. Separate hook so
+  // it runs after onRequest sets userId/orgId/role. Routes that don't need
+  // visibility still incur the query cost — routes are cheap here and the
+  // tradeoff is that every handler can call req.visibility.* safely.
+  app.addHook('preHandler', async (req) => {
+    if (!req.userId || !req.orgId) return;
+    req.visibility = await computeVisibility(req.orgId, req.userId, req.role);
   });
 });
