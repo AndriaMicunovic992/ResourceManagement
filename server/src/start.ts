@@ -1,4 +1,6 @@
-// Startup script: resolve DATABASE_URL, run migrations, start server
+// Canonical production entry point (used by both `npm start` and the Docker
+// image): resolve DATABASE_URL, run migrations, then boot the server. Dev uses
+// src/index.ts directly (no migrations) — run `npm run db:migrate` yourself.
 
 const varNames = ['DATABASE_URL', 'DATABASE_PRIVATE_URL', 'DATABASE_PUBLIC_URL'];
 

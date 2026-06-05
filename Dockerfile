@@ -20,4 +20,4 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma gene
 COPY --from=frontend-build /app/client/dist ./public
 
 EXPOSE 3000
-CMD ["npx", "tsx", "src/start.ts"]
+CMD ["npm", "start"]

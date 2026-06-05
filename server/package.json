@@ -6,7 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "npx prisma generate",
     "typecheck": "tsc --noEmit",
-    "start": "node --import tsx src/index.ts",
+    "start": "node --import tsx src/start.ts",
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "tsx src/db/seed.ts"
   },

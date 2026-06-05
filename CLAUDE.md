@@ -78,7 +78,7 @@ When adding an endpoint that returns or mutates org data: **filter by `req.orgId
 
 - **ESM with `.js` specifiers.** The server is `"type": "module"` and run through `tsx`. TypeScript files import each other using `.js` extensions (e.g. `import { routes } from './routes/index.js'`). Match this — a `.ts` extension or extensionless import will break at runtime.
 - **Org switch reloads the page** — state isn't preserved across switches by design.
-- **No migrations auto-run on boot** in dev; run `db:migrate` yourself. (The Dockerfile only runs `prisma generate`; production migrations are applied separately.)
+- **Two entry points by design.** Dev runs `src/index.ts` (no migrations — run `db:migrate` yourself). Production (`npm start` *and* the Docker image) runs `src/start.ts`, which resolves `DATABASE_URL` and runs `prisma migrate deploy` before booting `index.ts`. Keep them in sync.
 - Visibility is recomputed every request and must **not** be cached across requests (responsibilities/team membership change).
 
 ## Where things live (quick map)
