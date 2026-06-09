@@ -8,6 +8,7 @@ import jwtPlugin from './plugins/jwt.js';
 import authPlugin from './plugins/auth.js';
 import errorPlugin from './plugins/errorHandler.js';
 import { routes } from './routes/index.js';
+import { prisma } from './db/prisma.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -43,6 +44,26 @@ async function start() {
 
   const port = parseInt(process.env.PORT || '3000', 10);
   await app.listen({ port, host: '0.0.0.0' });
+
+  // Graceful shutdown: drain in-flight requests and close the DB pool so the
+  // platform (e.g. Railway sending SIGTERM on redeploy) doesn't kill us mid-query.
+  let shuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    app.log.info(`Received ${signal}, shutting down...`);
+    try {
+      await app.close();
+      await prisma.$disconnect();
+      process.exit(0);
+    } catch (err) {
+      app.log.error(err);
+      process.exit(1);
+    }
+  };
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(signal, () => shutdown(signal));
+  }
 }
 
 start().catch((err) => {

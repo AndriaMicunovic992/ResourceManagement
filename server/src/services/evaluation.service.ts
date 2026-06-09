@@ -56,7 +56,12 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-function computeFinal(snapshots: { id: string; weightSnapshot: number }[], scores: { categorySnapshotId: string; responsibleScore: number | null }[]): number | null {
+/**
+ * Weighted average of responsible scores across category snapshots. Categories
+ * with a null responsible score are skipped; returns null when no weight
+ * contributes. Exported for unit testing. Pure — no DB access.
+ */
+export function computeFinal(snapshots: { id: string; weightSnapshot: number }[], scores: { categorySnapshotId: string; responsibleScore: number | null }[]): number | null {
   let weightedSum = 0;
   let weightTotal = 0;
   for (const snap of snapshots) {

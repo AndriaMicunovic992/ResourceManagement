@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "npx prisma generate",
-    "start": "node --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node --import tsx src/start.ts",
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "tsx src/db/seed.ts"
   },
@@ -24,6 +27,7 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.8"
   }
 }

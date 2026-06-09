@@ -13,10 +13,13 @@ export default fp(async (app) => {
     if (error instanceof UnauthorizedError) return reply.status(401).send({ error: error.message });
     if (error instanceof ConflictError) return reply.status(409).send({ error: error.message });
 
+    // Unexpected error. Log the full detail server-side, but never echo raw
+    // internal/Prisma messages back to the client. The one exception is the
+    // missing-DATABASE_URL hint, which is actionable for whoever deploys.
     req.log.error(error);
     const message = error.message?.includes('DATABASE_URL')
       ? 'Database not configured. Set DATABASE_URL in Railway environment variables.'
-      : error.message || 'Internal server error';
+      : 'Internal server error';
     return reply.status(500).send({ error: message });
   });
 });

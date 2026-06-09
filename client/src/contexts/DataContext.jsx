@@ -1,227 +1,257 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useOrg } from './OrgContext';
 
 const DataContext = createContext(null);
 
+// Display order for performance-log categories: grouping ASC (nulls last),
+// then sortOrder ASC, then name ASC. Applied client-side so the order stays
+// stable regardless of what the list endpoint returns.
+function sortLogCategories(list) {
+  return [...list].sort((a, b) => {
+    const ga = a.grouping;
+    const gb = b.grouping;
+    if (ga == null && gb != null) return 1;
+    if (gb == null && ga != null) return -1;
+    if ((ga || '') !== (gb || '')) return (ga || '').localeCompare(gb || '');
+    const sa = a.sortOrder ?? 0;
+    const sb = b.sortOrder ?? 0;
+    if (sa !== sb) return sa - sb;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/** Full-screen fallback when the initial bulk load fails (vs. silently
+ *  rendering an empty app as the previous implementation did). */
+function DataLoadError({ onRetry }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-primary-bg p-6 font-sans">
+      <div className="max-w-md w-full bg-white border border-border rounded-xl shadow-card p-8 text-center">
+        <div className="w-12 h-12 rounded-full bg-danger-bg text-danger mx-auto mb-4 flex items-center justify-center text-2xl font-semibold">
+          !
+        </div>
+        <h1 className="text-lg font-semibold text-text mb-2">Couldn't load your data</h1>
+        <p className="text-sm text-text-mid mb-6">
+          We couldn't reach the server. Check your connection and try again.
+        </p>
+        <button
+          onClick={onRetry}
+          className="bg-primary text-white rounded-lg px-5 py-2 text-sm font-medium hover:opacity-90 transition"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Bulk-loads the core org collections via TanStack Query and exposes the same
+ * `useData()` surface the app already relies on (always-defined arrays + CRUD
+ * helpers). Mutations call the API and then invalidate the affected queries —
+ * the server is the source of truth, so cascades (deleting a customer removes
+ * its projects/needs/assignments) resolve on refetch rather than via
+ * hand-maintained client-side pruning.
+ *
+ * Queries are keyed by org id and only run once an org is active; the org
+ * switch already triggers a full page reload, so there's no stale-org data.
+ */
 export function DataProvider({ children }) {
   const { currentOrg } = useOrg();
-  const [loading, setLoading] = useState(true);
-  const [customers, setCustomers] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [resources, setResources] = useState([]);
-  const [teams, setTeams] = useState([]);
-  const [skills, setSkills] = useState([]);
-  const [logCategories, setLogCategories] = useState([]);
-  const [needs, setNeeds] = useState([]);
-  const [assignments, setAssignments] = useState([]);
-  const [meResource, setMeResource] = useState(null);
+  const orgId = currentOrg?.id;
+  const enabled = !!orgId;
+  const queryClient = useQueryClient();
 
-  const reload = useCallback(async () => {
-    if (!currentOrg) return;
-    setLoading(true);
-    try {
-      const [c, p, r, t, s, lc, n, a, me] = await Promise.all([
-        api.getCustomers(),
-        api.getProjects(),
-        api.getResources(),
-        api.getTeams(),
-        api.getSkills(),
-        api.getLogCategories(),
-        api.getNeeds(),
-        api.getAssignments(),
-        api.getMyResource().catch(() => null),
-      ]);
-      setCustomers(c); setProjects(p); setResources(r); setTeams(t); setSkills(s); setLogCategories(lc || []); setNeeds(n); setAssignments(a); setMeResource(me);
-    } catch (e) {
-      console.error('Load failed:', e);
-    }
-    setLoading(false);
-  }, [currentOrg]);
+  const customersQ = useQuery({ queryKey: ['customers', orgId], queryFn: api.getCustomers, enabled });
+  const projectsQ = useQuery({ queryKey: ['projects', orgId], queryFn: api.getProjects, enabled });
+  const resourcesQ = useQuery({ queryKey: ['resources', orgId], queryFn: api.getResources, enabled });
+  const teamsQ = useQuery({ queryKey: ['teams', orgId], queryFn: api.getTeams, enabled });
+  const skillsQ = useQuery({ queryKey: ['skills', orgId], queryFn: api.getSkills, enabled });
+  const logCategoriesQ = useQuery({
+    queryKey: ['logCategories', orgId],
+    queryFn: api.getLogCategories,
+    enabled,
+    select: (data) => sortLogCategories(data || []),
+  });
+  const needsQ = useQuery({ queryKey: ['needs', orgId], queryFn: api.getNeeds, enabled });
+  const assignmentsQ = useQuery({ queryKey: ['assignments', orgId], queryFn: api.getAssignments, enabled });
+  const meResourceQ = useQuery({
+    queryKey: ['meResource', orgId],
+    queryFn: () => api.getMyResource().catch(() => null),
+    enabled,
+  });
 
-  useEffect(() => { reload(); }, [reload]);
+  const customers = customersQ.data ?? [];
+  const projects = projectsQ.data ?? [];
+  const resources = resourcesQ.data ?? [];
+  const teams = teamsQ.data ?? [];
+  const skills = skillsQ.data ?? [];
+  const logCategories = logCategoriesQ.data ?? [];
+  const needs = needsQ.data ?? [];
+  const assignments = assignmentsQ.data ?? [];
+  const meResource = meResourceQ.data ?? null;
+
+  // Gate the app on the collections the planner/dashboards can't render without.
+  const coreQueries = [customersQ, projectsQ, resourcesQ, needsQ, assignmentsQ];
+  const loading = !enabled || coreQueries.some((q) => q.isLoading);
+  // Only treat it as a hard error on first load (no data yet). A failed
+  // background refetch keeps the last-good data on screen instead of blanking.
+  const loadError = coreQueries.find((q) => q.isError && q.data === undefined)?.error || null;
+
+  // Invalidate by base key (partial match also catches the org-scoped key).
+  const invalidate = useCallback(
+    (...keys) => keys.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] })),
+    [queryClient]
+  );
+  const reload = useCallback(() => queryClient.invalidateQueries(), [queryClient]);
 
   // Customer CRUD
   const addCustomer = useCallback(async (data) => {
     const created = await api.createCustomer(data);
-    setCustomers((prev) => [...prev, created]);
+    invalidate('customers');
     return created;
-  }, []);
+  }, [invalidate]);
   const updateCustomer = useCallback(async (id, data) => {
     const updated = await api.updateCustomer(id, data);
-    setCustomers((prev) => prev.map((c) => (c.id === id ? updated : c)));
-  }, []);
+    invalidate('customers');
+    return updated;
+  }, [invalidate]);
   const deleteCustomer = useCallback(async (id) => {
     await api.deleteCustomer(id);
-    const pIds = projects.filter((p) => p.customerId === id).map((p) => p.id);
-    const nIds = needs.filter((n) => pIds.includes(n.projectId)).map((n) => n.id);
-    setAssignments((prev) => prev.filter((a) => !nIds.includes(a.needId)));
-    setNeeds((prev) => prev.filter((n) => !pIds.includes(n.projectId)));
-    setProjects((prev) => prev.filter((p) => p.customerId !== id));
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
-  }, [projects, needs]);
+    invalidate('customers', 'projects', 'needs', 'assignments');
+  }, [invalidate]);
 
   // Project CRUD
   const addProject = useCallback(async (data) => {
     const created = await api.createProject(data);
-    setProjects((prev) => [...prev, created]);
+    invalidate('projects');
     return created;
-  }, []);
+  }, [invalidate]);
   const updateProject = useCallback(async (id, data) => {
     const updated = await api.updateProject(id, data);
-    setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
-  }, []);
+    invalidate('projects');
+    return updated;
+  }, [invalidate]);
   const deleteProject = useCallback(async (id) => {
     await api.deleteProject(id);
-    const nIds = needs.filter((n) => n.projectId === id).map((n) => n.id);
-    setAssignments((prev) => prev.filter((a) => !nIds.includes(a.needId)));
-    setNeeds((prev) => prev.filter((n) => n.projectId !== id));
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-  }, [needs]);
+    invalidate('projects', 'needs', 'assignments');
+  }, [invalidate]);
 
   // Resource CRUD
   const addResource = useCallback(async (data) => {
     const created = await api.createResource(data);
-    setResources((prev) => [...prev, created]);
+    invalidate('resources');
     return created;
-  }, []);
+  }, [invalidate]);
   const updateResource = useCallback(async (id, data) => {
     const updated = await api.updateResource(id, data);
-    setResources((prev) => prev.map((r) => (r.id === id ? updated : r)));
-  }, []);
+    invalidate('resources');
+    return updated;
+  }, [invalidate]);
   const deleteResource = useCallback(async (id) => {
     await api.deleteResource(id);
-    setAssignments((prev) => prev.filter((a) => a.resourceId !== id));
-    setResources((prev) => prev.filter((r) => r.id !== id));
-  }, []);
+    invalidate('resources', 'assignments');
+  }, [invalidate]);
 
-  // Team CRUD
+  // Team CRUD — membership changes are reflected on resources too.
   const addTeam = useCallback(async (data) => {
     const created = await api.createTeam(data);
-    setTeams((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+    invalidate('teams');
     return created;
-  }, []);
+  }, [invalidate]);
   const updateTeam = useCallback(async (id, data) => {
     const updated = await api.updateTeam(id, data);
-    setTeams((prev) => prev.map((t) => (t.id === id ? updated : t)).sort((a, b) => a.name.localeCompare(b.name)));
-  }, []);
+    invalidate('teams', 'resources');
+    return updated;
+  }, [invalidate]);
   const deleteTeam = useCallback(async (id) => {
     await api.deleteTeam(id);
-    setTeams((prev) => prev.filter((t) => t.id !== id));
-    setResources((prev) =>
-      prev.map((r) => ({
-        ...r,
-        teams: Array.isArray(r.teams) ? r.teams.filter((t) => t.id !== id) : r.teams,
-      }))
-    );
-  }, []);
+    invalidate('teams', 'resources');
+  }, [invalidate]);
 
   // Skill CRUD
   const addSkill = useCallback(async (data) => {
     const created = await api.createSkill(data);
-    setSkills((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+    invalidate('skills');
     return created;
-  }, []);
+  }, [invalidate]);
   const updateSkill = useCallback(async (id, data) => {
     const updated = await api.updateSkill(id, data);
-    setSkills((prev) => prev.map((s) => (s.id === id ? updated : s)).sort((a, b) => a.name.localeCompare(b.name)));
-  }, []);
+    invalidate('skills');
+    return updated;
+  }, [invalidate]);
   const deleteSkill = useCallback(async (id) => {
     await api.deleteSkill(id);
-    setSkills((prev) => prev.filter((s) => s.id !== id));
-    setResources((prev) => prev.map((r) => ({
-      ...r,
-      personSkills: (r.personSkills || []).filter((ps) => ps.skillId !== id),
-    })));
-  }, []);
+    invalidate('skills', 'resources');
+  }, [invalidate]);
 
   // Performance log category CRUD
-  // Sort: grouping ASC (NULLS LAST), then sortOrder ASC, then name ASC
-  const sortLogCategories = (list) =>
-    [...list].sort((a, b) => {
-      const ga = a.grouping;
-      const gb = b.grouping;
-      if (ga == null && gb != null) return 1;
-      if (gb == null && ga != null) return -1;
-      if ((ga || '') !== (gb || '')) return (ga || '').localeCompare(gb || '');
-      const sa = a.sortOrder ?? 0;
-      const sb = b.sortOrder ?? 0;
-      if (sa !== sb) return sa - sb;
-      return a.name.localeCompare(b.name);
-    });
   const addLogCategory = useCallback(async (data) => {
     const created = await api.createLogCategory(data);
-    setLogCategories((prev) => sortLogCategories([...prev, created]));
+    invalidate('logCategories');
     return created;
-  }, []);
+  }, [invalidate]);
   const updateLogCategory = useCallback(async (id, data) => {
     const updated = await api.updateLogCategory(id, data);
-    setLogCategories((prev) => sortLogCategories(prev.map((c) => (c.id === id ? updated : c))));
-  }, []);
+    invalidate('logCategories');
+    return updated;
+  }, [invalidate]);
   const deleteLogCategory = useCallback(async (id) => {
     await api.deleteLogCategory(id);
-    setLogCategories((prev) => prev.filter((c) => c.id !== id));
-  }, []);
+    invalidate('logCategories');
+  }, [invalidate]);
 
-  // PersonSkill CRUD
+  // PersonSkill CRUD (nested under resources)
   const upsertPersonSkill = useCallback(async (data) => {
     const result = await api.upsertPersonSkill(data);
-    setResources((prev) => prev.map((r) => {
-      if (r.id !== data.resourceId) return r;
-      const list = r.personSkills || [];
-      const idx = list.findIndex((ps) => ps.skillId === data.skillId);
-      const next = idx >= 0
-        ? list.map((ps) => (ps.skillId === data.skillId ? result : ps))
-        : [...list, result];
-      return { ...r, personSkills: next };
-    }));
+    invalidate('resources');
     return result;
-  }, []);
-  const deletePersonSkill = useCallback(async (resourceId, personSkillId) => {
+  }, [invalidate]);
+  const deletePersonSkill = useCallback(async (_resourceId, personSkillId) => {
     await api.deletePersonSkill(personSkillId);
-    setResources((prev) => prev.map((r) => {
-      if (r.id !== resourceId) return r;
-      return { ...r, personSkills: (r.personSkills || []).filter((ps) => ps.id !== personSkillId) };
-    }));
-  }, []);
+    invalidate('resources');
+  }, [invalidate]);
 
   // Need CRUD
   const addNeed = useCallback(async (data) => {
     const created = await api.createNeed(data);
-    setNeeds((prev) => [...prev, created]);
+    invalidate('needs');
     return created;
-  }, []);
+  }, [invalidate]);
   const updateNeed = useCallback(async (id, data) => {
     const updated = await api.updateNeed(id, data);
-    setNeeds((prev) => prev.map((n) => (n.id === id ? updated : n)));
-  }, []);
+    invalidate('needs');
+    return updated;
+  }, [invalidate]);
   const deleteNeed = useCallback(async (id) => {
     await api.deleteNeed(id);
-    setAssignments((prev) => prev.filter((a) => a.needId !== id));
-    setNeeds((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+    invalidate('needs', 'assignments');
+  }, [invalidate]);
 
   // Assignment CRUD
   const upsertAssignment = useCallback(async (data) => {
     const result = await api.upsertAssignment(data);
-    setAssignments((prev) => {
-      const idx = prev.findIndex((a) => a.id === result.id);
-      if (idx >= 0) return prev.map((a) => (a.id === result.id ? result : a));
-      return [...prev, result];
-    });
+    invalidate('assignments');
     return result;
-  }, []);
+  }, [invalidate]);
   const updateAssignment = useCallback(async (id, data) => {
     const result = await api.updateAssignment(id, data);
-    setAssignments((prev) => prev.map((a) => (a.id === id ? result : a)));
-  }, []);
+    invalidate('assignments');
+    return result;
+  }, [invalidate]);
   const deleteAssignment = useCallback(async (id) => {
     await api.deleteAssignment(id);
-    setAssignments((prev) => prev.filter((a) => a.id !== id));
-  }, []);
+    invalidate('assignments');
+  }, [invalidate]);
+
+  if (enabled && loadError) {
+    return <DataLoadError onRetry={reload} />;
+  }
 
   const value = {
-    loading, customers, projects, resources, teams, skills, logCategories, needs, assignments, meResource, reload,
+    loading, error: loadError,
+    customers, projects, resources, teams, skills, logCategories, needs, assignments, meResource, reload,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
     addResource, updateResource, deleteResource,

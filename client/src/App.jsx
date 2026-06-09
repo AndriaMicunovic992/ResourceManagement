@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { useVisibility } from './contexts/VisibilityContext';
 import { OrgProvider } from './contexts/OrgContext';
@@ -57,49 +58,57 @@ function PeopleListRoute() {
   return <PeopleListView />;
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false },
+  },
+});
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route element={
-            <ProtectedRoute>
-              <OrgProvider>
-                <VisibilityProvider>
-                  <DataProvider>
-                    <AppLayout />
-                  </DataProvider>
-                </VisibilityProvider>
-              </OrgProvider>
-            </ProtectedRoute>
-          }>
-            <Route path="/" element={<LandingRedirect />} />
-            <Route path="/planner" element={<PlannerView />} />
-            <Route path="/dashboard" element={<DashboardView />} />
-            <Route path="/people" element={<PeopleListRoute />} />
-            <Route path="/people/:id" element={<PersonPage />}>
-              <Route index element={<PersonOverview />} />
-              <Route path="allocation" element={<PersonAllocation />} />
-              <Route path="skills" element={<PersonSkills />} />
-              <Route path="oneonones" element={<PersonOneOnOnes />} />
-              <Route path="activity" element={<PersonActivity />} />
-              <Route path="performance" element={<PersonPerformance />} />
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route element={
+              <ProtectedRoute>
+                <OrgProvider>
+                  <VisibilityProvider>
+                    <DataProvider>
+                      <AppLayout />
+                    </DataProvider>
+                  </VisibilityProvider>
+                </OrgProvider>
+              </ProtectedRoute>
+            }>
+              <Route path="/" element={<LandingRedirect />} />
+              <Route path="/planner" element={<PlannerView />} />
+              <Route path="/dashboard" element={<DashboardView />} />
+              <Route path="/people" element={<PeopleListRoute />} />
+              <Route path="/people/:id" element={<PersonPage />}>
+                <Route index element={<PersonOverview />} />
+                <Route path="allocation" element={<PersonAllocation />} />
+                <Route path="skills" element={<PersonSkills />} />
+                <Route path="oneonones" element={<PersonOneOnOnes />} />
+                <Route path="activity" element={<PersonActivity />} />
+                <Route path="performance" element={<PersonPerformance />} />
+              </Route>
+              <Route path="/customers/:id" element={<CustomerPage />}>
+                <Route index element={<CustomerOverview />} />
+                <Route path="projects" element={<CustomerProjects />} />
+                <Route path="people" element={<CustomerPeople />} />
+                <Route path="activity" element={<CustomerActivity />} />
+                <Route path="performance" element={<CustomerPerformance />} />
+              </Route>
+              <Route path="/journal" element={<MyJournalView />} />
+              <Route path="/skills" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/settings" element={<SettingsView />} />
             </Route>
-            <Route path="/customers/:id" element={<CustomerPage />}>
-              <Route index element={<CustomerOverview />} />
-              <Route path="projects" element={<CustomerProjects />} />
-              <Route path="people" element={<CustomerPeople />} />
-              <Route path="activity" element={<CustomerActivity />} />
-              <Route path="performance" element={<CustomerPerformance />} />
-            </Route>
-            <Route path="/journal" element={<MyJournalView />} />
-            <Route path="/skills" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/settings" element={<SettingsView />} />
-          </Route>
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
