@@ -1,15 +1,30 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { api, MICROSOFT_LOGIN_URL } from '../../lib/api';
 import Button from '../../components/ui/Button';
+
+const SSO_ERRORS = {
+  no_access: "You don't have access yet. Ask an admin to invite you, then sign in again.",
+  sso_failed: 'Microsoft sign-in failed. Please try again.',
+  sso_disabled: 'Microsoft sign-in is not enabled for this deployment.',
+};
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(SSO_ERRORS[searchParams.get('error')] || '');
   const [loading, setLoading] = useState(false);
+  // Default both on until the server tells us otherwise, so the form never
+  // flickers away on a slow config fetch.
+  const [authConfig, setAuthConfig] = useState({ microsoftEnabled: false, localAuthEnabled: true });
+
+  useEffect(() => {
+    api.getAuthConfig().then(setAuthConfig).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,25 +47,60 @@ export default function LoginPage() {
         <h1 className="text-xl font-bold text-text mb-1">databob</h1>
         <p className="text-xs text-text-mid mb-6">People Hub — Sign in</p>
         {error && <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-4">{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-xs font-semibold text-text-mid mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary" />
+
+        {authConfig.microsoftEnabled && (
+          <a
+            href={MICROSOFT_LOGIN_URL}
+            className="flex items-center justify-center gap-2 w-full border border-border rounded-lg py-2 text-sm font-semibold text-text hover:bg-primary-light transition-colors"
+          >
+            <MicrosoftLogo />
+            Sign in with Microsoft
+          </a>
+        )}
+
+        {authConfig.microsoftEnabled && authConfig.localAuthEnabled && (
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-[11px] text-text-light uppercase tracking-wide">or</span>
+            <div className="flex-1 h-px bg-border" />
           </div>
-          <div className="mb-6">
-            <label className="block text-xs font-semibold text-text-mid mb-1">Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary" />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign in'}
-          </Button>
-        </form>
-        <p className="text-xs text-text-mid text-center mt-4">
-          Don't have an account? <Link to="/signup" className="text-primary font-semibold">Sign up</Link>
-        </p>
+        )}
+
+        {authConfig.localAuthEnabled && (
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-text-mid mb-1">Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary" />
+            </div>
+            <div className="mb-6">
+              <label className="block text-xs font-semibold text-text-mid mb-1">Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary" />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Signing in...' : 'Sign in'}
+            </Button>
+          </form>
+        )}
+
+        {authConfig.localAuthEnabled && (
+          <p className="text-xs text-text-mid text-center mt-4">
+            Don't have an account? <Link to="/signup" className="text-primary font-semibold">Sign up</Link>
+          </p>
+        )}
       </div>
     </div>
+  );
+}
+
+function MicrosoftLogo() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true">
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
   );
 }
