@@ -9,6 +9,19 @@ function clientRedirect(params: Record<string, string>): string {
   return `${config.clientUrl}/auth/callback#${frag}`;
 }
 
+// Map a thrown error to a coarse, non-sensitive reason code shown on the login
+// page. The full error is logged server-side for the operator.
+function reasonFor(e: unknown): string {
+  const msg = (e instanceof Error && e.message) || '';
+  if (msg === 'no_access') return 'no_access';
+  if (msg.includes('expired sign-in state') || msg.includes('Missing code')) return 'sso_expired';
+  if (msg.includes('restricted to your organization')) return 'sso_tenant';
+  if (msg.includes('Token exchange') || msg.includes('id_token') || msg.includes('not configured')) return 'sso_exchange';
+  if (msg.includes('already linked')) return 'sso_link_conflict';
+  // jose verification failures (issuer / audience / signature / nonce).
+  return 'sso_verify';
+}
+
 export const microsoftAuthRoutes: FastifyPluginAsync = async (app) => {
   app.get('/auth/microsoft/login', async (req, reply) => {
     if (!microsoftService.isEnabled()) {
@@ -34,10 +47,8 @@ export const microsoftAuthRoutes: FastifyPluginAsync = async (app) => {
       );
       return reply.redirect(clientRedirect({ token }));
     } catch (e) {
-      // "no_access" = authenticated but not invited; everything else is generic.
-      const message = (e as Error).message === 'no_access' ? 'no_access' : 'sso_failed';
-      req.log.error(e);
-      return reply.redirect(clientRedirect({ error: message }));
+      req.log.error({ err: e, scope: 'microsoft-callback' }, 'Microsoft sign-in failed');
+      return reply.redirect(clientRedirect({ error: reasonFor(e) }));
     }
   });
 
