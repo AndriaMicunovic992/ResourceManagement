@@ -48,6 +48,7 @@ export const api = {
   getMe: () => apiFetch('/auth/me'),
   getAuthConfig: () => apiFetch('/auth/config'),
   impersonate: (userId) => apiFetch('/auth/impersonate', { method: 'POST', body: JSON.stringify({ userId }) }),
+  startMicrosoftLink: () => apiFetch('/auth/microsoft/link', { method: 'POST', body: JSON.stringify({}) }),
 
   // Org invites (admin)
   getInvites: () => apiFetch('/org/invites'),

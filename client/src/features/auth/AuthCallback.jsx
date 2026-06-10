@@ -13,7 +13,11 @@ export default function AuthCallback() {
     const params = new URLSearchParams(raw);
     const token = params.get('token');
     const error = params.get('error');
-    if (token) {
+    if (params.get('linked')) {
+      // Account-linking round-trip: the existing session token is still valid,
+      // so just return to settings with a success marker.
+      window.location.replace('/settings?microsoft=linked');
+    } else if (token) {
       setToken(token);
       window.location.replace('/');
     } else {

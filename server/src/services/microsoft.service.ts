@@ -3,13 +3,19 @@ import crypto from 'crypto';
 import { prisma } from '../db/prisma.js';
 import { config } from '../config.js';
 import { inviteService } from './invite.service.js';
-import { BadRequestError, ForbiddenError } from '../utils/errors.js';
+import { BadRequestError, ForbiddenError, ConflictError } from '../utils/errors.js';
 
-// Transient login transactions (CSRF `state` → expected `nonce`). In-memory is
-// fine for a single-instance deployment; entries expire after 10 minutes. Move
-// to a shared store (Redis/cookie) if the API is ever horizontally scaled.
+// Transient login transactions (CSRF `state` → expected `nonce`, plus the user
+// id when this round-trip is linking Microsoft to an existing signed-in account
+// rather than logging in). In-memory is fine for a single-instance deployment;
+// entries expire after 10 minutes. Move to a shared store (Redis/cookie) if the
+// API is ever horizontally scaled.
 const STATE_TTL_MS = 10 * 60 * 1000;
-const pending = new Map<string, { nonce: string; createdAt: number }>();
+const pending = new Map<string, { nonce: string; createdAt: number; linkUserId?: string }>();
+
+export type SsoResult =
+  | { kind: 'login'; userId: string; orgId: string }
+  | { kind: 'linked'; userId: string };
 
 function sweep() {
   const now = Date.now();
@@ -35,13 +41,17 @@ export const microsoftService = {
     return config.entra.enabled;
   },
 
-  /** Build the Entra authorize URL and remember the state/nonce we expect back. */
-  beginLogin(): string {
+  /**
+   * Build the Entra authorize URL and remember the state/nonce we expect back.
+   * Pass `linkUserId` when the round-trip should attach the Microsoft identity
+   * to an existing account instead of signing someone in.
+   */
+  beginLogin(linkUserId?: string): string {
     if (!this.isEnabled()) throw new BadRequestError('Microsoft sign-in is not configured');
     sweep();
     const state = crypto.randomBytes(16).toString('hex');
     const nonce = crypto.randomBytes(16).toString('hex');
-    pending.set(state, { nonce, createdAt: Date.now() });
+    pending.set(state, { nonce, createdAt: Date.now(), linkUserId });
 
     const params = new URLSearchParams({
       client_id: config.entra.clientId!,
@@ -60,7 +70,7 @@ export const microsoftService = {
    * and resolve the org to sign them into. Returns the identity the route will
    * mint an internal JWT for. Throws on any failure.
    */
-  async completeLogin(code: string | undefined, state: string | undefined): Promise<{ userId: string; orgId: string }> {
+  async completeLogin(code: string | undefined, state: string | undefined): Promise<SsoResult> {
     if (!this.isEnabled()) throw new BadRequestError('Microsoft sign-in is not configured');
     if (!code || !state) throw new BadRequestError('Missing code or state');
 
@@ -96,16 +106,26 @@ export const microsoftService = {
 
     const oid = payload.oid as string | undefined;
     const tid = payload.tid as string | undefined;
-    const email = (payload.preferred_username || payload.email) as string | undefined;
-    const name = (payload.name as string | undefined) || email || 'Microsoft User';
-    if (!oid || !email) throw new BadRequestError('Microsoft token missing required claims');
+    // Entra users routinely have a UPN (preferred_username) that differs from
+    // their mail address — match local accounts against both.
+    const emails = [payload.preferred_username, payload.email]
+      .filter((e): e is string => typeof e === 'string' && e.includes('@'))
+      .map((e) => e.trim().toLowerCase());
+    const name = (payload.name as string | undefined) || emails[0] || 'Microsoft User';
+    if (!oid || emails.length === 0) throw new BadRequestError('Microsoft token missing required claims');
     // Defense in depth: reject tokens from outside the configured tenant.
     if (tid && tid !== config.entra.tenantId) {
       throw new ForbiddenError('Sign-in is restricted to your organization');
     }
 
-    const userId = await this.resolveUser(oid, email, name);
-    await inviteService.consumeForUser(userId, email);
+    // Link mode: attach this Microsoft identity to the already-signed-in user.
+    if (expected.linkUserId) {
+      await this.linkToUser(expected.linkUserId, oid);
+      return { kind: 'linked', userId: expected.linkUserId };
+    }
+
+    const userId = await this.resolveUser(oid, emails, name);
+    await inviteService.consumeForUser(userId, emails);
 
     const membership = await prisma.orgMember.findFirst({
       where: { userId },
@@ -115,27 +135,40 @@ export const microsoftService = {
       // Authenticated with Microsoft, but nobody has invited this person.
       throw new ForbiddenError('no_access');
     }
-    return { userId, orgId: membership.orgId };
+    return { kind: 'login', userId, orgId: membership.orgId };
   },
 
-  /** Find-or-link-or-create the local User for a verified Microsoft identity. */
-  async resolveUser(oid: string, email: string, name: string): Promise<string> {
+  /**
+   * Find-or-link-or-create the local User for a verified Microsoft identity.
+   * Strictly invite-first: an unknown, uninvited email is rejected without
+   * creating anything, so failed sign-ins don't leave orphan accounts behind.
+   */
+  async resolveUser(oid: string, emails: string[], name: string): Promise<string> {
     const byOid = await prisma.user.findUnique({ where: { microsoftId: oid } });
     if (byOid) return byOid.id;
 
+    const emailFilters = emails.map((e) => ({
+      email: { equals: e, mode: 'insensitive' as const },
+    }));
+
     // Single-tenant + IdP-verified email: linking an existing local account by
     // email is safe here (the email is asserted by our own Entra tenant).
-    const byEmail = await prisma.user.findFirst({
-      where: { email: { equals: email.trim().toLowerCase(), mode: 'insensitive' } },
-    });
+    const byEmail = await prisma.user.findFirst({ where: { OR: emailFilters } });
     if (byEmail) {
       await prisma.user.update({ where: { id: byEmail.id }, data: { microsoftId: oid } });
       return byEmail.id;
     }
 
+    const invite = await prisma.invite.findFirst({
+      where: { acceptedAt: null, OR: emailFilters },
+    });
+    if (!invite) throw new ForbiddenError('no_access');
+
     const created = await prisma.user.create({
       data: {
-        email: email.trim().toLowerCase(),
+        // Use the invited address as the canonical email — it's the one the
+        // admin knows this person by.
+        email: invite.email,
         name,
         microsoftId: oid,
         authProvider: 'microsoft',
@@ -143,5 +176,28 @@ export const microsoftService = {
       },
     });
     return created.id;
+  },
+
+  /** Attach a verified Microsoft identity to an existing account ("connect"). */
+  async linkToUser(userId: string, oid: string): Promise<void> {
+    const holder = await prisma.user.findUnique({
+      where: { microsoftId: oid },
+      include: { memberships: true },
+    });
+    if (holder) {
+      if (holder.id === userId) return; // already linked to this account
+      // A passwordless, membershipless holder is an orphan left by an earlier
+      // failed sign-in attempt — absorb its link instead of blocking on it.
+      const isOrphan = holder.memberships.length === 0 && !holder.password;
+      if (!isOrphan) {
+        throw new ConflictError('That Microsoft account is already linked to a different user');
+      }
+      await prisma.$transaction([
+        prisma.user.delete({ where: { id: holder.id } }),
+        prisma.user.update({ where: { id: userId }, data: { microsoftId: oid } }),
+      ]);
+      return;
+    }
+    await prisma.user.update({ where: { id: userId }, data: { microsoftId: oid } });
   },
 };
