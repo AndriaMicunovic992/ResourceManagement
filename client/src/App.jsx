@@ -8,6 +8,7 @@ import { DataProvider } from './contexts/DataContext';
 import ProtectedRoute from './features/auth/ProtectedRoute';
 import LoginPage from './features/auth/LoginPage';
 import SignupPage from './features/auth/SignupPage';
+import AuthCallback from './features/auth/AuthCallback';
 import AppLayout from './layouts/AppLayout';
 import PlannerView from './features/planner/PlannerView';
 import DashboardView from './features/dashboard/DashboardView';
@@ -72,6 +73,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route element={
               <ProtectedRoute>
                 <OrgProvider>

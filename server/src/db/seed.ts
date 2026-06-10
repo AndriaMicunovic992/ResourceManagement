@@ -3,6 +3,14 @@ import { hashPassword } from '../utils/password.js';
 import { monthRange } from '../utils/months.js';
 
 async function seed() {
+  // This wipes every table before inserting demo data. Guard against running it
+  // against a production database by accident.
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED !== 'true') {
+    throw new Error(
+      'Refusing to seed in production — this deletes all data. Set ALLOW_SEED=true to override.'
+    );
+  }
+
   console.log('Seeding database...');
 
   // Clean up

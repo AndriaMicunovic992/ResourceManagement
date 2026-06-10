@@ -1,7 +1,15 @@
 import { prisma } from '../db/prisma.js';
 import { NotFoundError, ConflictError, ForbiddenError } from '../utils/errors.js';
+import { inviteService } from './invite.service.js';
 
 export const orgService = {
+  /** Membership row for (user, org), or null. Used to gate org switching. */
+  async membershipFor(userId: string, orgId: string) {
+    return prisma.orgMember.findUnique({
+      where: { userId_orgId: { userId, orgId } },
+    });
+  },
+
   async listUserOrgs(userId: string) {
     const memberships = await prisma.orgMember.findMany({
       where: { userId },
@@ -50,9 +58,20 @@ export const orgService = {
     });
   },
 
-  async addMember(orgId: string, email: string, role: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) throw new NotFoundError('No user found with that email');
+  /**
+   * Add an existing user to the org, or — if no account exists for that email
+   * yet — create a pending invite they'll claim on first sign-in. Returns a
+   * discriminated result so the UI can say "added" vs "invited".
+   */
+  async addMember(orgId: string, email: string, role: string, invitedByUserId: string) {
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email.trim().toLowerCase(), mode: 'insensitive' } },
+    });
+
+    if (!user) {
+      const invite = await inviteService.create(orgId, email, role, invitedByUserId);
+      return { type: 'invited' as const, invite };
+    }
 
     const existing = await prisma.orgMember.findUnique({
       where: { userId_orgId: { userId: user.id, orgId } },
@@ -63,7 +82,7 @@ export const orgService = {
       data: { userId: user.id, orgId, role },
       include: { user: { select: { id: true, email: true, name: true, avatar: true } } },
     });
-    return member;
+    return { type: 'added' as const, member };
   },
 
   async updateMemberRole(orgId: string, memberId: string, role: string, requesterId: string) {

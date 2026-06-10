@@ -1,0 +1,71 @@
+import { prisma } from '../db/prisma.js';
+import { ConflictError, NotFoundError } from '../utils/errors.js';
+
+/**
+ * Invite-first provisioning. An admin invites an email to an org with a role;
+ * the seat sits pending until that person first signs in (Microsoft or local)
+ * with a matching, IdP-verified email, at which point it becomes an OrgMember.
+ */
+export const inviteService = {
+  async create(orgId: string, email: string, role: string, invitedByUserId: string) {
+    const normalized = email.trim().toLowerCase();
+
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: normalized, mode: 'insensitive' } },
+      include: { memberships: { where: { orgId } } },
+    });
+    if (existingUser && existingUser.memberships.length > 0) {
+      throw new ConflictError('That person is already a member of this organization');
+    }
+
+    // Re-inviting an email refreshes the role and clears any prior acceptance.
+    return prisma.invite.upsert({
+      where: { email_orgId: { email: normalized, orgId } },
+      create: { email: normalized, orgId, role, invitedByUserId },
+      update: { role, acceptedAt: null, invitedByUserId },
+    });
+  },
+
+  async list(orgId: string) {
+    return prisma.invite.findMany({
+      where: { orgId, acceptedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+  },
+
+  async revoke(orgId: string, inviteId: string) {
+    const invite = await prisma.invite.findFirst({ where: { id: inviteId, orgId } });
+    if (!invite) throw new NotFoundError('Invite not found');
+    await prisma.invite.delete({ where: { id: inviteId } });
+  },
+
+  /**
+   * Consume every pending invite matching this user's email, creating the
+   * corresponding memberships. Called on first sign-in. Returns the memberships
+   * that now exist for the user (created or pre-existing).
+   */
+  async consumeForUser(userId: string, email: string) {
+    const normalized = email.trim().toLowerCase();
+    const pending = await prisma.invite.findMany({
+      where: { email: { equals: normalized, mode: 'insensitive' }, acceptedAt: null },
+    });
+
+    const memberships = [];
+    for (const invite of pending) {
+      const existing = await prisma.orgMember.findUnique({
+        where: { userId_orgId: { userId, orgId: invite.orgId } },
+      });
+      const membership =
+        existing ??
+        (await prisma.orgMember.create({
+          data: { userId, orgId: invite.orgId, role: invite.role },
+        }));
+      await prisma.invite.update({
+        where: { id: invite.id },
+        data: { acceptedAt: new Date() },
+      });
+      memberships.push(membership);
+    }
+    return memberships;
+  },
+};

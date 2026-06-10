@@ -1,7 +1,23 @@
+import { getToken, removeToken, isImpersonating, stopImpersonation } from './auth';
+
 const API = import.meta.env.VITE_API_URL || '/api';
 
-function getToken() {
-  return localStorage.getItem('databob_token');
+export const MICROSOFT_LOGIN_URL = API + '/auth/microsoft/login';
+
+// Handle an authenticated request that came back 401: the session is gone or
+// expired. If we were impersonating (the short-lived token timed out), drop back
+// to the admin session; otherwise clear the token and bounce to login. Without
+// this, an expired token leaves the user stuck on silent "Request failed".
+function handleUnauthorized() {
+  if (isImpersonating()) {
+    stopImpersonation();
+    window.location.reload();
+    return;
+  }
+  removeToken();
+  if (!window.location.pathname.startsWith('/login')) {
+    window.location.href = '/login';
+  }
 }
 
 async function apiFetch(path, options = {}) {
@@ -10,6 +26,12 @@ async function apiFetch(path, options = {}) {
   if (token) headers['Authorization'] = 'Bearer ' + token;
 
   const res = await fetch(API + path, { ...options, headers });
+
+  // Only treat 401 as a session failure when we actually sent a token — a 401
+  // from the login call itself is just bad credentials.
+  if (res.status === 401 && token) {
+    handleUnauthorized();
+  }
 
   if (res.status === 204) return null;
   if (!res.ok) {
@@ -24,6 +46,13 @@ export const api = {
   login: (email, password) => apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   signup: (data) => apiFetch('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
   getMe: () => apiFetch('/auth/me'),
+  getAuthConfig: () => apiFetch('/auth/config'),
+  impersonate: (userId) => apiFetch('/auth/impersonate', { method: 'POST', body: JSON.stringify({ userId }) }),
+
+  // Org invites (admin)
+  getInvites: () => apiFetch('/org/invites'),
+  createInvite: (email, role) => apiFetch('/org/invites', { method: 'POST', body: JSON.stringify({ email, role }) }),
+  revokeInvite: (id) => apiFetch('/org/invites/' + id, { method: 'DELETE' }),
 
   // Orgs
   getOrgs: () => apiFetch('/orgs'),

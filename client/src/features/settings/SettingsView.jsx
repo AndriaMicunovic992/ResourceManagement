@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOrg } from '../../contexts/OrgContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { api } from '../../lib/api';
+import { viewAs } from '../../lib/impersonation';
 import { DEFAULT_SKILLS } from '../../lib/defaultSkills';
 import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
@@ -10,8 +12,11 @@ const ROLES = ['viewer', 'member', 'admin'];
 
 export default function SettingsView() {
   const { currentOrg, role, updateOrg } = useOrg();
+  const { user } = useAuth();
   const { teams, resources, addTeam, updateTeam, deleteTeam, skills, addSkill, updateSkill, deleteSkill, logCategories, addLogCategory, updateLogCategory, deleteLogCategory } = useData();
   const [members, setMembers] = useState([]);
+  const [invites, setInvites] = useState([]);
+  const [memberNotice, setMemberNotice] = useState('');
   const [email, setEmail] = useState('');
   const [newRole, setNewRole] = useState('member');
   const [error, setError] = useState('');
@@ -159,22 +164,56 @@ export default function SettingsView() {
     } catch { /* ignore */ }
   }, []);
 
+  const loadInvites = useCallback(async () => {
+    try {
+      setInvites(await api.getInvites());
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => { loadMembers(); }, [loadMembers]);
+  useEffect(() => { if (isAdmin) loadInvites(); }, [isAdmin, loadInvites]);
 
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!email.trim()) return;
     setError('');
+    setMemberNotice('');
     setLoading(true);
     try {
-      await api.addMember(email.trim(), newRole);
+      const res = await api.addMember(email.trim(), newRole);
       setEmail('');
       setNewRole('member');
+      // The server adds existing accounts directly, but invites unknown emails —
+      // tell the admin which happened.
+      if (res && res.type === 'invited') {
+        setMemberNotice(`Invitation created for ${res.invite.email}. They'll get access the first time they sign in.`);
+      } else if (res && res.member) {
+        setMemberNotice(`${res.member.user.name} added to the organization.`);
+      }
       await loadMembers();
+      await loadInvites();
     } catch (err) {
       setError(err.message || 'Failed to add member');
     }
     setLoading(false);
+  };
+
+  const handleViewAs = async (userId) => {
+    setError('');
+    try {
+      await viewAs(userId, user?.name || 'Admin');
+    } catch (err) {
+      setError(err.message || 'Could not start view-as');
+    }
+  };
+
+  const handleRevokeInvite = async (id) => {
+    try {
+      await api.revokeInvite(id);
+      await loadInvites();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const handleRoleChange = async (memberId, role) => {
@@ -976,6 +1015,9 @@ export default function SettingsView() {
         {error && (
           <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{error}</div>
         )}
+        {memberNotice && (
+          <div className="text-xs text-primary bg-primary-light p-2 rounded mb-3">{memberNotice}</div>
+        )}
 
         {/* Member list */}
         <div className="space-y-2 mb-4">
@@ -1001,6 +1043,15 @@ export default function SettingsView() {
               ) : (
                 <span className="text-[10px] text-text-light capitalize">{m.role}</span>
               )}
+              {isAdmin && m.user.id !== user?.id && (
+                <button
+                  onClick={() => handleViewAs(m.user.id)}
+                  className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:text-primary/80 px-1"
+                  title="See the app exactly as this person does (read-only)"
+                >
+                  View as
+                </button>
+              )}
               {isAdmin && m.role !== 'owner' && (
                 <button
                   onClick={() => handleRemove(m.id, m.user.name)}
@@ -1015,6 +1066,29 @@ export default function SettingsView() {
             <p className="text-xs text-text-light py-2">No members yet.</p>
           )}
         </div>
+
+        {/* Pending invites */}
+        {isAdmin && invites.length > 0 && (
+          <div className="mb-4 pt-3 border-t border-border-light">
+            <h4 className="text-[11px] font-bold text-text-mid uppercase tracking-wide mb-2">Pending invites</h4>
+            <div className="space-y-2">
+              {invites.map((inv) => (
+                <div key={inv.id} className="flex items-center gap-3 py-1.5 px-3 rounded-lg bg-primary-bg/30">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-text truncate">{inv.email}</div>
+                    <div className="text-[10px] text-text-light">Invited as {inv.role} — awaiting first sign-in</div>
+                  </div>
+                  <button
+                    onClick={() => handleRevokeInvite(inv.id)}
+                    className="text-[10px] text-danger bg-transparent border-0 cursor-pointer hover:text-danger/80 px-1"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Add member form */}
         {isAdmin && (
