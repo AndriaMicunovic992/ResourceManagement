@@ -6,6 +6,11 @@ import Button from '../../components/ui/Button';
 
 const SSO_ERRORS = {
   no_access: "You don't have access yet. Ask an admin to invite you, then sign in again.",
+  sso_expired: 'That sign-in attempt expired (or the server restarted). Please try again.',
+  sso_tenant: 'Your Microsoft account is outside the allowed tenant. Check ENTRA_TENANT_ID is your Directory (tenant) ID.',
+  sso_verify: 'Could not verify the Microsoft token. Check ENTRA_TENANT_ID is your Directory (tenant) ID (a GUID, not a domain) and ENTRA_CLIENT_ID matches the app registration.',
+  sso_exchange: 'Microsoft rejected the token exchange. Check ENTRA_CLIENT_SECRET and that ENTRA_REDIRECT_URI exactly matches the app registration.',
+  sso_link_conflict: 'That Microsoft account is already linked to a different user.',
   sso_failed: 'Microsoft sign-in failed. Please try again.',
   sso_disabled: 'Microsoft sign-in is not enabled for this deployment.',
 };
