@@ -13,6 +13,7 @@ const SSO_ERRORS = {
   sso_link_conflict: 'That Microsoft account is already linked to a different user.',
   sso_failed: 'Microsoft sign-in failed. Please try again.',
   sso_disabled: 'Microsoft sign-in is not enabled for this deployment.',
+  session_expired: 'Your session ended and you were signed out. Please sign in again.',
 };
 
 export default function LoginPage() {

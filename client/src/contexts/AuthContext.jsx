@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api';
-import { getToken, setToken, removeToken } from '../lib/auth';
+import { getToken, setToken, removeToken, clearImpersonation } from '../lib/auth';
 
 const AuthContext = createContext(null);
 
@@ -19,6 +19,8 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const result = await api.login(email, password);
+    // A fresh session must never inherit a stale "view as" stash.
+    clearImpersonation();
     setToken(result.token);
     setUser(result.user);
     return result;
@@ -26,12 +28,14 @@ export function AuthProvider({ children }) {
 
   const signup = useCallback(async (data) => {
     const result = await api.signup(data);
+    clearImpersonation();
     setToken(result.token);
     setUser(result.user);
     return result;
   }, []);
 
   const logout = useCallback(() => {
+    clearImpersonation();
     removeToken();
     setUser(null);
   }, []);
