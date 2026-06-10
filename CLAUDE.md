@@ -29,7 +29,7 @@ npm start                   # production server (API + built SPA)
 
 Demo credentials after seeding: `demo@databob.ch` / `demo123`.
 
-There is **no test suite, linter, or CI** configured. Verify changes by running the app. After changing `schema.prisma`, you must create a migration (`db:migrate`) and `prisma generate` (covered by `npm run build`).
+Tests run with **Vitest** (`npm test --prefix server`) and on CI (`.github/workflows/ci.yml`: server typecheck + tests, client build). There is **no linter** configured. Also verify behavior by running the app. After changing `schema.prisma`, you must create a migration (`db:migrate`) and `prisma generate` (covered by `npm run build`).
 
 ## Request lifecycle (server)
 
@@ -39,6 +39,8 @@ Every `/api` request (except `/api/auth/login`, `/api/auth/signup`, `/api/health
 2. **`preHandler` hook** — computes `req.visibility` (a `VisibilityScope`) via `services/visibility.service.ts`. Every handler can safely read `req.visibility.*`.
 
 The **JWT carries `{ userId, orgId }`** — the active org is baked into the token. Switching orgs (`POST /api/orgs/switch`) mints a **new token** and the client does a full `window.location.reload()`. There is no `x-org-id` header.
+
+**Sign-in paths** (both mint the same internal JWT, so visibility/org logic is auth-agnostic): local email/password (`/api/auth/login`, gated by `ALLOW_LOCAL_AUTH`) and Microsoft Entra SSO (`/api/auth/microsoft/*`, active only when the `ENTRA_*` env vars are set; single-tenant, invite-first provisioning via the `Invite` model). **Impersonation** ("view as"): admin-only `/api/auth/impersonate` mints a short-lived token with an `imp` claim (the real admin id); the auth hook computes visibility for the target user but **blocks all writes** while `imp` is set. The client stashes the admin token and shows a banner. Runtime config is centralized in `server/src/config.ts`.
 
 Layering per domain: **`routes/` (thin HTTP) → `services/` (logic) → `schemas/` (Zod validation)**. Errors are thrown as typed classes from `utils/errors.ts` (`NotFoundError`, `ForbiddenError`, `BadRequestError`, …) and turned into HTTP responses by `plugins/errorHandler.ts`.
 

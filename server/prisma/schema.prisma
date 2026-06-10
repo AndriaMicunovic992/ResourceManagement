@@ -34,14 +34,22 @@ model Organization {
   performanceLogCategories PerformanceLogCategory[]
   personManagers PersonManager[]
   evaluations Evaluation[]
+  invites     Invite[]
 }
 
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  password  String
+  // Nullable: SSO-provisioned users authenticate via Microsoft and have no
+  // local password. Guard local login against null before bcrypt compare.
+  password  String?
   name      String
   avatar    String?
+  // Entra/Microsoft object id (the `oid` claim). Stable per user per tenant —
+  // the canonical link for SSO, matched on before email.
+  microsoftId  String? @unique
+  // "local" | "microsoft" — how this account was provisioned / signs in.
+  authProvider String  @default("local")
   createdAt DateTime @default(now())
 
   memberships        OrgMember[]
@@ -50,6 +58,7 @@ model User {
   resources          Resource[]  @relation("UserResources")
   createdEvaluations   Evaluation[] @relation("EvaluationCreator")
   finalizedEvaluations Evaluation[] @relation("EvaluationFinalizer")
+  sentInvites          Invite[]
 }
 
 model OrgMember {
@@ -63,6 +72,27 @@ model OrgMember {
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([userId, orgId])
+}
+
+// Pending org access for an email that may not have an account yet. Created by
+// an admin; consumed on first sign-in (Microsoft or local) when the verified
+// email matches, which creates the OrgMember. Underpins invite-first SSO.
+model Invite {
+  id              String    @id @default(cuid())
+  email           String
+  role            String    @default("member")
+  createdAt       DateTime  @default(now())
+  acceptedAt      DateTime?
+
+  orgId           String
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  invitedByUserId String?
+  invitedBy       User?     @relation(fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([email, orgId])
+  @@index([orgId])
+  @@index([email])
 }
 
 model Customer {

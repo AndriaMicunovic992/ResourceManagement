@@ -36,6 +36,8 @@ export const authService = {
       include: { memberships: { include: { org: true } } },
     });
     if (!user) throw new UnauthorizedError('Invalid credentials');
+    // SSO-provisioned accounts have no local password.
+    if (!user.password) throw new UnauthorizedError('This account uses Microsoft sign-in');
 
     const valid = await verifyPassword(input.password, user.password);
     if (!valid) throw new UnauthorizedError('Invalid credentials');
