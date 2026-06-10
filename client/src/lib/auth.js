@@ -55,3 +55,9 @@ export function stopImpersonation() {
   }
   return false;
 }
+
+/** Drop any impersonation stash WITHOUT restoring the stashed token. Call on
+ * every fresh sign-in/sign-out so a stale stash can never hijack a new session. */
+export function clearImpersonation() {
+  localStorage.removeItem(IMPERSONATION_KEY);
+}

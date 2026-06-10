@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { setToken } from '../../lib/auth';
+import { setToken, clearImpersonation } from '../../lib/auth';
 
 /**
  * Lands here after the Microsoft round-trip. The server puts the result in the
@@ -18,6 +18,8 @@ export default function AuthCallback() {
       // so just return to settings with a success marker.
       window.location.replace('/settings?microsoft=linked');
     } else if (token) {
+      // Fresh sign-in: drop any stale "view as" stash before adopting the token.
+      clearImpersonation();
       setToken(token);
       window.location.replace('/');
     } else {

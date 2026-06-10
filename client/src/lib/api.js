@@ -8,15 +8,20 @@ export const MICROSOFT_LOGIN_URL = API + '/auth/microsoft/login';
 // expired. If we were impersonating (the short-lived token timed out), drop back
 // to the admin session; otherwise clear the token and bounce to login. Without
 // this, an expired token leaves the user stuck on silent "Request failed".
-function handleUnauthorized() {
+// `path` rides along in the redirect so a bounce is never anonymous — the login
+// URL shows which request killed the session.
+function handleUnauthorized(path) {
   if (isImpersonating()) {
-    stopImpersonation();
-    window.location.reload();
-    return;
+    const restored = stopImpersonation();
+    if (restored) {
+      window.location.reload();
+      return;
+    }
+    // Stash existed but held no usable token — fall through to a clean logout.
   }
   removeToken();
   if (!window.location.pathname.startsWith('/login')) {
-    window.location.href = '/login';
+    window.location.href = '/login?error=session_expired&from=' + encodeURIComponent(path);
   }
 }
 
@@ -30,7 +35,7 @@ async function apiFetch(path, options = {}) {
   // Only treat 401 as a session failure when we actually sent a token — a 401
   // from the login call itself is just bad credentials.
   if (res.status === 401 && token) {
-    handleUnauthorized();
+    handleUnauthorized(path);
   }
 
   if (res.status === 204) return null;
