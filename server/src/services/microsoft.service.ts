@@ -5,23 +5,16 @@ import { config } from '../config.js';
 import { inviteService } from './invite.service.js';
 import { BadRequestError, ForbiddenError, ConflictError } from '../utils/errors.js';
 
-// Transient login transactions (CSRF `state` → expected `nonce`, plus the user
-// id when this round-trip is linking Microsoft to an existing signed-in account
-// rather than logging in). In-memory is fine for a single-instance deployment;
-// entries expire after 10 minutes. Move to a shared store (Redis/cookie) if the
-// API is ever horizontally scaled.
-const STATE_TTL_MS = 10 * 60 * 1000;
-const pending = new Map<string, { nonce: string; createdAt: number; linkUserId?: string }>();
-
 export type SsoResult =
   | { kind: 'login'; userId: string; orgId: string }
   | { kind: 'linked'; userId: string };
 
-function sweep() {
-  const now = Date.now();
-  for (const [k, v] of pending) {
-    if (now - v.createdAt > STATE_TTL_MS) pending.delete(k);
-  }
+/** What the routes carry across the Microsoft round-trip (in a signed cookie,
+ * so it survives server restarts and works across replicas). */
+export interface SsoTransaction {
+  state: string;
+  nonce: string;
+  linkUserId?: string;
 }
 
 function authority(): string {
@@ -42,16 +35,15 @@ export const microsoftService = {
   },
 
   /**
-   * Build the Entra authorize URL and remember the state/nonce we expect back.
-   * Pass `linkUserId` when the round-trip should attach the Microsoft identity
-   * to an existing account instead of signing someone in.
+   * Build the Entra authorize URL plus the state/nonce the caller must carry
+   * across the round-trip (the routes store them in a signed cookie). Pass
+   * `linkUserId` when the round-trip should attach the Microsoft identity to an
+   * existing account instead of signing someone in.
    */
-  beginLogin(linkUserId?: string): string {
+  beginLogin(linkUserId?: string): { url: string; txn: SsoTransaction } {
     if (!this.isEnabled()) throw new BadRequestError('Microsoft sign-in is not configured');
-    sweep();
     const state = crypto.randomBytes(16).toString('hex');
     const nonce = crypto.randomBytes(16).toString('hex');
-    pending.set(state, { nonce, createdAt: Date.now(), linkUserId });
 
     const params = new URLSearchParams({
       client_id: config.entra.clientId!,
@@ -62,21 +54,21 @@ export const microsoftService = {
       state,
       nonce,
     });
-    return `${authority()}/oauth2/v2.0/authorize?${params.toString()}`;
+    return {
+      url: `${authority()}/oauth2/v2.0/authorize?${params.toString()}`,
+      txn: { state, nonce, linkUserId },
+    };
   },
 
   /**
    * Validate the callback, verify the ID token, provision the user (invite-first),
-   * and resolve the org to sign them into. Returns the identity the route will
-   * mint an internal JWT for. Throws on any failure.
+   * and resolve the org to sign them into. `expected` is the transaction the
+   * routes restored from the signed cookie (already state-checked). Returns the
+   * identity the route will mint an internal JWT for. Throws on any failure.
    */
-  async completeLogin(code: string | undefined, state: string | undefined): Promise<SsoResult> {
+  async completeLogin(code: string | undefined, expected: SsoTransaction): Promise<SsoResult> {
     if (!this.isEnabled()) throw new BadRequestError('Microsoft sign-in is not configured');
-    if (!code || !state) throw new BadRequestError('Missing code or state');
-
-    const expected = pending.get(state);
-    pending.delete(state);
-    if (!expected) throw new BadRequestError('Invalid or expired sign-in state');
+    if (!code) throw new BadRequestError('Missing code or state');
 
     // Exchange the auth code for tokens (confidential client, secret-authenticated).
     const tokenRes = await fetch(`${authority()}/oauth2/v2.0/token`, {
