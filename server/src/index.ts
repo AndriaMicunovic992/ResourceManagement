@@ -4,6 +4,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import fastifyStatic from '@fastify/static';
 import rateLimit from '@fastify/rate-limit';
+import cookie from '@fastify/cookie';
 import corsPlugin from './plugins/cors.js';
 import jwtPlugin from './plugins/jwt.js';
 import authPlugin from './plugins/auth.js';
@@ -21,6 +22,9 @@ async function start() {
   // Rate limiting is opt-in per route (global: false); auth endpoints set their
   // own limits. Keeps planner/data endpoints unthrottled while protecting login.
   await app.register(rateLimit, { global: false });
+  // Used only for the Microsoft SSO round-trip cookie (value is a signed JWT,
+  // so no cookie-level signing needed).
+  await app.register(cookie);
   await app.register(jwtPlugin);
   await app.register(authPlugin);
   await app.register(errorPlugin);
