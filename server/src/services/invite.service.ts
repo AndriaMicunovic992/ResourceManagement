@@ -40,14 +40,19 @@ export const inviteService = {
   },
 
   /**
-   * Consume every pending invite matching this user's email, creating the
-   * corresponding memberships. Called on first sign-in. Returns the memberships
-   * that now exist for the user (created or pre-existing).
+   * Consume every pending invite matching any of this user's emails (UPN and
+   * mail address can differ in Entra), creating the corresponding memberships.
+   * Called on first sign-in. Returns the memberships that now exist for the
+   * user (created or pre-existing).
    */
-  async consumeForUser(userId: string, email: string) {
-    const normalized = email.trim().toLowerCase();
+  async consumeForUser(userId: string, emails: string[]) {
+    const normalized = emails.map((e) => e.trim().toLowerCase());
+    if (normalized.length === 0) return [];
     const pending = await prisma.invite.findMany({
-      where: { email: { equals: normalized, mode: 'insensitive' }, acceptedAt: null },
+      where: {
+        acceptedAt: null,
+        OR: normalized.map((e) => ({ email: { equals: e, mode: 'insensitive' as const } })),
+      },
     });
 
     const memberships = [];

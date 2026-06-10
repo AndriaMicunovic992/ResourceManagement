@@ -55,12 +55,25 @@ export const authService = {
   async getMe(userId: string, orgId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, avatar: true },
+      select: { id: true, email: true, name: true, avatar: true, microsoftId: true },
     });
     const membership = await prisma.orgMember.findUnique({
       where: { userId_orgId: { userId, orgId } },
       include: { org: true },
     });
-    return { user, org: membership?.org, role: membership?.role };
+    return {
+      user: user
+        ? {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            avatar: user.avatar,
+            // Boolean only — the oid itself stays server-side.
+            microsoftLinked: !!user.microsoftId,
+          }
+        : null,
+      org: membership?.org,
+      role: membership?.role,
+    };
   },
 };

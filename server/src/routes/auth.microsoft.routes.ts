@@ -22,8 +22,16 @@ export const microsoftAuthRoutes: FastifyPluginAsync = async (app) => {
     if (error) return reply.redirect(clientRedirect({ error }));
 
     try {
-      const { userId, orgId } = await microsoftService.completeLogin(code, state);
-      const token = app.jwt.sign({ userId, orgId }, { expiresIn: config.tokenTtl });
+      const result = await microsoftService.completeLogin(code, state);
+      if (result.kind === 'linked') {
+        // Account linking: the user's existing session token is untouched —
+        // just send them back to the app with a success marker.
+        return reply.redirect(clientRedirect({ linked: '1' }));
+      }
+      const token = app.jwt.sign(
+        { userId: result.userId, orgId: result.orgId },
+        { expiresIn: config.tokenTtl }
+      );
       return reply.redirect(clientRedirect({ token }));
     } catch (e) {
       // "no_access" = authenticated but not invited; everything else is generic.
@@ -31,5 +39,12 @@ export const microsoftAuthRoutes: FastifyPluginAsync = async (app) => {
       req.log.error(e);
       return reply.redirect(clientRedirect({ error: message }));
     }
+  });
+
+  // Authenticated (not in the auth plugin's public list): start a round-trip
+  // that attaches the caller's Microsoft identity to their existing account, so
+  // people who predate SSO can switch without depending on email matching.
+  app.post('/auth/microsoft/link', async (req) => {
+    return { url: microsoftService.beginLogin(req.userId) };
   });
 };

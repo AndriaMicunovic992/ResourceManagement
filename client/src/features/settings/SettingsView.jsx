@@ -17,6 +17,13 @@ export default function SettingsView() {
   const [members, setMembers] = useState([]);
   const [invites, setInvites] = useState([]);
   const [memberNotice, setMemberNotice] = useState('');
+  const [authConfig, setAuthConfig] = useState({ microsoftEnabled: false });
+  const [accountError, setAccountError] = useState('');
+  // Set when we land back here after a successful Microsoft account link.
+  const justLinkedMicrosoft = useMemo(
+    () => new URLSearchParams(window.location.search).get('microsoft') === 'linked',
+    []
+  );
   const [email, setEmail] = useState('');
   const [newRole, setNewRole] = useState('member');
   const [error, setError] = useState('');
@@ -172,6 +179,17 @@ export default function SettingsView() {
 
   useEffect(() => { loadMembers(); }, [loadMembers]);
   useEffect(() => { if (isAdmin) loadInvites(); }, [isAdmin, loadInvites]);
+  useEffect(() => { api.getAuthConfig().then(setAuthConfig).catch(() => {}); }, []);
+
+  const handleConnectMicrosoft = async () => {
+    setAccountError('');
+    try {
+      const { url } = await api.startMicrosoftLink();
+      window.location.href = url;
+    } catch (err) {
+      setAccountError(err.message || 'Could not start Microsoft linking');
+    }
+  };
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -446,6 +464,34 @@ export default function SettingsView() {
   return (
     <div className="max-w-[600px] mx-auto px-5 py-6">
       <h2 className="text-xl font-bold text-text mb-6">Settings</h2>
+
+      {/* Your account — sign-in methods for the current user (all roles). */}
+      <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+        <h3 className="text-sm font-bold text-text mb-1">Your account</h3>
+        <p className="text-xs text-text-mid mb-3">{user?.email}</p>
+        {justLinkedMicrosoft && (
+          <div className="text-xs text-success bg-success-bg p-2 rounded mb-3">
+            Microsoft account connected. You can now use "Sign in with Microsoft".
+          </div>
+        )}
+        {accountError && (
+          <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{accountError}</div>
+        )}
+        {authConfig.microsoftEnabled ? (
+          user?.microsoftLinked ? (
+            <p className="text-xs font-semibold text-success">✓ Microsoft sign-in connected</p>
+          ) : (
+            <div>
+              <Button onClick={handleConnectMicrosoft}>Connect Microsoft account</Button>
+              <p className="text-[10px] text-text-light mt-2">
+                Links your Microsoft work account to this profile so you can use "Sign in with Microsoft".
+              </p>
+            </div>
+          )
+        ) : (
+          <p className="text-[10px] text-text-light">Microsoft sign-in is not enabled on this deployment.</p>
+        )}
+      </div>
 
       <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-3">Organization</h3>
