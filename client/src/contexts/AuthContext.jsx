@@ -9,11 +9,24 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // The OAuth callback page (/auth/callback) sets the token and immediately
+    // navigates away; don't start a bootstrap getMe there — the navigation
+    // cancels it mid-flight and a canceled request must never be mistaken for
+    // an invalid session.
+    if (window.location.pathname.startsWith('/auth/callback')) {
+      setLoading(false);
+      return;
+    }
     const token = getToken();
     if (!token) { setLoading(false); return; }
     api.getMe()
       .then((data) => { setUser(data.user); })
-      .catch(() => { removeToken(); })
+      .catch(() => {
+        // Deliberately keep the token: a real 401 is already handled globally
+        // in apiFetch (clears the token and redirects to login). Anything else
+        // here is a network blip or a canceled request — deleting the token on
+        // those turned a flaky start into a silent login loop.
+      })
       .finally(() => setLoading(false));
   }, []);
 
