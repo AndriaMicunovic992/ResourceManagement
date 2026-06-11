@@ -60,3 +60,7 @@ export type BatchCreateEvaluationInput = z.infer<typeof batchCreateEvaluationSch
 export type UpdateScoreInput = z.infer<typeof updateScoreSchema>;
 export type FinalizeEvaluationInput = z.infer<typeof finalizeEvaluationSchema>;
 export type ListEvaluationsQuery = z.infer<typeof listEvaluationsQuerySchema>;
+
+export const compensationSchema = z.object({
+  compensationSatisfaction: z.number().int().min(1).max(5).nullable(),
+});

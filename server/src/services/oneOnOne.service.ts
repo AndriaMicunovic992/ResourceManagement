@@ -8,6 +8,10 @@ type OneOnOneRecord = {
   resourceId: string;
   authorUserId: string;
   meetingDate: Date;
+  overallScore: number | null;
+  workSatisfaction: number | null;
+  wentWell: string | null;
+  wentBad: string | null;
   generalStatus: string | null;
   personalNotes: string | null;
   careerDevelopment: string | null;
@@ -95,6 +99,10 @@ export async function createOneOnOne(
       resourceId,
       authorUserId,
       meetingDate: parseMeetingDate(data.meetingDate),
+      overallScore: data.overallScore ?? null,
+      workSatisfaction: data.workSatisfaction ?? null,
+      wentWell: data.wentWell ?? null,
+      wentBad: data.wentBad ?? null,
       generalStatus: data.generalStatus ?? null,
       personalNotes: data.personalNotes ?? null,
       careerDevelopment: data.careerDevelopment ?? null,
@@ -125,6 +133,10 @@ export async function updateOneOnOne(
 
   const patch: Record<string, unknown> = {};
   if (data.meetingDate !== undefined) patch.meetingDate = parseMeetingDate(data.meetingDate);
+  if (data.overallScore !== undefined) patch.overallScore = data.overallScore ?? null;
+  if (data.workSatisfaction !== undefined) patch.workSatisfaction = data.workSatisfaction ?? null;
+  if (data.wentWell !== undefined) patch.wentWell = data.wentWell ?? null;
+  if (data.wentBad !== undefined) patch.wentBad = data.wentBad ?? null;
   if (data.generalStatus !== undefined) patch.generalStatus = data.generalStatus ?? null;
   if (data.personalNotes !== undefined) patch.personalNotes = data.personalNotes ?? null;
   if (data.careerDevelopment !== undefined) patch.careerDevelopment = data.careerDevelopment ?? null;

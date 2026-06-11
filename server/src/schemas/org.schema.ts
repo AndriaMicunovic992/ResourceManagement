@@ -23,6 +23,8 @@ export const updateOrgSchema = z
     performanceTrendDefaultKind: z.string().max(50).optional(),
     performanceTrendDefaultFrom: z.string().nullable().optional(),
     performanceTrendDefaultTo: z.string().nullable().optional(),
+    oneOnOneReminderDays: z.number().int().min(1).max(365).nullable().optional(),
+    pmLogReminderDays: z.number().int().min(1).max(365).nullable().optional(),
   })
   .strict();
 

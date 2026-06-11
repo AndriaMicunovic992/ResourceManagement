@@ -2,18 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { useData } from '../../contexts/DataContext';
 import EmptyState from '../../components/ui/EmptyState';
+import {
+  EMPLOYEE_LOG_KIND_OPTIONS,
+  LOG_KIND_COLORS,
+} from '../../lib/constants';
 
-const KINDS = [
-  { value: 'win', label: 'Win' },
-  { value: 'down', label: 'Down' },
-  { value: 'blocker', label: 'Blocker' },
-];
-
-const KIND_COLORS = {
-  win: 'bg-emerald-100 text-emerald-700',
-  down: 'bg-amber-100 text-amber-700',
-  blocker: 'bg-rose-100 text-rose-700',
-};
+const KINDS = EMPLOYEE_LOG_KIND_OPTIONS;
+const KIND_COLORS = LOG_KIND_COLORS;
 
 function formatDate(value) {
   if (!value) return '';
@@ -28,7 +23,7 @@ function formatDate(value) {
 
 function LogForm({ initial, customers, projects, logCategories, onCancel, onSave }) {
   const [content, setContent] = useState(initial?.content || '');
-  const [kind, setKind] = useState(initial?.kind || 'win');
+  const [kind, setKind] = useState(initial?.kind || 'strength');
   const [customerId, setCustomerId] = useState(initial?.customerId || '');
   const [projectId, setProjectId] = useState(initial?.projectId || '');
   const [jiraUrl, setJiraUrl] = useState(initial?.jiraUrl || '');

@@ -510,6 +510,33 @@ export const evaluationService = {
     return updated;
   },
 
+  /**
+   * Compensation satisfaction (1-5) is employee-reported on the evaluation
+   * cadence (deliberately not asked at every 1:1). Editable by the subject
+   * while their self-assessment is still in draft.
+   */
+  async setCompensationSatisfaction(
+    orgId: string,
+    id: string,
+    requestingUserId: string,
+    value: number | null
+  ) {
+    const evaluation = await prisma.evaluation.findFirst({ where: { id, orgId } });
+    if (!evaluation) throw new NotFoundError('Evaluation not found');
+    if (evaluation.state !== 'draft') {
+      throw new ForbiddenError('Compensation satisfaction can only be set during self-assessment');
+    }
+    const meId = await getRequestingResourceId(orgId, requestingUserId);
+    if (meId !== evaluation.resourceId) {
+      throw new ForbiddenError('Only the target person can set compensation satisfaction');
+    }
+    return prisma.evaluation.update({
+      where: { id },
+      data: { compensationSatisfaction: value },
+      include: evaluationInclude,
+    });
+  },
+
   async submitEmployee(
     orgId: string,
     id: string,

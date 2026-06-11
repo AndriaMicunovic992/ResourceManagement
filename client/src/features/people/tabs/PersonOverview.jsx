@@ -7,6 +7,7 @@ import { orgDefaultWindow } from './performance/PersonPerformance';
 import { useComputed } from '../../../hooks/useComputed';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
 import { api } from '../../../lib/api';
+import { LOG_KIND_COLORS as KIND_COLORS } from '../../../lib/constants';
 
 function PerformanceSparkline({ points }) {
   const valid = points.filter((p) => p.overall != null);
@@ -29,16 +30,6 @@ function PerformanceSparkline({ points }) {
     </svg>
   );
 }
-
-const KIND_COLORS = {
-  good: 'bg-green-100 text-green-700',
-  bad: 'bg-red-100 text-red-700',
-  incident: 'bg-orange-100 text-orange-700',
-  observation: 'bg-gray-100 text-gray-700',
-  win: 'bg-emerald-100 text-emerald-700',
-  down: 'bg-amber-100 text-amber-700',
-  blocker: 'bg-rose-100 text-rose-700',
-};
 
 function truncate(text, max) {
   if (!text) return '';
@@ -297,7 +288,7 @@ export default function PersonOverview() {
                 >
                   <span
                     className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase shrink-0 ${
-                      KIND_COLORS[log.kind] || KIND_COLORS.observation
+                      KIND_COLORS[log.kind] || KIND_COLORS.note
                     }`}
                   >
                     {log.kind}

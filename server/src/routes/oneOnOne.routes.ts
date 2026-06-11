@@ -14,18 +14,25 @@ import { assertCanViewPerson, isSelf } from '../services/visibility.service.js';
 import { ForbiddenError } from '../utils/errors.js';
 
 export const oneOnOneRoutes: FastifyPluginAsync = async (app) => {
+  // Creator-only fields (privateNote) must stay hidden during "view as":
+  // an impersonated session never matches the author, even if the admin is
+  // viewing as the author themself.
+  function viewerId(req: { userId: string; impersonatorUserId: string | null }): string {
+    return req.impersonatorUserId ? '__impersonated__' : req.userId;
+  }
+
   app.get('/people/:personId/oneonones', async (req) => {
     const { personId } = req.params as { personId: string };
     assertCanViewPerson(req.visibility, personId);
     // Subjects may read their own 1:1s in self mode (author-private fields
     // like managerPersonalNotes/privateNote are stripped by the service).
-    return listOneOnOnes(req.orgId, personId, req.userId);
+    return listOneOnOnes(req.orgId, personId, viewerId(req));
   });
 
   app.get('/people/:personId/oneonones/:id', async (req) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
-    return getOneOnOne(req.orgId, id, req.userId);
+    return getOneOnOne(req.orgId, id, viewerId(req));
   });
 
   app.post('/people/:personId/oneonones', async (req, reply) => {

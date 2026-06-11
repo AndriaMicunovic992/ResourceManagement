@@ -1,17 +1,25 @@
 import { z } from 'zod';
 
+// Entry types: polarity is inherent in the type (no good/bad labels).
+//   strength        — what the person did well, with context
+//   concern         — what fell short of expectations
+//   incident        — dated hard fact (missed deadline, quality failure, conflict)
+//   blocker         — outside their control, slowing them down (fairness context)
+//   note            — neutral, fits nowhere else
+//   project_checkin — per-project box filled during a 1:1; surfaces on the
+//                     customer page for admins + that project's responsible
 export const LOG_KINDS = [
-  'good',
-  'bad',
+  'strength',
+  'concern',
   'incident',
-  'observation',
-  'win',
-  'down',
   'blocker',
+  'note',
+  'project_checkin',
 ] as const;
 
-export const EMPLOYEE_LOG_KINDS = ['win', 'down', 'blocker'] as const;
-export const OBSERVER_LOG_KINDS = ['good', 'bad', 'incident', 'observation'] as const;
+// Kinds an employee may use on their own journal. Self-vs-observer separation
+// is authorship-based now that kinds are shared (see log.service.ts).
+export const EMPLOYEE_LOG_KINDS = ['strength', 'concern', 'blocker', 'note'] as const;
 
 const kindSchema = z.enum(LOG_KINDS);
 
@@ -43,6 +51,10 @@ export const listLogsQuerySchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
+});
+
+export const createLogCommentSchema = z.object({
+  content: z.string().trim().min(1).max(2000),
 });
 
 export type CreateLogInput = z.infer<typeof createLogSchema>;
