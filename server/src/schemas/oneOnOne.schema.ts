@@ -9,11 +9,6 @@ export const createOneOnOneSchema = z.object({
   wentWell: z.string().max(10000).optional().nullable(),
   wentBad: z.string().max(10000).optional().nullable(),
   privateNote: z.string().max(5000).optional().nullable(),
-  // Legacy fields — still accepted so pre-cockpit records stay editable.
-  generalStatus: z.string().max(5000).optional().nullable(),
-  personalNotes: z.string().max(5000).optional().nullable(),
-  careerDevelopment: z.string().max(5000).optional().nullable(),
-  managerPersonalNotes: z.string().max(5000).optional().nullable(),
 });
 
 export const updateOneOnOneSchema = createOneOnOneSchema.partial();

@@ -9,15 +9,6 @@ function toDateInputValue(value) {
   return d.toISOString().slice(0, 10);
 }
 
-// Pre-cockpit fields: only shown when editing an old record that has content
-// in them, so legacy 1:1s stay readable/editable. New records don't write them.
-const LEGACY_FIELDS = [
-  { key: 'generalStatus', label: 'General status (legacy)' },
-  { key: 'personalNotes', label: 'Personal notes (legacy)' },
-  { key: 'careerDevelopment', label: 'Career development (legacy)' },
-  { key: 'managerPersonalNotes', label: 'My personal notes (legacy, private)' },
-];
-
 function RatingPicker({ label, hint, value, onChange }) {
   return (
     <div>
@@ -57,17 +48,8 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
   const [wentWell, setWentWell] = useState(initial?.wentWell || '');
   const [wentBad, setWentBad] = useState(initial?.wentBad || '');
   const [privateNote, setPrivateNote] = useState(initial?.privateNote || '');
-  const [legacy, setLegacy] = useState(() => {
-    const base = {};
-    for (const f of LEGACY_FIELDS) base[f.key] = initial?.[f.key] || '';
-    return base;
-  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  const legacyFieldsToShow = isEdit
-    ? LEGACY_FIELDS.filter((f) => (initial?.[f.key] || '') !== '')
-    : [];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,9 +66,6 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
         wentWell: wentWell.trim() ? wentWell : null,
         wentBad: wentBad.trim() ? wentBad : null,
       };
-      for (const f of legacyFieldsToShow) {
-        payload[f.key] = legacy[f.key].trim() ? legacy[f.key] : null;
-      }
       if (isAuthor) {
         payload.privateNote = privateNote.trim() ? privateNote : null;
       }
@@ -148,23 +127,6 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
             className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
           />
         </div>
-
-        {legacyFieldsToShow.map((f) => (
-          <div key={f.key}>
-            <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
-              {f.label}
-            </label>
-            <textarea
-              value={legacy[f.key]}
-              onChange={(e) =>
-                setLegacy((prev) => ({ ...prev, [f.key]: e.target.value }))
-              }
-              rows={3}
-              maxLength={5000}
-              className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
-            />
-          </div>
-        ))}
 
         {isAuthor && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">

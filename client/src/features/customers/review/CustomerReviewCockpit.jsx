@@ -194,7 +194,7 @@ function PersonReviewCard({
               {composing !== row.kind && (
                 <button
                   onClick={() => setComposing(row.kind)}
-                  className="text-[11px] font-semibold text-primary bg-transparent border-0 cursor-pointer hover:underline"
+                  className="text-[11px] font-semibold text-primary bg-transparent border border-primary rounded px-2 py-0.5 cursor-pointer hover:bg-primary hover:text-white"
                 >
                   + Add entry
                 </button>

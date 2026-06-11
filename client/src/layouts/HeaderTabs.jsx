@@ -10,6 +10,7 @@ export default function HeaderTabs() {
   // (they only land on their own person page).
   const allTabs = [
     { path: '/people', label: 'People' },
+    { path: '/customers', label: 'Customers' },
     { path: '/planner', label: 'Planner' },
     { path: '/dashboard', label: 'Insights' },
   ];

@@ -15,9 +15,15 @@ model Organization {
   maxPlanningDate String?
   performanceTrendDefaultMonths Int @default(12)
   performanceTrendDefaultKind String @default("rolling_months")
-  // In-app reminder cadences (null = reminder off).
-  oneOnOneReminderDays Int?
-  pmLogReminderDays    Int?
+  // In-app reminder schedules: fire on ticks of `every` × unit, anchored at a
+  // start date; an item is due when nothing happened since the latest tick.
+  // Null unit/every = reminder off.
+  oneOnOneReminderEvery Int?
+  oneOnOneReminderUnit  String? // daily | weekly | monthly
+  oneOnOneReminderStart String? // "YYYY-MM-DD"
+  pmLogReminderEvery    Int?
+  pmLogReminderUnit     String?
+  pmLogReminderStart    String?
   performanceTrendDefaultFrom String?
   performanceTrendDefaultTo   String?
   createdAt       DateTime @default(now())
@@ -343,12 +349,6 @@ model OneOnOne {
   // Creator-only note: stripped for everyone else, including admins and
   // impersonated sessions.
   privateNote           String?
-  // Legacy fields (pre-cockpit records render them read-only; new records
-  // don't write them).
-  generalStatus         String?
-  personalNotes         String?
-  careerDevelopment     String?
-  managerPersonalNotes  String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

@@ -1,9 +1,24 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../../components/ui/StatusBadge';
+import CustomerForm from '../../components/forms/CustomerForm';
+import { useData } from '../../contexts/DataContext';
+import { useVisibility } from '../../contexts/VisibilityContext';
 
 export default function CustomerPageHeader({ customer, responsiblePerson }) {
   const navigate = useNavigate();
+  const { updateCustomer } = useData();
+  const { isAdmin } = useVisibility();
+  const [editing, setEditing] = useState(false);
   const color = '#6366f1';
+
+  const handleSave = async (data) => {
+    await updateCustomer(customer.id, data);
+    setEditing(false);
+    // The page's detail payload (projects, responsible) is fetched separately —
+    // reload so every tab reflects the new metadata.
+    window.location.reload();
+  };
 
   return (
     <div
@@ -12,11 +27,19 @@ export default function CustomerPageHeader({ customer, responsiblePerson }) {
     >
       <div className="flex items-start justify-between mb-3">
         <button
-          onClick={() => navigate('/planner')}
+          onClick={() => navigate('/customers')}
           className="text-[11px] font-semibold text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary p-0"
         >
-          ← Planner
+          ← Customers
         </button>
+        {isAdmin && (
+          <button
+            onClick={() => setEditing(true)}
+            className="text-xs font-semibold text-primary bg-white/70 border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
+          >
+            Edit
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-4">
         <div
@@ -49,6 +72,14 @@ export default function CustomerPageHeader({ customer, responsiblePerson }) {
           </div>
         </div>
       </div>
+
+      {editing && (
+        <CustomerForm
+          initial={customer}
+          onSave={handleSave}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </div>
   );
 }

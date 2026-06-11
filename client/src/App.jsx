@@ -25,6 +25,7 @@ import OneOnOneCockpit from './features/people/cockpit/OneOnOneCockpit';
 import CustomerReviewCockpit from './features/customers/review/CustomerReviewCockpit';
 import MyJournalView from './features/journal/MyJournalView';
 import CustomerPage from './features/customers/CustomerPage';
+import CustomersListView from './features/customers/CustomersListView';
 import CustomerOverview from './features/customers/tabs/CustomerOverview';
 import CustomerProjects from './features/customers/tabs/CustomerProjects';
 import CustomerPeople from './features/customers/tabs/CustomerPeople';
@@ -104,6 +105,7 @@ export default function App() {
                 <Route path="activity" element={<PersonActivity />} />
                 <Route path="performance" element={<PersonPerformance />} />
               </Route>
+              <Route path="/customers" element={<CustomersListView />} />
               {/* Full-width PM review cockpit — outside the customer tab shell. */}
               <Route
                 path="/customers/:customerId/reviews/:reviewId/cockpit"

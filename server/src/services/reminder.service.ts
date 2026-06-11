@@ -15,16 +15,61 @@ export interface ReminderItem {
   customerName?: string;
   /** Last relevant activity, if any. */
   lastAt?: string | null;
-  daysOverdue?: number;
-}
-
-function daysSince(date: Date | null | undefined): number | null {
-  if (!date) return null;
-  return Math.floor((Date.now() - date.getTime()) / 86_400_000);
 }
 
 function currentMonthKey(): string {
   return new Date().toISOString().slice(0, 7);
+}
+
+type ReminderUnit = 'daily' | 'weekly' | 'monthly';
+
+interface Schedule {
+  every: number;
+  unit: ReminderUnit;
+  start: Date;
+}
+
+function parseSchedule(
+  every: number | null,
+  unit: string | null,
+  start: string | null
+): Schedule | null {
+  if (!every || !unit || (unit !== 'daily' && unit !== 'weekly' && unit !== 'monthly')) return null;
+  const startDate = start ? new Date(`${start}T00:00:00.000Z`) : null;
+  if (!startDate || Number.isNaN(startDate.getTime())) return null;
+  return { every, unit, start: startDate };
+}
+
+/**
+ * The most recent scheduled tick at or before `now` (anchored at the start
+ * date, repeating every N units). Null when the schedule hasn't started yet.
+ * An item is "due" when nothing relevant happened since this tick.
+ */
+function latestTick(schedule: Schedule, now: Date): Date | null {
+  const { start, every, unit } = schedule;
+  if (start > now) return null;
+  if (unit === 'daily' || unit === 'weekly') {
+    const periodMs = every * (unit === 'weekly' ? 7 : 1) * 86_400_000;
+    const ticks = Math.floor((now.getTime() - start.getTime()) / periodMs);
+    return new Date(start.getTime() + ticks * periodMs);
+  }
+  // monthly: count whole months elapsed, clamp day-of-month overflow
+  // (e.g. start on the 31st → tick on the last day of shorter months).
+  const monthsElapsed =
+    (now.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+    (now.getUTCMonth() - start.getUTCMonth());
+  for (let k = Math.floor(monthsElapsed / every); k >= 0; k--) {
+    const tick = new Date(start);
+    const targetMonth = start.getUTCMonth() + k * every;
+    tick.setUTCDate(1);
+    tick.setUTCMonth(targetMonth);
+    const daysInMonth = new Date(
+      Date.UTC(tick.getUTCFullYear(), tick.getUTCMonth() + 1, 0)
+    ).getUTCDate();
+    tick.setUTCDate(Math.min(start.getUTCDate(), daysInMonth));
+    if (tick <= now) return tick;
+  }
+  return null;
 }
 
 export const reminderService = {
@@ -47,9 +92,30 @@ export const reminderService = {
   async forUser(orgId: string, userId: string, scope: VisibilityScope): Promise<ReminderItem[]> {
     const org = await prisma.organization.findUnique({
       where: { id: orgId },
-      select: { oneOnOneReminderDays: true, pmLogReminderDays: true },
+      select: {
+        oneOnOneReminderEvery: true,
+        oneOnOneReminderUnit: true,
+        oneOnOneReminderStart: true,
+        pmLogReminderEvery: true,
+        pmLogReminderUnit: true,
+        pmLogReminderStart: true,
+      },
     });
     if (!org) return [];
+
+    const now = new Date();
+    const oneOnOneSchedule = parseSchedule(
+      org.oneOnOneReminderEvery,
+      org.oneOnOneReminderUnit,
+      org.oneOnOneReminderStart
+    );
+    const pmLogSchedule = parseSchedule(
+      org.pmLogReminderEvery,
+      org.pmLogReminderUnit,
+      org.pmLogReminderStart
+    );
+    const oneOnOneTick = oneOnOneSchedule ? latestTick(oneOnOneSchedule, now) : null;
+    const pmLogTick = pmLogSchedule ? latestTick(pmLogSchedule, now) : null;
 
     const items: ReminderItem[] = [];
     // Duty-based scoping, independent of role (an admin is NOT implicitly
@@ -94,7 +160,8 @@ export const reminderService = {
     };
 
     // --- Overdue 1:1s for people the user manages (direct or via team) ---
-    if (org.oneOnOneReminderDays && managedIds.length > 0) {
+    // Due = no 1:1 (and no dismissal) since the latest scheduled tick.
+    if (oneOnOneTick && managedIds.length > 0) {
       const people = await prisma.resource.findMany({
         where: { orgId, id: { in: managedIds } },
         select: { id: true, name: true },
@@ -108,14 +175,12 @@ export const reminderService = {
       for (const p of people) {
         const last = latestBy.get(p.id) ?? null;
         const effective = maxDate(last, latestDismissal.get(`oneOnOne|${p.id}|`));
-        const days = daysSince(effective);
-        if (days === null || days >= org.oneOnOneReminderDays) {
+        if (!effective || effective < oneOnOneTick) {
           items.push({
             type: 'oneOnOne',
             resourceId: p.id,
             resourceName: p.name,
             lastAt: last ? last.toISOString() : null,
-            daysOverdue: days === null ? undefined : days - org.oneOnOneReminderDays,
           });
         }
       }
@@ -185,7 +250,7 @@ export const reminderService = {
         const signalSet = new Set(signals.map((s) => `${s.customerId}|${s.resourceId}`));
 
         // Latest update the user logged per (customer, person).
-        const sinceLogs = org.pmLogReminderDays
+        const sinceLogs = pmLogTick
           ? await prisma.log.findMany({
               where: {
                 orgId,
@@ -221,21 +286,20 @@ export const reminderService = {
                 customerName: customerName.get(customerId) || '?',
               });
             }
-            if (org.pmLogReminderDays) {
+            // Due = no update (and no dismissal) since the latest scheduled tick.
+            if (pmLogTick) {
               const last = maxDate(
                 latestLog.get(key) ?? null,
                 latestDismissal.get(`pmUpdate|${resourceId}|${customerId}`)
               );
-              const days = daysSince(last);
-              if (days === null || days >= org.pmLogReminderDays) {
+              if (!last || last < pmLogTick) {
                 items.push({
                   type: 'pmUpdate',
                   resourceId,
                   resourceName: personName.get(resourceId) || '?',
                   customerId,
                   customerName: customerName.get(customerId) || '?',
-                  lastAt: last ? last.toISOString() : null,
-                  daysOverdue: days === null ? undefined : days - org.pmLogReminderDays,
+                  lastAt: latestLog.get(key)?.toISOString() ?? null,
                 });
               }
             }
