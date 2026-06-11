@@ -1,0 +1,875 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { api } from '../../../lib/api';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useData } from '../../../contexts/DataContext';
+import { useVisibility } from '../../../contexts/VisibilityContext';
+import Avatar from '../../../components/ui/Avatar';
+import {
+  LOG_KIND_OPTIONS,
+  LOG_KIND_COLORS,
+  LOG_KIND_LABELS,
+} from '../../../lib/constants';
+
+function currentMonthKey() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function formatDate(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function toDateInput(value) {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  return d.toISOString().slice(0, 10);
+}
+
+function Panel({ title, children, action }) {
+  return (
+    <div className="bg-white rounded-xl border border-border shadow-card p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-bold text-text uppercase tracking-wider m-0">{title}</h3>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function RatingPicker({ label, value, onChange }) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
+        {label}
+      </div>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(value === n ? null : n)}
+            className={`w-8 h-8 rounded-lg border text-xs font-bold cursor-pointer ${
+              value === n
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-text-mid border-border hover:border-primary'
+            }`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The meeting record itself: pulse, satisfaction, summaries, private note. */
+function MeetingPanel({ personId, record, onSaved }) {
+  const [meetingDate, setMeetingDate] = useState(toDateInput(record.meetingDate));
+  const [overallScore, setOverallScore] = useState(record.overallScore ?? null);
+  const [workSatisfaction, setWorkSatisfaction] = useState(record.workSatisfaction ?? null);
+  const [wentWell, setWentWell] = useState(record.wentWell || '');
+  const [wentBad, setWentBad] = useState(record.wentBad || '');
+  const [privateNote, setPrivateNote] = useState(record.privateNote || '');
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState(null);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await api.updateOneOnOne(personId, record.id, {
+        meetingDate,
+        overallScore,
+        workSatisfaction,
+        wentWell: wentWell.trim() ? wentWell : null,
+        wentBad: wentBad.trim() ? wentBad : null,
+        privateNote: privateNote.trim() ? privateNote : null,
+      });
+      onSaved(updated);
+      setSavedAt(new Date());
+    } catch (err) {
+      setError(err.message || 'Failed to save');
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Panel
+      title="This 1:1"
+      action={
+        <div className="flex items-center gap-2">
+          {savedAt && !saving && (
+            <span className="text-[10px] text-success font-semibold">Saved ✓</span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      }
+    >
+      {error && <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{error}</div>}
+      <div className="grid sm:grid-cols-3 gap-4 mb-4">
+        <div>
+          <div className="text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
+            Meeting date
+          </div>
+          <input
+            type="date"
+            value={meetingDate}
+            onChange={(e) => setMeetingDate(e.target.value)}
+            className="px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+          />
+        </div>
+        <RatingPicker label="Overall score (pulse)" value={overallScore} onChange={setOverallScore} />
+        <RatingPicker
+          label="Work satisfaction"
+          value={workSatisfaction}
+          onChange={setWorkSatisfaction}
+        />
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3 mb-3">
+        <div>
+          <div className="text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
+            What went well
+          </div>
+          <textarea
+            value={wentWell}
+            onChange={(e) => setWentWell(e.target.value)}
+            rows={4}
+            maxLength={10000}
+            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+          />
+        </div>
+        <div>
+          <div className="text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
+            What went bad
+          </div>
+          <textarea
+            value={wentBad}
+            onChange={(e) => setWentBad(e.target.value)}
+            rows={4}
+            maxLength={10000}
+            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+          />
+        </div>
+      </div>
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+        <div className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold mb-1">
+          🔒 Private note (only you)
+        </div>
+        <textarea
+          value={privateNote}
+          onChange={(e) => setPrivateNote(e.target.value)}
+          rows={2}
+          maxLength={5000}
+          className="w-full px-2 py-1.5 border border-amber-300 rounded text-xs text-text outline-none focus:border-amber-500 bg-white resize-y"
+        />
+      </div>
+    </Panel>
+  );
+}
+
+/** One box per active project — saved as project_checkin entries on this 1:1. */
+function ProjectCheckins({ personId, oneOnOneId, activeProjects, checkins, onChanged }) {
+  const [drafts, setDrafts] = useState({});
+  const [busy, setBusy] = useState({});
+  const [errors, setErrors] = useState({});
+
+  const existingFor = (projectId) => checkins.find((l) => l.projectId === projectId);
+
+  const handleSave = async (project) => {
+    const existing = existingFor(project.id);
+    const text = (drafts[project.id] ?? existing?.content ?? '').trim();
+    if (!text) return;
+    setBusy((b) => ({ ...b, [project.id]: true }));
+    setErrors((e) => ({ ...e, [project.id]: '' }));
+    try {
+      if (existing) {
+        const updated = await api.updateLog(personId, existing.id, { content: text });
+        onChanged((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+      } else {
+        const created = await api.createLog(personId, {
+          content: text,
+          kind: 'project_checkin',
+          projectId: project.id,
+          customerId: project.customerId || null,
+          oneOnOneId,
+        });
+        onChanged((prev) => [...prev, created]);
+      }
+    } catch (err) {
+      setErrors((e) => ({ ...e, [project.id]: err.message || 'Failed to save' }));
+    }
+    setBusy((b) => ({ ...b, [project.id]: false }));
+  };
+
+  if (activeProjects.length === 0) {
+    return (
+      <Panel title="Project check-ins">
+        <div className="text-xs text-text-light">No active project assignments.</div>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel title="Project check-ins">
+      <div className="space-y-3">
+        {activeProjects.map(({ project, customer, fte }) => {
+          const existing = existingFor(project.id);
+          const value = drafts[project.id] ?? existing?.content ?? '';
+          const dirty = (drafts[project.id] ?? null) !== null && drafts[project.id] !== (existing?.content ?? '');
+          return (
+            <div key={project.id} className="rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="text-xs font-semibold text-text">
+                  {project.name}
+                  <span className="text-text-light font-normal">
+                    {' '}· {customer?.name || '—'} {fte ? `· ${fte.toFixed(1)} FTE` : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {existing && !dirty && (
+                    <span className="text-[10px] text-success font-semibold">Filled ✓</span>
+                  )}
+                  <button
+                    onClick={() => handleSave({ ...project })}
+                    disabled={busy[project.id] || !value.trim() || (!dirty && !!existing)}
+                    className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-2.5 py-1 cursor-pointer hover:opacity-90 disabled:opacity-40"
+                  >
+                    {busy[project.id] ? '…' : existing ? 'Update' : 'Save'}
+                  </button>
+                </div>
+              </div>
+              <textarea
+                value={value}
+                onChange={(e) => setDrafts((d) => ({ ...d, [project.id]: e.target.value }))}
+                rows={2}
+                maxLength={5000}
+                placeholder="How is it going on this project?"
+                className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+              />
+              {errors[project.id] && (
+                <div className="text-[10px] text-danger mt-1">{errors[project.id]}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+/** Open action items; resolvable into this 1:1. */
+function FollowUpsPanel({ personId, oneOnOneId, followUps, setFollowUps }) {
+  const [newContent, setNewContent] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const open = followUps.filter((f) => f.status === 'open');
+  const resolvedHere = followUps.filter(
+    (f) => f.status === 'resolved' && f.resolvedInOneOnOneId === oneOnOneId
+  );
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!newContent.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      const created = await api.createFollowUp(personId, {
+        content: newContent.trim(),
+        oneOnOneId,
+      });
+      setFollowUps((prev) => [created, ...prev]);
+      setNewContent('');
+    } catch (err) {
+      setError(err.message || 'Failed to add follow-up');
+    }
+    setBusy(false);
+  };
+
+  const handleResolve = async (id) => {
+    try {
+      const updated = await api.updateFollowUp(personId, id, {
+        status: 'resolved',
+        resolvedInOneOnOneId: oneOnOneId,
+      });
+      setFollowUps((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+    } catch (err) {
+      setError(err.message || 'Failed to resolve');
+    }
+  };
+
+  const handleReopen = async (id) => {
+    try {
+      const updated = await api.updateFollowUp(personId, id, { status: 'open' });
+      setFollowUps((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+    } catch (err) {
+      setError(err.message || 'Failed to reopen');
+    }
+  };
+
+  return (
+    <Panel title={`Follow-ups (${open.length} open)`}>
+      {error && <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-2">{error}</div>}
+      <div className="space-y-1.5 mb-3">
+        {open.length === 0 && resolvedHere.length === 0 && (
+          <div className="text-xs text-text-light">Nothing open. 🎉</div>
+        )}
+        {open.map((f) => (
+          <div key={f.id} className="flex items-start gap-2 py-1">
+            <button
+              onClick={() => handleResolve(f.id)}
+              title="Mark resolved in this 1:1"
+              className="mt-0.5 w-4 h-4 rounded border border-border bg-white cursor-pointer hover:border-success shrink-0"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-xs text-text">{f.content}</div>
+              <div className="text-[10px] text-text-light">
+                {formatDate(f.createdAt)}
+                {f.oneOnOne ? ` · from 1:1 on ${formatDate(f.oneOnOne.meetingDate)}` : ''}
+              </div>
+            </div>
+          </div>
+        ))}
+        {resolvedHere.map((f) => (
+          <div key={f.id} className="flex items-start gap-2 py-1 opacity-60">
+            <span className="mt-0.5 w-4 h-4 rounded bg-success text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+              ✓
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs text-text line-through">{f.content}</div>
+            </div>
+            <button
+              onClick={() => handleReopen(f.id)}
+              className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-primary"
+            >
+              Reopen
+            </button>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={handleAdd} className="flex items-center gap-2">
+        <input
+          type="text"
+          value={newContent}
+          onChange={(e) => setNewContent(e.target.value)}
+          placeholder="New follow-up…"
+          maxLength={2000}
+          className="flex-1 px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+        />
+        <button
+          type="submit"
+          disabled={busy || !newContent.trim()}
+          className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-40"
+        >
+          Add
+        </button>
+      </form>
+    </Panel>
+  );
+}
+
+const GOAL_STATUS_COLORS = {
+  active: 'bg-primary-light text-primary',
+  achieved: 'bg-success-bg text-success',
+  dropped: 'bg-gray-100 text-gray-500',
+};
+
+/** Career thread spanning all 1:1s. */
+function CareerPanel({ personId, oneOnOneId, entries, setEntries }) {
+  const [newContent, setNewContent] = useState('');
+  const [asGoal, setAsGoal] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!newContent.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      const created = await api.createCareerEntry(personId, {
+        content: newContent.trim(),
+        kind: asGoal ? 'goal' : 'note',
+        oneOnOneId,
+      });
+      setEntries((prev) => [created, ...prev]);
+      setNewContent('');
+      setAsGoal(false);
+    } catch (err) {
+      setError(err.message || 'Failed to add entry');
+    }
+    setBusy(false);
+  };
+
+  const handleGoalStatus = async (id, goalStatus) => {
+    try {
+      const updated = await api.updateCareerEntry(personId, id, { goalStatus });
+      setEntries((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    } catch (err) {
+      setError(err.message || 'Failed to update goal');
+    }
+  };
+
+  return (
+    <Panel title="Career">
+      {error && <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-2">{error}</div>}
+      <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
+        {entries.length === 0 && (
+          <div className="text-xs text-text-light">No career entries yet.</div>
+        )}
+        {entries.map((c) => (
+          <div key={c.id} className="rounded-lg border border-border-light p-2">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              {c.kind === 'goal' ? (
+                <select
+                  value={c.goalStatus || 'active'}
+                  onChange={(e) => handleGoalStatus(c.id, e.target.value)}
+                  className={`text-[10px] font-semibold rounded px-1 py-0.5 border-0 cursor-pointer ${
+                    GOAL_STATUS_COLORS[c.goalStatus || 'active']
+                  }`}
+                >
+                  <option value="active">Goal · active</option>
+                  <option value="achieved">Goal · achieved</option>
+                  <option value="dropped">Goal · dropped</option>
+                </select>
+              ) : (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">
+                  Note
+                </span>
+              )}
+              <span className="text-[10px] text-text-light">{formatDate(c.createdAt)}</span>
+            </div>
+            <div className="text-xs text-text whitespace-pre-wrap">{c.content}</div>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={handleAdd} className="space-y-1.5">
+        <textarea
+          value={newContent}
+          onChange={(e) => setNewContent(e.target.value)}
+          rows={2}
+          maxLength={5000}
+          placeholder="Career note or goal…"
+          className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+        />
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-1.5 text-[11px] text-text-mid cursor-pointer">
+            <input type="checkbox" checked={asGoal} onChange={(e) => setAsGoal(e.target.checked)} />
+            Track as goal
+          </label>
+          <button
+            type="submit"
+            disabled={busy || !newContent.trim()}
+            className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-40"
+          >
+            Add
+          </button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+/** Quick-add an entry attached to this 1:1. */
+function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
+  const kinds = LOG_KIND_OPTIONS.filter((k) => k.value !== 'project_checkin');
+  const [kind, setKind] = useState('strength');
+  const [categoryId, setCategoryId] = useState('');
+  const [content, setContent] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const activeCategories = logCategories.filter((c) => c.active !== false);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!content.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      const created = await api.createLog(personId, {
+        content: content.trim(),
+        kind,
+        categoryId: categoryId || null,
+        oneOnOneId,
+      });
+      onCreated(created);
+      setContent('');
+    } catch (err) {
+      setError(err.message || 'Failed to add entry');
+    }
+    setBusy(false);
+  };
+
+  return (
+    <form onSubmit={handleAdd} className="space-y-1.5 pt-2 border-t border-border-light">
+      <div className="flex gap-1.5">
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value)}
+          className="px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
+        >
+          {kinds.map((k) => (
+            <option key={k.value} value={k.value}>
+              {k.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          className="flex-1 px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
+        >
+          <option value="">No category</option>
+          {activeCategories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.grouping ? `${c.grouping} · ${c.name}` : c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Log something from this conversation…"
+          maxLength={5000}
+          className="flex-1 px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+        />
+        <button
+          type="submit"
+          disabled={busy || !content.trim()}
+          className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-40"
+        >
+          Log
+        </button>
+      </div>
+      {error && <div className="text-[10px] text-danger">{error}</div>}
+    </form>
+  );
+}
+
+export default function OneOnOneCockpit() {
+  const { personId, oneOnOneId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { resources, projects, customers, needs, assignments, skills, logCategories } = useData();
+  const visibility = useVisibility();
+
+  const person = resources.find((r) => r.id === personId);
+
+  const [record, setRecord] = useState(null);
+  const [allOneOnOnes, setAllOneOnOnes] = useState([]);
+  const [attachedLogs, setAttachedLogs] = useState([]);
+  const [recentLogs, setRecentLogs] = useState([]);
+  const [followUps, setFollowUps] = useState([]);
+  const [careerEntries, setCareerEntries] = useState([]);
+  const [signals, setSignals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // The cockpit is a manager/admin tool — subjects use their profile tabs.
+  const isSelf = !visibility.loading && visibility.selfResourceId === personId && !visibility.isAdmin;
+
+  useEffect(() => {
+    if (isSelf) navigate(`/people/${personId}`, { replace: true });
+  }, [isSelf, navigate, personId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    Promise.all([
+      api.getOneOnOne(personId, oneOnOneId),
+      api.listOneOnOnes(personId),
+      api.listLogs(personId, { oneOnOneId }),
+      api.listFollowUps(personId),
+      api.listCareerEntries(personId),
+      api.getPersonSignals(personId).catch(() => []),
+    ])
+      .then(([rec, all, attached, fups, career, sigs]) => {
+        if (cancelled) return;
+        setRecord(rec);
+        setAllOneOnOnes(Array.isArray(all) ? all : []);
+        setAttachedLogs(Array.isArray(attached) ? attached : []);
+        setFollowUps(Array.isArray(fups) ? fups : []);
+        setCareerEntries(Array.isArray(career) ? career : []);
+        setSignals(Array.isArray(sigs) ? sigs : []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.message || 'Failed to load 1:1');
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [personId, oneOnOneId]);
+
+  // Previous meeting before this one → "entries since last 1:1" window.
+  const previousMeetingDate = useMemo(() => {
+    if (!record) return null;
+    const before = allOneOnOnes
+      .filter((o) => o.id !== record.id && new Date(o.meetingDate) < new Date(record.meetingDate))
+      .sort((a, b) => new Date(b.meetingDate) - new Date(a.meetingDate));
+    return before[0]?.meetingDate ?? null;
+  }, [record, allOneOnOnes]);
+
+  useEffect(() => {
+    if (!record) return;
+    let cancelled = false;
+    const params = previousMeetingDate
+      ? { from: toDateInput(previousMeetingDate) }
+      : { limit: 30 };
+    api
+      .listLogs(personId, params)
+      .then((data) => {
+        if (!cancelled) setRecentLogs(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [record, previousMeetingDate, personId]);
+
+  // Projects with any allocation in the current or a future month.
+  const activeProjects = useMemo(() => {
+    const nowKey = currentMonthKey();
+    const byProject = new Map();
+    for (const a of assignments) {
+      if (a.resourceId !== personId) continue;
+      const need = needs.find((n) => n.id === a.needId);
+      if (!need) continue;
+      const project = projects.find((p) => p.id === need.projectId);
+      if (!project) continue;
+      const alloc = a.monthAllocations || {};
+      const months = Object.keys(alloc).filter((m) => m >= nowKey && alloc[m] > 0);
+      if (months.length === 0) continue;
+      const cur = alloc[nowKey] || 0;
+      const prev = byProject.get(project.id) || {
+        project,
+        customer: customers.find((c) => c.id === project.customerId),
+        fte: 0,
+      };
+      prev.fte += cur;
+      byProject.set(project.id, prev);
+    }
+    return Array.from(byProject.values());
+  }, [assignments, needs, projects, customers, personId]);
+
+  const checkins = attachedLogs.filter((l) => l.kind === 'project_checkin');
+
+  const personSkills = useMemo(() => {
+    const list = person?.personSkills || [];
+    return list
+      .map((ps) => ({ ...ps, skill: skills.find((s) => s.id === ps.skillId) }))
+      .filter((ps) => ps.skill);
+  }, [person, skills]);
+
+  const signalsByCustomer = useMemo(() => {
+    const map = new Map();
+    for (const s of signals) {
+      const key = s.customer?.name || s.customerId;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(s);
+    }
+    for (const list of map.values()) list.sort((a, b) => (a.month < b.month ? -1 : 1));
+    return Array.from(map.entries());
+  }, [signals]);
+
+  if (loading || visibility.loading) {
+    return (
+      <div className="max-w-[1200px] mx-auto px-5 py-10 text-center text-xs text-text-light">
+        Loading cockpit…
+      </div>
+    );
+  }
+  if (error || !record) {
+    return (
+      <div className="max-w-[1200px] mx-auto px-5 py-10">
+        <div className="text-xs text-danger bg-danger-bg p-3 rounded">
+          {error || '1:1 not found'}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-[1200px] mx-auto px-5 py-5">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <Avatar name={person?.name || '?'} color="#4CBAD4" size={40} />
+          <div>
+            <h2 className="text-lg font-bold text-text m-0">
+              1:1 — {person?.name || 'Unknown'}
+            </h2>
+            <div className="text-[11px] text-text-mid">
+              {formatDate(record.meetingDate)}
+              {previousMeetingDate
+                ? ` · previous 1:1 ${formatDate(previousMeetingDate)}`
+                : ' · first recorded 1:1'}
+            </div>
+          </div>
+        </div>
+        <Link
+          to={`/people/${personId}/oneonones`}
+          className="text-xs font-semibold text-text-mid border border-border rounded-lg px-3 py-1.5 no-underline hover:bg-primary-bg"
+        >
+          ← Back to 1:1 list
+        </Link>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4 items-start">
+        {/* Main column */}
+        <div className="lg:col-span-2 space-y-4">
+          <MeetingPanel personId={personId} record={record} onSaved={setRecord} />
+          <ProjectCheckins
+            personId={personId}
+            oneOnOneId={oneOnOneId}
+            activeProjects={activeProjects}
+            checkins={checkins}
+            onChanged={setAttachedLogs}
+          />
+          <FollowUpsPanel
+            personId={personId}
+            oneOnOneId={oneOnOneId}
+            followUps={followUps}
+            setFollowUps={setFollowUps}
+          />
+          <CareerPanel
+            personId={personId}
+            oneOnOneId={oneOnOneId}
+            entries={careerEntries}
+            setEntries={setCareerEntries}
+          />
+        </div>
+
+        {/* Context column */}
+        <div className="space-y-4">
+          <Panel title={previousMeetingDate ? 'Since the last 1:1' : 'Recent entries'}>
+            <div className="space-y-2 max-h-96 overflow-y-auto mb-1">
+              {recentLogs.length === 0 && (
+                <div className="text-xs text-text-light">No entries in this window.</div>
+              )}
+              {recentLogs.map((log) => (
+                <div key={log.id} className="rounded-lg border border-border-light p-2">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                    <span
+                      className={`text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase ${
+                        LOG_KIND_COLORS[log.kind] || LOG_KIND_COLORS.note
+                      }`}
+                    >
+                      {LOG_KIND_LABELS[log.kind] || log.kind}
+                    </span>
+                    {log.category && (
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
+                        {log.category.name}
+                      </span>
+                    )}
+                    {log.customer && (
+                      <span className="text-[9px] text-text-light">{log.customer.name}</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-text whitespace-pre-wrap">{log.content}</div>
+                  <div className="text-[10px] text-text-light mt-0.5">
+                    {log.authorUser?.name || '—'} · {formatDate(log.createdAt)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <QuickAddEntry
+              personId={personId}
+              oneOnOneId={oneOnOneId}
+              logCategories={logCategories}
+              onCreated={(created) => {
+                setRecentLogs((prev) => [created, ...prev]);
+                setAttachedLogs((prev) => [...prev, created]);
+              }}
+            />
+          </Panel>
+
+          {signalsByCustomer.length > 0 && (
+            <Panel title="Client signals (PM-perceived)">
+              <div className="space-y-2">
+                {signalsByCustomer.map(([customerName, list]) => (
+                  <div key={customerName}>
+                    <div className="text-[11px] font-semibold text-text mb-1">{customerName}</div>
+                    <div className="flex gap-1 flex-wrap">
+                      {list.slice(-6).map((s) => (
+                        <span
+                          key={s.id}
+                          title={s.note || ''}
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            s.rating >= 4
+                              ? 'bg-success-bg text-success'
+                              : s.rating === 3
+                                ? 'bg-warning-bg text-warning'
+                                : 'bg-danger-bg text-danger'
+                          }`}
+                        >
+                          {s.month.slice(5)} · {s.rating}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          )}
+
+          <Panel title="Skills">
+            {personSkills.length === 0 ? (
+              <div className="text-xs text-text-light">No skills recorded.</div>
+            ) : (
+              <div className="flex gap-1.5 flex-wrap">
+                {personSkills.map((ps) => (
+                  <span
+                    key={ps.id}
+                    className="text-[10px] font-semibold px-2 py-1 rounded-full bg-primary-light text-primary"
+                  >
+                    {ps.skill.name} · {ps.level}
+                  </span>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Planned allocation (this month)">
+            {activeProjects.length === 0 ? (
+              <div className="text-xs text-text-light">No active assignments.</div>
+            ) : (
+              <div className="space-y-1">
+                {activeProjects.map(({ project, customer, fte }) => (
+                  <div key={project.id} className="flex items-center justify-between text-xs">
+                    <span className="text-text truncate">
+                      {project.name}
+                      <span className="text-text-light"> · {customer?.name || '—'}</span>
+                    </span>
+                    <span className="font-mono text-text-mid shrink-0 ml-2">
+                      {fte > 0 ? fte.toFixed(1) : '—'} FTE
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+      </div>
+    </div>
+  );
+}

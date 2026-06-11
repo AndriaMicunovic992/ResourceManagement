@@ -21,6 +21,7 @@ import PersonSkills from './features/people/tabs/PersonSkills';
 import PersonOneOnOnes from './features/people/tabs/oneonones/PersonOneOnOnes';
 import PersonActivity from './features/people/tabs/activity/PersonActivity';
 import PersonPerformance from './features/people/tabs/performance/PersonPerformance';
+import OneOnOneCockpit from './features/people/cockpit/OneOnOneCockpit';
 import MyJournalView from './features/journal/MyJournalView';
 import CustomerPage from './features/customers/CustomerPage';
 import CustomerOverview from './features/customers/tabs/CustomerOverview';
@@ -89,6 +90,11 @@ export default function App() {
               <Route path="/planner" element={<PlannerView />} />
               <Route path="/dashboard" element={<DashboardView />} />
               <Route path="/people" element={<PeopleListRoute />} />
+              {/* Full-width 1:1 cockpit — outside the person-page tab shell. */}
+              <Route
+                path="/people/:personId/oneonones/:oneOnOneId/cockpit"
+                element={<OneOnOneCockpit />}
+              />
               <Route path="/people/:id" element={<PersonPage />}>
                 <Route index element={<PersonOverview />} />
                 <Route path="allocation" element={<PersonAllocation />} />
