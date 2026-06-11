@@ -6,6 +6,9 @@ import {
   EMPLOYEE_LOG_KIND_OPTIONS,
   LOG_KIND_COLORS,
 } from '../../lib/constants';
+import CategoryMultiPicker, {
+  CategoryChips,
+} from '../../components/forms/CategoryMultiPicker';
 
 const KINDS = EMPLOYEE_LOG_KIND_OPTIONS;
 const KIND_COLORS = LOG_KIND_COLORS;
@@ -27,7 +30,9 @@ function LogForm({ initial, customers, projects, logCategories, onCancel, onSave
   const [customerId, setCustomerId] = useState(initial?.customerId || '');
   const [projectId, setProjectId] = useState(initial?.projectId || '');
   const [jiraUrl, setJiraUrl] = useState(initial?.jiraUrl || '');
-  const [categoryId, setCategoryId] = useState(initial?.categoryId || '');
+  const [categoryIds, setCategoryIds] = useState(
+    (initial?.categories || []).map((c) => c.id)
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -35,24 +40,6 @@ function LogForm({ initial, customers, projects, logCategories, onCancel, onSave
     if (!customerId) return projects;
     return projects.filter((p) => p.customerId === customerId);
   }, [projects, customerId]);
-
-  const groupedCategories = useMemo(() => {
-    const active = logCategories.filter((c) => c.active !== false);
-    // If we're editing a log whose category is now inactive, keep it visible
-    // in this picker so the user doesn't accidentally clear it.
-    if (initial?.category && initial.category.active === false) {
-      if (!active.some((c) => c.id === initial.category.id)) {
-        active.push(initial.category);
-      }
-    }
-    const groups = new Map();
-    for (const c of active) {
-      const g = c.grouping || '';
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g).push(c);
-    }
-    return Array.from(groups.entries()).map(([grouping, categories]) => ({ grouping, categories }));
-  }, [logCategories, initial?.category]);
 
   const handleCustomerChange = (e) => {
     const newId = e.target.value;
@@ -78,7 +65,7 @@ function LogForm({ initial, customers, projects, logCategories, onCancel, onSave
         customerId: customerId || null,
         projectId: projectId || null,
         jiraUrl: jiraUrl.trim() || null,
-        categoryId: categoryId || null,
+        categoryIds,
       });
     } catch (err) {
       setError(err.message || 'Failed to save');
@@ -115,26 +102,13 @@ function LogForm({ initial, customers, projects, logCategories, onCancel, onSave
             </option>
           ))}
         </select>
-        <select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
-        >
-          <option value="">Category: None</option>
-          {groupedCategories.map((group) => (
-            group.grouping ? (
-              <optgroup key={group.grouping} label={group.grouping}>
-                {group.categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </optgroup>
-            ) : (
-              group.categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))
-            )
-          ))}
-        </select>
+        <div className="col-span-2">
+          <CategoryMultiPicker
+            logCategories={logCategories}
+            value={categoryIds}
+            onChange={setCategoryIds}
+          />
+        </div>
         <select
           value={customerId}
           onChange={handleCustomerChange}
@@ -201,11 +175,7 @@ function LogCard({ log, onEdit, onDelete }) {
         >
           {log.kind}
         </span>
-        {log.category && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
-            {log.category.grouping ? `${log.category.grouping} · ${log.category.name}` : log.category.name}
-          </span>
-        )}
+        <CategoryChips categories={log.categories} />
         {log.customer && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
             🏢 {log.customer.name}

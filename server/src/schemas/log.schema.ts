@@ -26,7 +26,8 @@ const kindSchema = z.enum(LOG_KINDS);
 export const createLogSchema = z.object({
   content: z.string().trim().min(1).max(5000),
   kind: kindSchema,
-  categoryId: z.string().optional().nullable(),
+  // Multiple dimensions per entry (an incident can span several).
+  categoryIds: z.array(z.string()).max(20).optional(),
   customerId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
   jiraUrl: z.string().url().max(500).optional().nullable(),
@@ -36,7 +37,7 @@ export const createLogSchema = z.object({
 export const updateLogSchema = z.object({
   content: z.string().trim().min(1).max(5000).optional(),
   kind: kindSchema.optional(),
-  categoryId: z.string().optional().nullable(),
+  categoryIds: z.array(z.string()).max(20).optional(),
   customerId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
   jiraUrl: z.string().url().max(500).optional().nullable(),

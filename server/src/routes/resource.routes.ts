@@ -9,6 +9,13 @@ import {
 import { NotFoundError } from '../utils/errors.js';
 import { prisma } from '../db/prisma.js';
 import { reminderService } from '../services/reminder.service.js';
+import { z } from 'zod';
+
+const dismissReminderSchema = z.object({
+  type: z.enum(['oneOnOne', 'pmUpdate', 'clientSignal']),
+  resourceId: z.string().min(1),
+  customerId: z.string().optional().nullable(),
+});
 
 export const resourceRoutes: FastifyPluginAsync = async (app) => {
   app.get('/resources', async (req) => {
@@ -78,6 +85,14 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
   // from org cadence settings — nothing stored.
   app.get('/me/reminders', async (req) => {
     return reminderService.forUser(req.orgId, req.userId, req.visibility);
+  });
+
+  // Snooze one reminder item (e.g. the person was on leave). Cadence reminders
+  // re-arm after another cadence window; monthly signals re-arm next month.
+  app.post('/me/reminders/dismiss', async (req, reply) => {
+    const body = dismissReminderSchema.parse(req.body);
+    await reminderService.dismiss(req.orgId, req.userId, body);
+    return reply.status(204).send();
   });
 
   app.get('/me/visibility', async (req) => {

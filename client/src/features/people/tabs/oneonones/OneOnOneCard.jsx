@@ -4,6 +4,7 @@ import { api } from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { useData } from '../../../../contexts/DataContext';
 import LogInlineEditor from './LogInlineEditor';
+import { CategoryChips } from '../../../../components/forms/CategoryMultiPicker';
 
 // One combined list — perspective is carried by authorship, not by kind.
 const SECTIONS = [
@@ -44,11 +45,7 @@ function LogEntry({ log, currentUserId, onEdit, onDelete }) {
     <div className="border border-border-light rounded-lg p-2.5 bg-white">
       <div className="text-xs text-text whitespace-pre-wrap mb-1.5">{log.content}</div>
       <div className="flex flex-wrap gap-1.5 mb-1.5">
-        {log.category && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
-            {log.category.grouping ? `${log.category.grouping} · ${log.category.name}` : log.category.name}
-          </span>
-        )}
+        <CategoryChips categories={log.categories} />
         {log.customer && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
             🏢 {log.customer.name}

@@ -3,11 +3,13 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useData } from '../../../contexts/DataContext';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
 import TimeRangePicker from '../../planner/toolbar/TimeRangePicker';
-import ClientSignalsSection from './ClientSignalsSection';
+import { useVisibility } from '../../../contexts/VisibilityContext';
 
 export default function CustomerPeople() {
   const { customer } = useOutletContext();
   const { projects, needs, assignments, resources } = useData();
+  const { isAdmin, responsibleCustomerIds } = useVisibility();
+  const canReview = isAdmin || responsibleCustomerIds.has(customer.id);
   const navigate = useNavigate();
 
   // "Currently" = allocated in the month window right now; "Ever" = any month
@@ -81,9 +83,19 @@ export default function CustomerPeople() {
             </button>
           ))}
         </div>
-        {mode === 'ever' && (
-          <TimeRangePicker timeRange={timeRange} onChange={setTimeRange} />
-        )}
+        <div className="flex items-center gap-2">
+          {mode === 'ever' && (
+            <TimeRangePicker timeRange={timeRange} onChange={setTimeRange} />
+          )}
+          {canReview && (
+            <button
+              onClick={() => navigate(`/customers/${customer.id}/review`)}
+              className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90"
+            >
+              ▶ PM review
+            </button>
+          )}
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -129,8 +141,6 @@ export default function CustomerPeople() {
           </table>
         </div>
       )}
-
-      <ClientSignalsSection customer={customer} />
     </div>
   );
 }

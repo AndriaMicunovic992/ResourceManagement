@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../../../lib/api';
 import { LOG_KIND_COLORS, LOG_KIND_LABELS } from '../../../../lib/constants';
+import { CategoryChips } from '../../../../components/forms/CategoryMultiPicker';
 
 function formatDate(value) {
   if (!value) return '';
@@ -72,13 +73,7 @@ export default function LogCard({
       </div>
       <div className="text-sm text-text whitespace-pre-wrap mb-2">{log.content}</div>
       <div className="flex flex-wrap gap-1.5 mb-2">
-        {log.category && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
-            {log.category.grouping
-              ? `${log.category.grouping} · ${log.category.name}`
-              : log.category.name}
-          </span>
-        )}
+        <CategoryChips categories={log.categories} />
         {log.customer && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
             🏢 {log.customer.name}

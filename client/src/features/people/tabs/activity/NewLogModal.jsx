@@ -6,6 +6,7 @@ import {
   LOG_KIND_OPTIONS,
   EMPLOYEE_LOG_KIND_OPTIONS,
 } from '../../../../lib/constants';
+import CategoryMultiPicker from '../../../../components/forms/CategoryMultiPicker';
 
 export default function NewLogModal({ resourceId, onCancel, onCreated }) {
   const { customers, projects, logCategories } = useData();
@@ -15,7 +16,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
   const [customerId, setCustomerId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [jiraUrl, setJiraUrl] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [categoryIds, setCategoryIds] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,17 +24,6 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
     if (!customerId) return projects;
     return projects.filter((p) => p.customerId === customerId);
   }, [projects, customerId]);
-
-  const groupedCategories = useMemo(() => {
-    const active = logCategories.filter((c) => c.active !== false);
-    const groups = new Map();
-    for (const c of active) {
-      const g = c.grouping || '';
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g).push(c);
-    }
-    return Array.from(groups.entries()).map(([grouping, categories]) => ({ grouping, categories }));
-  }, [logCategories]);
 
   const kindOptions =
     perspective === 'employee' ? EMPLOYEE_LOG_KIND_OPTIONS : LOG_KIND_OPTIONS;
@@ -67,7 +57,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
         customerId: customerId || null,
         projectId: projectId || null,
         jiraUrl: jiraUrl.trim() || null,
-        categoryId: categoryId || null,
+        categoryIds,
       });
       onCreated(created);
     } catch (err) {
@@ -146,28 +136,13 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
-              Category
+              Categories
             </label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
-            >
-              <option value="">None</option>
-              {groupedCategories.map((group) => (
-                group.grouping ? (
-                  <optgroup key={group.grouping} label={group.grouping}>
-                    {group.categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </optgroup>
-                ) : (
-                  group.categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))
-                )
-              ))}
-            </select>
+            <CategoryMultiPicker
+              logCategories={logCategories}
+              value={categoryIds}
+              onChange={setCategoryIds}
+            />
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">

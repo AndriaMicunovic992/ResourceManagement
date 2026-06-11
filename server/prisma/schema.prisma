@@ -42,6 +42,7 @@ model Organization {
   followUps     FollowUp[]
   careerEntries CareerEntry[]
   clientSignals ClientSignal[]
+  reminderDismissals ReminderDismissal[]
 }
 
 model User {
@@ -70,6 +71,7 @@ model User {
   createdFollowUps      FollowUp[]     @relation("FollowUpCreator")
   authoredCareerEntries CareerEntry[]  @relation("AuthoredCareerEntries")
   authoredClientSignals ClientSignal[] @relation("AuthoredClientSignals")
+  reminderDismissals    ReminderDismissal[] @relation("ReminderDismissals")
 }
 
 model OrgMember {
@@ -367,8 +369,8 @@ model Log {
   authorUser      User     @relation("AuthoredLogs", fields: [authorUserId], references: [id], onDelete: Restrict)
   content         String
   kind            String
-  categoryId      String?
-  category        PerformanceLogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // One incident can evidence several dimensions — many-to-many by design.
+  categories      PerformanceLogCategory[] @relation("LogCategories")
   customerId      String?
   customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   projectId       String?
@@ -387,7 +389,6 @@ model Log {
   @@index([resourceId])
   @@index([authorUserId])
   @@index([oneOnOneId])
-  @@index([categoryId])
   @@index([evaluationId])
 }
 
@@ -493,7 +494,7 @@ model PerformanceLogCategory {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  logs                Log[]
+  logs                Log[] @relation("LogCategories")
   evaluationSnapshots EvaluationCategorySnapshot[]
 
   @@unique([orgId, grouping, name])
@@ -582,4 +583,20 @@ model EvaluationScore {
 
   @@unique([evaluationId, categorySnapshotId])
   @@index([evaluationId])
+}
+
+// A user snoozing a reminder item ("on leave this month", etc.). Cadence-based
+// reminders treat the dismissal like activity; monthly ones hide for the month.
+model ReminderDismissal {
+  id         String   @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation("ReminderDismissals", fields: [userId], references: [id], onDelete: Cascade)
+  type       String   // oneOnOne | pmUpdate | clientSignal
+  resourceId String
+  customerId String?
+  createdAt  DateTime @default(now())
+
+  @@index([orgId, userId])
 }

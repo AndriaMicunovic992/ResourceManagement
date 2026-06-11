@@ -5,6 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 import Avatar from '../../../components/ui/Avatar';
+import MiniThread from '../../../components/ui/MiniThread';
 import {
   LOG_KIND_OPTIONS,
   LOG_KIND_COLORS,
@@ -502,7 +503,7 @@ function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
       const created = await api.createLog(personId, {
         content: content.trim(),
         kind,
-        categoryId: categoryId || null,
+        categoryIds: categoryId ? [categoryId] : [],
         oneOnOneId,
       });
       onCreated(created);
@@ -515,11 +516,11 @@ function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
 
   return (
     <form onSubmit={handleAdd} className="space-y-1.5 pt-2 border-t border-border-light">
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 min-w-0">
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value)}
-          className="px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
+          className="shrink-0 max-w-[110px] px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
         >
           {kinds.map((k) => (
             <option key={k.value} value={k.value}>
@@ -530,7 +531,7 @@ function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
         <select
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
-          className="flex-1 px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
+          className="flex-1 min-w-0 w-full px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
         >
           <option value="">No category</option>
           {activeCategories.map((c) => (
@@ -776,11 +777,14 @@ export default function OneOnOneCockpit() {
                     >
                       {LOG_KIND_LABELS[log.kind] || log.kind}
                     </span>
-                    {log.category && (
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
-                        {log.category.name}
+                    {(log.categories || []).map((c) => (
+                      <span
+                        key={c.id}
+                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary"
+                      >
+                        {c.name}
                       </span>
-                    )}
+                    ))}
                     {log.customer && (
                       <span className="text-[9px] text-text-light">{log.customer.name}</span>
                     )}
@@ -789,6 +793,15 @@ export default function OneOnOneCockpit() {
                   <div className="text-[10px] text-text-light mt-0.5">
                     {log.authorUser?.name || '—'} · {formatDate(log.createdAt)}
                   </div>
+                  <MiniThread
+                    personId={personId}
+                    log={log}
+                    onUpdated={(updated) =>
+                      setRecentLogs((prev) =>
+                        prev.map((l) => (l.id === updated.id ? updated : l))
+                      )
+                    }
+                  />
                 </div>
               ))}
             </div>

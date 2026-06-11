@@ -2,6 +2,9 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../../../lib/api';
 import { useData } from '../../../contexts/DataContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useOrg } from '../../../contexts/OrgContext';
+import { useVisibility } from '../../../contexts/VisibilityContext';
 import LogCard from '../../people/tabs/activity/LogCard';
 import { LOG_KIND_OPTIONS } from '../../../lib/constants';
 
@@ -10,6 +13,9 @@ const KIND_OPTIONS = [{ value: '', label: 'All kinds' }, ...LOG_KIND_OPTIONS];
 export default function CustomerActivity() {
   const { customer } = useOutletContext();
   const { projects, resources } = useData();
+  const { user } = useAuth();
+  const { role } = useOrg();
+  const { selfResourceId } = useVisibility();
   const navigate = useNavigate();
 
   const [logs, setLogs] = useState([]);
@@ -115,7 +121,13 @@ export default function CustomerActivity() {
                     </button>
                   </div>
                 )}
-                <LogCard log={log} resourceId={log.resourceId} />
+                <LogCard
+                  log={log}
+                  resourceId={log.resourceId}
+                  currentUserId={user?.id}
+                  subjectUserId={person?.userId}
+                  canComment={role !== 'viewer' && log.resourceId !== selfResourceId}
+                />
               </div>
             );
           })}
