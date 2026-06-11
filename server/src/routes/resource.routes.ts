@@ -8,6 +8,7 @@ import {
 } from '../services/visibility.service.js';
 import { NotFoundError } from '../utils/errors.js';
 import { prisma } from '../db/prisma.js';
+import { reminderService } from '../services/reminder.service.js';
 
 export const resourceRoutes: FastifyPluginAsync = async (app) => {
   app.get('/resources', async (req) => {
@@ -70,6 +71,13 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
     });
 
     return { resource, assignments };
+  });
+
+  // What's due for me: overdue 1:1s (managed people), missing monthly client
+  // signals and stale PM updates (responsible customers). Derived on request
+  // from org cadence settings — nothing stored.
+  app.get('/me/reminders', async (req) => {
+    return reminderService.forUser(req.orgId, req.userId, req.visibility);
   });
 
   app.get('/me/visibility', async (req) => {

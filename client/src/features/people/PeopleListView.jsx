@@ -7,6 +7,7 @@ import ResourceForm from '../../components/forms/ResourceForm';
 import { useData } from '../../contexts/DataContext';
 import { useOrg } from '../../contexts/OrgContext';
 import { resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
+import RemindersPanel from './RemindersPanel';
 
 export default function PeopleListView() {
   const { resources, teams, addResource } = useData();
@@ -32,6 +33,7 @@ export default function PeopleListView() {
 
   return (
     <div className="max-w-[1100px] mx-auto px-5 py-6">
+      <RemindersPanel />
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
           <div className="text-lg font-bold text-text">People</div>

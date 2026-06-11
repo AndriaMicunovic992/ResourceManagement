@@ -260,6 +260,9 @@ export const api = {
   // Visibility scope for the current user in the current org.
   getMyVisibility: () => apiFetch('/me/visibility'),
 
+  // In-app reminder queue (derived from org cadence settings).
+  getMyReminders: () => apiFetch('/me/reminders'),
+
   // Customer detail + performance
   getCustomerDetail: (id) => apiFetch('/customers/' + id + '/detail'),
   getCustomerActivity: (id, params) => apiFetch(_qs('/customers/' + id + '/activity', params)),
