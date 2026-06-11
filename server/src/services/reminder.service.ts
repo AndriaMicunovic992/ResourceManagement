@@ -52,7 +52,29 @@ export const reminderService = {
     if (!org) return [];
 
     const items: ReminderItem[] = [];
-    const managedIds = Array.from(scope.managedPersonIds);
+    // Duty-based scoping, independent of role (an admin is NOT implicitly
+    // responsible for everything here — reminders follow explicit duties):
+    //  - 1:1s: people this user actually manages (direct links + managed teams)
+    //  - PM items: projects where this user is set as responsible (directly,
+    //    or via being the customer's responsible person)
+    const self = scope.selfResourceId;
+    let managedIds: string[] = [];
+    if (self) {
+      const [links, teams] = await Promise.all([
+        prisma.personManager.findMany({
+          where: { orgId, managerId: self },
+          select: { personId: true },
+        }),
+        prisma.team.findMany({
+          where: { orgId, managerId: self },
+          select: { resources: { select: { id: true } } },
+        }),
+      ]);
+      const set = new Set<string>(links.map((l) => l.personId));
+      for (const t of teams) for (const r of t.resources) set.add(r.id);
+      set.delete(self);
+      managedIds = Array.from(set);
+    }
 
     // Dismissals ("on leave this month" etc.): for cadence-based reminders the
     // dismissal counts as activity; for monthly signals it hides the month.
@@ -99,17 +121,26 @@ export const reminderService = {
       }
     }
 
-    // --- PM duties: per responsible customer × person allocated this month ---
-    const responsibleCustomerIds = Array.from(scope.responsibleCustomerIds);
-    if (responsibleCustomerIds.length > 0 && (org.pmLogReminderDays || true)) {
+    // --- PM duties: per (responsible project → its customer) × person
+    // allocated to those projects this month ---
+    const projects = self
+      ? await prisma.project.findMany({
+          where: {
+            orgId,
+            OR: [
+              { responsiblePersonId: self },
+              { customer: { responsiblePersonId: self } },
+            ],
+          },
+          select: { id: true, customerId: true },
+        })
+      : [];
+    const responsibleCustomerIds = Array.from(new Set(projects.map((p) => p.customerId)));
+    if (projects.length > 0) {
       const month = currentMonthKey();
       const customers = await prisma.customer.findMany({
         where: { orgId, id: { in: responsibleCustomerIds } },
         select: { id: true, name: true },
-      });
-      const projects = await prisma.project.findMany({
-        where: { orgId, customerId: { in: responsibleCustomerIds } },
-        select: { id: true, customerId: true },
       });
       const projByid = new Map(projects.map((p) => [p.id, p]));
       const needs = await prisma.need.findMany({

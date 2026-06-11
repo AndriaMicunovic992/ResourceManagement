@@ -175,6 +175,14 @@ export const api = {
     apiFetch('/customers/' + customerId + '/signals/' + id, { method: 'DELETE' }),
   getPersonSignals: (resourceId, params) => apiFetch(_qs('/people/' + resourceId + '/signals', params)),
 
+  // PM review sessions (dated records per customer)
+  listCustomerReviews: (customerId) => apiFetch('/customers/' + customerId + '/reviews'),
+  getCustomerReview: (customerId, id) => apiFetch('/customers/' + customerId + '/reviews/' + id),
+  createCustomerReview: (customerId, data) =>
+    apiFetch('/customers/' + customerId + '/reviews', { method: 'POST', body: JSON.stringify(data || {}) }),
+  deleteCustomerReview: (customerId, id) =>
+    apiFetch('/customers/' + customerId + '/reviews/' + id, { method: 'DELETE' }),
+
   // Compensation satisfaction (on the evaluation cadence)
   setEvaluationCompensation: (id, compensationSatisfaction) =>
     apiFetch('/evaluations/' + id + '/compensation', { method: 'PATCH', body: JSON.stringify({ compensationSatisfaction }) }),

@@ -54,7 +54,6 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
 
   const [meetingDate, setMeetingDate] = useState(toDateInputValue(initial?.meetingDate));
   const [overallScore, setOverallScore] = useState(initial?.overallScore ?? null);
-  const [workSatisfaction, setWorkSatisfaction] = useState(initial?.workSatisfaction ?? null);
   const [wentWell, setWentWell] = useState(initial?.wentWell || '');
   const [wentBad, setWentBad] = useState(initial?.wentBad || '');
   const [privateNote, setPrivateNote] = useState(initial?.privateNote || '');
@@ -82,7 +81,6 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
       const payload = {
         meetingDate,
         overallScore,
-        workSatisfaction,
         wentWell: wentWell.trim() ? wentWell : null,
         wentBad: wentBad.trim() ? wentBad : null,
       };
@@ -119,20 +117,12 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <RatingPicker
-            label="Overall score (pulse)"
-            hint="Your read on this period — distinct from formal evaluations."
-            value={overallScore}
-            onChange={setOverallScore}
-          />
-          <RatingPicker
-            label="Work satisfaction"
-            hint="As reported by the employee in the meeting."
-            value={workSatisfaction}
-            onChange={setWorkSatisfaction}
-          />
-        </div>
+        <RatingPicker
+          label="Overall score (pulse)"
+          hint="Your read on this period — distinct from formal evaluations."
+          value={overallScore}
+          onChange={setOverallScore}
+        />
 
         <div>
           <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">

@@ -32,6 +32,7 @@ export const createLogSchema = z.object({
   projectId: z.string().optional().nullable(),
   jiraUrl: z.string().url().max(500).optional().nullable(),
   oneOnOneId: z.string().optional().nullable(),
+  customerReviewId: z.string().optional().nullable(),
 });
 
 export const updateLogSchema = z.object({
@@ -49,6 +50,7 @@ export const listLogsQuerySchema = z.object({
   customerId: z.string().optional(),
   projectId: z.string().optional(),
   oneOnOneId: z.string().optional(),
+  customerReviewId: z.string().optional(),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),

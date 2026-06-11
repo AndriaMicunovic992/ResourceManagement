@@ -4,6 +4,7 @@ import { ForbiddenError } from '../utils/errors.js';
 import { followUpService } from '../services/followUp.service.js';
 import { careerEntryService } from '../services/careerEntry.service.js';
 import { clientSignalService } from '../services/clientSignal.service.js';
+import { customerReviewService } from '../services/customerReview.service.js';
 import {
   createFollowUpSchema,
   updateFollowUpSchema,
@@ -126,5 +127,40 @@ export const peopleOpsRoutes: FastifyPluginAsync = async (app) => {
     assertCanViewPerson(req.visibility, personId);
     const query = listClientSignalsQuerySchema.parse(req.query ?? {});
     return clientSignalService.listForResource(req.orgId, req.visibility, personId, query);
+  });
+
+  // --- PM review sessions (dated records, like 1:1s on the customer side) ---
+
+  app.get('/customers/:customerId/reviews', async (req) => {
+    const { customerId } = req.params as { customerId: string };
+    assertCanViewCustomer(req.visibility, customerId);
+    return customerReviewService.list(req.orgId, req.visibility, customerId);
+  });
+
+  app.get('/customers/:customerId/reviews/:id', async (req) => {
+    const { customerId, id } = req.params as { customerId: string; id: string };
+    assertCanViewCustomer(req.visibility, customerId);
+    return customerReviewService.get(req.orgId, req.visibility, customerId, id);
+  });
+
+  app.post('/customers/:customerId/reviews', async (req, reply) => {
+    const { customerId } = req.params as { customerId: string };
+    assertCanViewCustomer(req.visibility, customerId);
+    const { reviewDate } = (req.body ?? {}) as { reviewDate?: string };
+    const created = await customerReviewService.create(
+      req.orgId,
+      req.visibility,
+      customerId,
+      req.userId,
+      reviewDate
+    );
+    return reply.status(201).send(created);
+  });
+
+  app.delete('/customers/:customerId/reviews/:id', async (req, reply) => {
+    const { customerId, id } = req.params as { customerId: string; id: string };
+    assertCanViewCustomer(req.visibility, customerId);
+    await customerReviewService.remove(req.orgId, req.visibility, customerId, id, req.userId);
+    return reply.status(204).send();
   });
 };

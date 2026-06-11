@@ -6,6 +6,7 @@ import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 import Avatar from '../../../components/ui/Avatar';
 import MiniThread from '../../../components/ui/MiniThread';
+import SignalChart from '../../../components/ui/SignalChart';
 import {
   LOG_KIND_OPTIONS,
   LOG_KIND_COLORS,
@@ -14,6 +15,25 @@ import {
 
 function currentMonthKey() {
   return new Date().toISOString().slice(0, 7);
+}
+
+function nextMonthKey() {
+  const d = new Date();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  return d.toISOString().slice(0, 7);
+}
+
+function lastMonthKeys(n) {
+  const keys = [];
+  const d = new Date();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() - (n - 1));
+  for (let i = 0; i < n; i++) {
+    keys.push(d.toISOString().slice(0, 7));
+    d.setUTCMonth(d.getUTCMonth() + 1);
+  }
+  return keys;
 }
 
 function formatDate(value) {
@@ -72,7 +92,6 @@ function RatingPicker({ label, value, onChange }) {
 function MeetingPanel({ personId, record, onSaved }) {
   const [meetingDate, setMeetingDate] = useState(toDateInput(record.meetingDate));
   const [overallScore, setOverallScore] = useState(record.overallScore ?? null);
-  const [workSatisfaction, setWorkSatisfaction] = useState(record.workSatisfaction ?? null);
   const [wentWell, setWentWell] = useState(record.wentWell || '');
   const [wentBad, setWentBad] = useState(record.wentBad || '');
   const [privateNote, setPrivateNote] = useState(record.privateNote || '');
@@ -87,7 +106,6 @@ function MeetingPanel({ personId, record, onSaved }) {
       const updated = await api.updateOneOnOne(personId, record.id, {
         meetingDate,
         overallScore,
-        workSatisfaction,
         wentWell: wentWell.trim() ? wentWell : null,
         wentBad: wentBad.trim() ? wentBad : null,
         privateNote: privateNote.trim() ? privateNote : null,
@@ -119,7 +137,7 @@ function MeetingPanel({ personId, record, onSaved }) {
       }
     >
       {error && <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{error}</div>}
-      <div className="grid sm:grid-cols-3 gap-4 mb-4">
+      <div className="grid sm:grid-cols-2 gap-4 mb-4">
         <div>
           <div className="text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
             Meeting date
@@ -132,11 +150,6 @@ function MeetingPanel({ personId, record, onSaved }) {
           />
         </div>
         <RatingPicker label="Overall score (pulse)" value={overallScore} onChange={setOverallScore} />
-        <RatingPicker
-          label="Work satisfaction"
-          value={workSatisfaction}
-          onChange={setWorkSatisfaction}
-        />
       </div>
       <div className="grid sm:grid-cols-2 gap-3 mb-3">
         <div>
@@ -647,9 +660,11 @@ export default function OneOnOneCockpit() {
     };
   }, [record, previousMeetingDate, personId]);
 
-  // Projects with any allocation in the current or a future month.
+  // Projects with any allocation in the current or a future month, with this
+  // month's and next month's planned FTE.
   const activeProjects = useMemo(() => {
     const nowKey = currentMonthKey();
+    const nextKey = nextMonthKey();
     const byProject = new Map();
     for (const a of assignments) {
       if (a.resourceId !== personId) continue;
@@ -660,13 +675,14 @@ export default function OneOnOneCockpit() {
       const alloc = a.monthAllocations || {};
       const months = Object.keys(alloc).filter((m) => m >= nowKey && alloc[m] > 0);
       if (months.length === 0) continue;
-      const cur = alloc[nowKey] || 0;
       const prev = byProject.get(project.id) || {
         project,
         customer: customers.find((c) => c.id === project.customerId),
         fte: 0,
+        fteNext: 0,
       };
-      prev.fte += cur;
+      prev.fte += alloc[nowKey] || 0;
+      prev.fteNext += alloc[nextKey] || 0;
       byProject.set(project.id, prev);
     }
     return Array.from(byProject.values());
@@ -680,6 +696,18 @@ export default function OneOnOneCockpit() {
       .map((ps) => ({ ...ps, skill: skills.find((s) => s.id === ps.skillId) }))
       .filter((ps) => ps.skill);
   }, [person, skills]);
+
+  // "Since last 1:1" entries grouped per customer, each group collapsible.
+  const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const recentGroups = useMemo(() => {
+    const map = new Map();
+    for (const log of recentLogs) {
+      const key = log.customer?.name || 'No customer';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(log);
+    }
+    return Array.from(map.entries());
+  }, [recentLogs]);
 
   const signalsByCustomer = useMemo(() => {
     const map = new Map();
@@ -763,47 +791,66 @@ export default function OneOnOneCockpit() {
         {/* Context column */}
         <div className="space-y-4">
           <Panel title={previousMeetingDate ? 'Since the last 1:1' : 'Recent entries'}>
-            <div className="space-y-2 max-h-96 overflow-y-auto mb-1">
+            <div className="space-y-1.5 max-h-96 overflow-y-auto mb-1">
               {recentLogs.length === 0 && (
                 <div className="text-xs text-text-light">No entries in this window.</div>
               )}
-              {recentLogs.map((log) => (
-                <div key={log.id} className="rounded-lg border border-border-light p-2">
-                  <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                    <span
-                      className={`text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase ${
-                        LOG_KIND_COLORS[log.kind] || LOG_KIND_COLORS.note
-                      }`}
+              {recentGroups.map(([groupName, list]) => {
+                const collapsed = collapsedGroups.has(groupName);
+                return (
+                  <div key={groupName}>
+                    <button
+                      onClick={() =>
+                        setCollapsedGroups((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(groupName)) next.delete(groupName);
+                          else next.add(groupName);
+                          return next;
+                        })
+                      }
+                      className="w-full flex items-center justify-between text-[11px] font-bold text-text bg-transparent border-0 cursor-pointer px-0 py-1"
                     >
-                      {LOG_KIND_LABELS[log.kind] || log.kind}
-                    </span>
-                    {(log.categories || []).map((c) => (
-                      <span
-                        key={c.id}
-                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary"
-                      >
-                        {c.name}
-                      </span>
-                    ))}
-                    {log.customer && (
-                      <span className="text-[9px] text-text-light">{log.customer.name}</span>
-                    )}
+                      <span>{collapsed ? '▸' : '▾'} {groupName}</span>
+                      <span className="text-text-light font-normal">{list.length}</span>
+                    </button>
+                    {!collapsed &&
+                      list.map((log) => (
+                        <div key={log.id} className="rounded-lg border border-border-light p-2 mb-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            <span
+                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase ${
+                                LOG_KIND_COLORS[log.kind] || LOG_KIND_COLORS.note
+                              }`}
+                            >
+                              {LOG_KIND_LABELS[log.kind] || log.kind}
+                            </span>
+                            {(log.categories || []).map((c) => (
+                              <span
+                                key={c.id}
+                                className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary"
+                              >
+                                {c.name}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="text-xs text-text whitespace-pre-wrap">{log.content}</div>
+                          <div className="text-[10px] text-text-light mt-0.5">
+                            {log.authorUser?.name || '—'} · {formatDate(log.createdAt)}
+                          </div>
+                          <MiniThread
+                            personId={personId}
+                            log={log}
+                            onUpdated={(updated) =>
+                              setRecentLogs((prev) =>
+                                prev.map((l) => (l.id === updated.id ? updated : l))
+                              )
+                            }
+                          />
+                        </div>
+                      ))}
                   </div>
-                  <div className="text-xs text-text whitespace-pre-wrap">{log.content}</div>
-                  <div className="text-[10px] text-text-light mt-0.5">
-                    {log.authorUser?.name || '—'} · {formatDate(log.createdAt)}
-                  </div>
-                  <MiniThread
-                    personId={personId}
-                    log={log}
-                    onUpdated={(updated) =>
-                      setRecentLogs((prev) =>
-                        prev.map((l) => (l.id === updated.id ? updated : l))
-                      )
-                    }
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
             <QuickAddEntry
               personId={personId}
@@ -818,32 +865,64 @@ export default function OneOnOneCockpit() {
 
           {signalsByCustomer.length > 0 && (
             <Panel title="Client signals (PM-perceived)">
-              <div className="space-y-2">
-                {signalsByCustomer.map(([customerName, list]) => (
-                  <div key={customerName}>
-                    <div className="text-[11px] font-semibold text-text mb-1">{customerName}</div>
-                    <div className="flex gap-1 flex-wrap">
-                      {list.slice(-6).map((s) => (
-                        <span
-                          key={s.id}
-                          title={s.note || ''}
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                            s.rating >= 4
-                              ? 'bg-success-bg text-success'
-                              : s.rating === 3
-                                ? 'bg-warning-bg text-warning'
-                                : 'bg-danger-bg text-danger'
-                          }`}
-                        >
-                          {s.month.slice(5)} · {s.rating}
-                        </span>
-                      ))}
+              <div className="space-y-3">
+                {signalsByCustomer.map(([customerName, list]) => {
+                  const byMonth = new Map(list.map((s) => [s.month, s.rating]));
+                  const points = lastMonthKeys(12).map((m) => ({
+                    label: m.slice(5),
+                    value: byMonth.get(m) ?? null,
+                  }));
+                  return (
+                    <div key={customerName}>
+                      <div className="text-[11px] font-semibold text-text mb-1">{customerName}</div>
+                      <SignalChart points={points} height={84} />
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Panel>
           )}
+
+          <Panel title="Planned allocation">
+            {activeProjects.length === 0 ? (
+              <div className="text-xs text-text-light">No active assignments.</div>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-[10px] text-text-mid uppercase tracking-wider">
+                    <th className="text-left font-semibold pb-1">Project</th>
+                    <th className="text-right font-semibold pb-1">This mo</th>
+                    <th className="text-right font-semibold pb-1">Next mo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeProjects.map(({ project, customer, fte, fteNext }) => (
+                    <tr key={project.id} className="border-t border-border-light">
+                      <td className="py-1 text-text truncate max-w-[160px]">
+                        {project.name}
+                        <span className="text-text-light"> · {customer?.name || '—'}</span>
+                      </td>
+                      <td className="py-1 font-mono text-right text-text-mid">
+                        {fte > 0 ? fte.toFixed(1) : '—'}
+                      </td>
+                      <td className="py-1 font-mono text-right text-text-mid">
+                        {fteNext > 0 ? fteNext.toFixed(1) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-border">
+                    <td className="py-1 font-bold text-text">Total</td>
+                    <td className="py-1 font-mono text-right font-bold text-text">
+                      {activeProjects.reduce((s, p) => s + p.fte, 0).toFixed(1)}
+                    </td>
+                    <td className="py-1 font-mono text-right font-bold text-text">
+                      {activeProjects.reduce((s, p) => s + p.fteNext, 0).toFixed(1)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </Panel>
 
           <Panel title="Skills">
             {personSkills.length === 0 ? (
@@ -857,26 +936,6 @@ export default function OneOnOneCockpit() {
                   >
                     {ps.skill.name} · {ps.level}
                   </span>
-                ))}
-              </div>
-            )}
-          </Panel>
-
-          <Panel title="Planned allocation (this month)">
-            {activeProjects.length === 0 ? (
-              <div className="text-xs text-text-light">No active assignments.</div>
-            ) : (
-              <div className="space-y-1">
-                {activeProjects.map(({ project, customer, fte }) => (
-                  <div key={project.id} className="flex items-center justify-between text-xs">
-                    <span className="text-text truncate">
-                      {project.name}
-                      <span className="text-text-light"> · {customer?.name || '—'}</span>
-                    </span>
-                    <span className="font-mono text-text-mid shrink-0 ml-2">
-                      {fte > 0 ? fte.toFixed(1) : '—'} FTE
-                    </span>
-                  </div>
                 ))}
               </div>
             )}

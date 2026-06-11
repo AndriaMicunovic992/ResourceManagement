@@ -118,6 +118,7 @@ export async function listLogs(
   if (filters.customerId) where.customerId = filters.customerId;
   if (filters.projectId) where.projectId = filters.projectId;
   if (filters.oneOnOneId) where.oneOnOneId = filters.oneOnOneId;
+  if (filters.customerReviewId) where.customerReviewId = filters.customerReviewId;
 
   if (filters.from || filters.to) {
     const createdAt: Prisma.DateTimeFilter = {};
@@ -188,6 +189,12 @@ export async function createLog(
   if (data.customerId) await ensureCustomerInOrg(orgId, data.customerId);
   if (data.projectId) await ensureProjectInOrg(orgId, data.projectId);
   if (data.oneOnOneId) await ensureOneOnOneForResource(orgId, data.oneOnOneId, resourceId);
+  if (data.customerReviewId) {
+    const review = await prisma.customerReview.findFirst({
+      where: { id: data.customerReviewId, orgId },
+    });
+    if (!review) throw new NotFoundError('Review not found');
+  }
   const categoryIds = data.categoryIds ?? [];
   await ensureCategoriesInOrg(orgId, categoryIds);
 
@@ -203,6 +210,7 @@ export async function createLog(
       projectId: data.projectId ?? null,
       jiraUrl: data.jiraUrl ?? null,
       oneOnOneId: data.oneOnOneId ?? null,
+      customerReviewId: data.customerReviewId ?? null,
     },
     include: logInclude,
   });
