@@ -104,6 +104,14 @@ export default function SettingsView() {
   const [perfTrendTo, setPerfTrendTo] = useState(currentOrg?.performanceTrendDefaultTo || '');
   const [perfTrendSaving, setPerfTrendSaving] = useState(false);
   const [perfTrendSuccess, setPerfTrendSuccess] = useState(false);
+  const [oneOnOneDays, setOneOnOneDays] = useState(
+    currentOrg?.oneOnOneReminderDays != null ? String(currentOrg.oneOnOneReminderDays) : ''
+  );
+  const [pmLogDays, setPmLogDays] = useState(
+    currentOrg?.pmLogReminderDays != null ? String(currentOrg.pmLogReminderDays) : ''
+  );
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderSuccess, setReminderSuccess] = useState(false);
 
   useEffect(() => {
     setMinDate(currentOrg?.minPlanningDate || '');
@@ -112,7 +120,29 @@ export default function SettingsView() {
     setPerfTrendMonths(String(currentOrg?.performanceTrendDefaultMonths ?? 12));
     setPerfTrendFrom(currentOrg?.performanceTrendDefaultFrom || '');
     setPerfTrendTo(currentOrg?.performanceTrendDefaultTo || '');
+    setOneOnOneDays(
+      currentOrg?.oneOnOneReminderDays != null ? String(currentOrg.oneOnOneReminderDays) : ''
+    );
+    setPmLogDays(
+      currentOrg?.pmLogReminderDays != null ? String(currentOrg.pmLogReminderDays) : ''
+    );
   }, [currentOrg]);
+
+  const handleSaveReminders = async () => {
+    setReminderSaving(true);
+    setReminderSuccess(false);
+    try {
+      await updateOrg({
+        oneOnOneReminderDays: oneOnOneDays ? parseInt(oneOnOneDays, 10) : null,
+        pmLogReminderDays: pmLogDays ? parseInt(pmLogDays, 10) : null,
+      });
+      setReminderSuccess(true);
+      setTimeout(() => setReminderSuccess(false), 2000);
+    } catch (err) {
+      setError(err.message || 'Failed to save reminder settings');
+    }
+    setReminderSaving(false);
+  };
 
   const handleSaveDates = async () => {
     setDateSaving(true);
@@ -526,6 +556,44 @@ export default function SettingsView() {
             </div>
             <Button onClick={handleSaveDates} disabled={dateSaving}>
               {dateSaving ? 'Saving...' : dateSuccess ? 'Saved!' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-3">Reminders</h3>
+          <p className="text-[10px] text-text-light mb-3">
+            In-app reminders shown to managers and responsible people on the People page. Leave a
+            field empty to turn that reminder off. Monthly client signals are always flagged when
+            missing for the current month.
+          </p>
+          <div className="flex gap-3 items-end flex-wrap">
+            <div className="flex-1 min-w-[160px] max-w-[220px]">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">
+                1:1 cadence (days)
+              </label>
+              <input
+                type="number" min="1" max="365" value={oneOnOneDays}
+                onChange={(e) => setOneOnOneDays(e.target.value)}
+                placeholder="e.g. 21"
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+              />
+            </div>
+            <div className="flex-1 min-w-[160px] max-w-[220px]">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">
+                PM update cadence (days)
+              </label>
+              <input
+                type="number" min="1" max="365" value={pmLogDays}
+                onChange={(e) => setPmLogDays(e.target.value)}
+                placeholder="e.g. 14"
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+              />
+            </div>
+            <Button onClick={handleSaveReminders} disabled={reminderSaving}>
+              {reminderSaving ? 'Saving...' : reminderSuccess ? 'Saved!' : 'Save'}
             </Button>
           </div>
         </div>
