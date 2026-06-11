@@ -262,6 +262,7 @@ export const api = {
 
   // In-app reminder queue (derived from org cadence settings).
   getMyReminders: () => apiFetch('/me/reminders'),
+  dismissReminder: (data) => apiFetch('/me/reminders/dismiss', { method: 'POST', body: JSON.stringify(data) }),
 
   // Customer detail + performance
   getCustomerDetail: (id) => apiFetch('/customers/' + id + '/detail'),

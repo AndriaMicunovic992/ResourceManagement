@@ -28,6 +28,22 @@ function currentMonthKey(): string {
 }
 
 export const reminderService = {
+  async dismiss(
+    orgId: string,
+    userId: string,
+    data: { type: string; resourceId: string; customerId?: string | null }
+  ) {
+    return prisma.reminderDismissal.create({
+      data: {
+        orgId,
+        userId,
+        type: data.type,
+        resourceId: data.resourceId,
+        customerId: data.customerId ?? null,
+      },
+    });
+  },
+
   async forUser(orgId: string, userId: string, scope: VisibilityScope): Promise<ReminderItem[]> {
     const org = await prisma.organization.findUnique({
       where: { id: orgId },
@@ -37,6 +53,23 @@ export const reminderService = {
 
     const items: ReminderItem[] = [];
     const managedIds = Array.from(scope.managedPersonIds);
+
+    // Dismissals ("on leave this month" etc.): for cadence-based reminders the
+    // dismissal counts as activity; for monthly signals it hides the month.
+    const dismissals = await prisma.reminderDismissal.findMany({
+      where: { orgId, userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const latestDismissal = new Map<string, Date>();
+    for (const d of dismissals) {
+      const key = `${d.type}|${d.resourceId}|${d.customerId ?? ''}`;
+      if (!latestDismissal.has(key)) latestDismissal.set(key, d.createdAt);
+    }
+    const maxDate = (a: Date | null, b: Date | undefined): Date | null => {
+      if (!b) return a;
+      if (!a) return b;
+      return a > b ? a : b;
+    };
 
     // --- Overdue 1:1s for people the user manages (direct or via team) ---
     if (org.oneOnOneReminderDays && managedIds.length > 0) {
@@ -52,7 +85,8 @@ export const reminderService = {
       const latestBy = new Map(latest.map((l) => [l.resourceId, l._max.meetingDate]));
       for (const p of people) {
         const last = latestBy.get(p.id) ?? null;
-        const days = daysSince(last);
+        const effective = maxDate(last, latestDismissal.get(`oneOnOne|${p.id}|`));
+        const days = daysSince(effective);
         if (days === null || days >= org.oneOnOneReminderDays) {
           items.push({
             type: 'oneOnOne',
@@ -143,7 +177,11 @@ export const reminderService = {
           for (const resourceId of resourceIds) {
             if (resourceId === scope.selfResourceId) continue;
             const key = `${customerId}|${resourceId}`;
-            if (!signalSet.has(key)) {
+            const signalDismissed = (() => {
+              const at = latestDismissal.get(`clientSignal|${resourceId}|${customerId}`);
+              return !!at && at.toISOString().slice(0, 7) === month;
+            })();
+            if (!signalSet.has(key) && !signalDismissed) {
               items.push({
                 type: 'clientSignal',
                 resourceId,
@@ -153,7 +191,10 @@ export const reminderService = {
               });
             }
             if (org.pmLogReminderDays) {
-              const last = latestLog.get(key) ?? null;
+              const last = maxDate(
+                latestLog.get(key) ?? null,
+                latestDismissal.get(`pmUpdate|${resourceId}|${customerId}`)
+              );
               const days = daysSince(last);
               if (days === null || days >= org.pmLogReminderDays) {
                 items.push({

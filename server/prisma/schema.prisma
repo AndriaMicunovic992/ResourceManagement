@@ -42,6 +42,7 @@ model Organization {
   followUps     FollowUp[]
   careerEntries CareerEntry[]
   clientSignals ClientSignal[]
+  reminderDismissals ReminderDismissal[]
 }
 
 model User {
@@ -70,6 +71,7 @@ model User {
   createdFollowUps      FollowUp[]     @relation("FollowUpCreator")
   authoredCareerEntries CareerEntry[]  @relation("AuthoredCareerEntries")
   authoredClientSignals ClientSignal[] @relation("AuthoredClientSignals")
+  reminderDismissals    ReminderDismissal[] @relation("ReminderDismissals")
 }
 
 model OrgMember {
@@ -581,4 +583,20 @@ model EvaluationScore {
 
   @@unique([evaluationId, categorySnapshotId])
   @@index([evaluationId])
+}
+
+// A user snoozing a reminder item ("on leave this month", etc.). Cadence-based
+// reminders treat the dismissal like activity; monthly ones hide for the month.
+model ReminderDismissal {
+  id         String   @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation("ReminderDismissals", fields: [userId], references: [id], onDelete: Cascade)
+  type       String   // oneOnOne | pmUpdate | clientSignal
+  resourceId String
+  customerId String?
+  createdAt  DateTime @default(now())
+
+  @@index([orgId, userId])
 }
