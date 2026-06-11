@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { useData } from '../../../../contexts/DataContext';
@@ -181,6 +182,12 @@ export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = fals
         </div>
         {!readOnly && (
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <Link
+              to={`/people/${record.resourceId}/oneonones/${record.id}/cockpit`}
+              className="text-xs font-semibold text-white bg-primary border border-primary rounded px-2 py-1 no-underline hover:opacity-90"
+            >
+              Cockpit
+            </Link>
             <button
               onClick={onEdit}
               className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"

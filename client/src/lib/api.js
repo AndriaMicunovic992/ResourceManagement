@@ -121,6 +121,7 @@ export const api = {
 
   // 1:1 Meetings
   listOneOnOnes: (resourceId) => apiFetch('/people/' + resourceId + '/oneonones'),
+  getOneOnOne: (resourceId, id) => apiFetch('/people/' + resourceId + '/oneonones/' + id),
   createOneOnOne: (resourceId, data) => apiFetch('/people/' + resourceId + '/oneonones', { method: 'POST', body: JSON.stringify(data) }),
   updateOneOnOne: (resourceId, id, data) => apiFetch('/people/' + resourceId + '/oneonones/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteOneOnOne: (resourceId, id) => apiFetch('/people/' + resourceId + '/oneonones/' + id, { method: 'DELETE' }),

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../../../../lib/api';
 import EmptyState from '../../../../components/ui/EmptyState';
 import OneOnOneList from './OneOnOneList';
@@ -7,12 +7,14 @@ import OneOnOneForm from './OneOnOneForm';
 
 export default function PersonOneOnOnes() {
   const { resource, viewMode } = useOutletContext();
+  const navigate = useNavigate();
   const isSelfView = viewMode === 'self';
 
   const [oneOnOnes, setOneOnOnes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [starting, setStarting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,6 +42,21 @@ export default function PersonOneOnOnes() {
   const handleEdit = (id) => setEditingId(id);
   const handleCancel = () => setEditingId(null);
 
+  // "Start 1:1": create a meeting dated today and jump straight to the cockpit.
+  const handleStartCockpit = async () => {
+    setStarting(true);
+    setError('');
+    try {
+      const created = await api.createOneOnOne(resource.id, {
+        meetingDate: new Date().toISOString().slice(0, 10),
+      });
+      navigate(`/people/${resource.id}/oneonones/${created.id}/cockpit`);
+    } catch (err) {
+      setError(err.message || 'Failed to start 1:1');
+      setStarting(false);
+    }
+  };
+
   const handleSave = async (data) => {
     if (editingId === 'new') {
       const created = await api.createOneOnOne(resource.id, data);
@@ -66,12 +83,21 @@ export default function PersonOneOnOnes() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-bold text-text m-0">1:1 Meetings</h2>
         {!isSelfView && (
-          <button
-            onClick={handleCreate}
-            className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90"
-          >
-            + New 1:1
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleStartCockpit}
+              disabled={starting}
+              className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+            >
+              {starting ? 'Starting…' : '▶ Start 1:1'}
+            </button>
+            <button
+              onClick={handleCreate}
+              className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-3 py-1.5 cursor-pointer hover:bg-primary hover:text-white"
+            >
+              + Quick add
+            </button>
+          </div>
         )}
       </div>
 
