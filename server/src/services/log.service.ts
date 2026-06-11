@@ -21,6 +21,10 @@ const logInclude = {
   authorUser: { select: authorSelect },
   oneOnOne: { select: oneOnOneSelect },
   category: { select: categorySelect },
+  comments: {
+    include: { authorUser: { select: authorSelect } },
+    orderBy: { createdAt: 'asc' as const },
+  },
 } as const;
 
 export { logInclude };
@@ -97,20 +101,17 @@ export async function listLogs(
   const where: Prisma.LogWhereInput = { orgId, resourceId };
 
   if (!admin) {
-    // Non-admins viewing their own resource only see their own employee logs
-    // (manager notes stay hidden). Non-admins viewing a visible other person
-    // see all logs — they reached the route by being a manager/responsible.
+    // Kinds are shared between self-journal and observer entries, so the
+    // self-vs-manager separation is authorship-based: a non-admin subject sees
+    // only entries they authored (PM/manager entries about them stay hidden).
+    // Non-admins viewing a visible other person see all entries — they reached
+    // the route by being a manager/responsible.
     const self = await findResourceForUser(orgId, requestingUserId);
-    const isSelf = self?.id === resourceId;
-    if (isSelf) {
-      where.kind = { in: [...EMPLOYEE_LOG_KINDS] };
-      if (filters.kind && isEmployeeKind(filters.kind)) where.kind = filters.kind;
-    } else if (filters.kind) {
-      where.kind = filters.kind;
+    if (self?.id === resourceId) {
+      where.authorUserId = requestingUserId;
     }
-  } else if (filters.kind) {
-    where.kind = filters.kind;
   }
+  if (filters.kind) where.kind = filters.kind;
 
   if (filters.categoryId) where.categoryId = filters.categoryId;
   if (filters.customerId) where.customerId = filters.customerId;
@@ -145,11 +146,11 @@ export async function getLog(
   if (!log) throw new NotFoundError('Log not found');
 
   if (!isAdminRole(requestingUserRole)) {
-    // Non-admin viewing self: only their own employee-kind logs. Non-admin
-    // viewing another person's logs: allowed (route has already asserted
-    // visibility via the person gate).
+    // Non-admin viewing self: own-authored entries only (authorship rule).
+    // Non-admin viewing another person's logs: allowed (route has already
+    // asserted visibility via the person gate).
     const self = await findResourceForUser(orgId, requestingUserId);
-    if (self?.id === log.resourceId && !isEmployeeKind(log.kind)) {
+    if (self?.id === log.resourceId && log.authorUserId !== requestingUserId) {
       throw new NotFoundError('Log not found');
     }
   }
@@ -219,12 +220,14 @@ export async function updateLog(
   }
 
   if (!isAdminRole(requestingUserRole)) {
-    // Employees can only edit their own employee-kind logs.
-    if (!isEmployeeKind(existing.kind)) {
-      throw new ForbiddenError('You cannot edit this log');
-    }
-    if (data.kind !== undefined && !isEmployeeKind(data.kind)) {
-      throw new ForbiddenError('You cannot change this log to that kind');
+    // Authors edit their own entries. On their own profile (self-journal) the
+    // kind must stay within the employee set — no self-authored incidents or
+    // project check-ins.
+    const self = await findResourceForUser(orgId, requestingUserId);
+    if (self?.id === existing.resourceId) {
+      if (data.kind !== undefined && !isEmployeeKind(data.kind)) {
+        throw new ForbiddenError('You cannot change this log to that kind');
+      }
     }
   }
 
@@ -275,12 +278,58 @@ export async function deleteLog(
   if (!existing) throw new NotFoundError('Log not found');
   const isAuthor = existing.authorUserId === requestingUserId;
   const admin = isAdminRole(requestingUserRole);
-  if (!admin) {
-    if (!isAuthor || !isEmployeeKind(existing.kind)) {
-      throw new ForbiddenError('You cannot delete this log');
-    }
-  } else if (!isAuthor && !admin) {
+  if (!admin && !isAuthor) {
     throw new ForbiddenError('You cannot delete this log');
   }
   await prisma.log.delete({ where: { id } });
+}
+
+// --- Thread comments ---
+// v1 participants: entry author (PM), the subject's managers, admins. The
+// subject employee neither sees PM entries nor comments anywhere — their
+// manager mediates the conversation and documents the outcome.
+
+export async function addLogComment(
+  orgId: string,
+  logId: string,
+  requestingUserId: string,
+  requestingUserRole: string,
+  content: string
+) {
+  const log = await prisma.log.findFirst({ where: { id: logId, orgId } });
+  if (!log) throw new NotFoundError('Log not found');
+
+  if (!isAdminRole(requestingUserRole)) {
+    if (requestingUserRole === 'viewer') {
+      throw new ForbiddenError('You cannot comment on logs');
+    }
+    // The subject of an entry never participates in its thread (v1).
+    const self = await findResourceForUser(orgId, requestingUserId);
+    if (self?.id === log.resourceId) {
+      throw new ForbiddenError('You cannot comment on logs about yourself');
+    }
+  }
+
+  return prisma.logComment.create({
+    data: { orgId, logId, authorUserId: requestingUserId, content },
+    include: { authorUser: { select: authorSelect } },
+  });
+}
+
+export async function deleteLogComment(
+  orgId: string,
+  logId: string,
+  commentId: string,
+  requestingUserId: string,
+  requestingUserRole: string
+): Promise<void> {
+  const comment = await prisma.logComment.findFirst({
+    where: { id: commentId, logId, orgId },
+  });
+  if (!comment) throw new NotFoundError('Comment not found');
+  const isAuthor = comment.authorUserId === requestingUserId;
+  if (!isAuthor && !isAdminRole(requestingUserRole)) {
+    throw new ForbiddenError('You cannot delete this comment');
+  }
+  await prisma.logComment.delete({ where: { id: commentId } });
 }

@@ -141,6 +141,43 @@ export const api = {
   updateLog: (resourceId, id, data) => apiFetch('/people/' + resourceId + '/logs/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteLog: (resourceId, id) => apiFetch('/people/' + resourceId + '/logs/' + id, { method: 'DELETE' }),
 
+  // Log thread comments
+  addLogComment: (resourceId, logId, content) =>
+    apiFetch('/people/' + resourceId + '/logs/' + logId + '/comments', { method: 'POST', body: JSON.stringify({ content }) }),
+  deleteLogComment: (resourceId, logId, commentId) =>
+    apiFetch('/people/' + resourceId + '/logs/' + logId + '/comments/' + commentId, { method: 'DELETE' }),
+
+  // Follow-ups
+  listFollowUps: (resourceId, status) =>
+    apiFetch(_qs('/people/' + resourceId + '/followups', status ? { status } : null)),
+  createFollowUp: (resourceId, data) =>
+    apiFetch('/people/' + resourceId + '/followups', { method: 'POST', body: JSON.stringify(data) }),
+  updateFollowUp: (resourceId, id, data) =>
+    apiFetch('/people/' + resourceId + '/followups/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteFollowUp: (resourceId, id) =>
+    apiFetch('/people/' + resourceId + '/followups/' + id, { method: 'DELETE' }),
+
+  // Career thread
+  listCareerEntries: (resourceId) => apiFetch('/people/' + resourceId + '/career'),
+  createCareerEntry: (resourceId, data) =>
+    apiFetch('/people/' + resourceId + '/career', { method: 'POST', body: JSON.stringify(data) }),
+  updateCareerEntry: (resourceId, id, data) =>
+    apiFetch('/people/' + resourceId + '/career/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteCareerEntry: (resourceId, id) =>
+    apiFetch('/people/' + resourceId + '/career/' + id, { method: 'DELETE' }),
+
+  // Client satisfaction signals (monthly, per person per customer)
+  getCustomerSignals: (customerId, params) => apiFetch(_qs('/customers/' + customerId + '/signals', params)),
+  upsertCustomerSignal: (customerId, data) =>
+    apiFetch('/customers/' + customerId + '/signals', { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCustomerSignal: (customerId, id) =>
+    apiFetch('/customers/' + customerId + '/signals/' + id, { method: 'DELETE' }),
+  getPersonSignals: (resourceId, params) => apiFetch(_qs('/people/' + resourceId + '/signals', params)),
+
+  // Compensation satisfaction (on the evaluation cadence)
+  setEvaluationCompensation: (id, compensationSatisfaction) =>
+    apiFetch('/evaluations/' + id + '/compensation', { method: 'PATCH', body: JSON.stringify({ compensationSatisfaction }) }),
+
   // Needs
   getNeeds: () => apiFetch('/needs'),
   createNeed: (data) => apiFetch('/needs', { method: 'POST', body: JSON.stringify(data) }),

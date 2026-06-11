@@ -29,3 +29,37 @@ export function hoursToFte(hours) {
 }
 
 export { SKILL_LEVELS, SKILL_LEVEL_LIST } from './skillLevels';
+
+// --- Activity log entry types ---
+// Polarity is inherent in the type (no good/bad labels). project_checkin is
+// the per-project box filled during a 1:1; client satisfaction is a separate
+// monthly signal, not a log kind.
+export const LOG_KIND_OPTIONS = [
+  { value: 'strength', label: 'Strength' },
+  { value: 'concern', label: 'Concern' },
+  { value: 'incident', label: 'Incident' },
+  { value: 'blocker', label: 'Blocker' },
+  { value: 'note', label: 'Note' },
+  { value: 'project_checkin', label: 'Project check-in' },
+];
+
+// Types an employee may use on their own journal.
+export const EMPLOYEE_LOG_KIND_OPTIONS = [
+  { value: 'strength', label: 'Strength' },
+  { value: 'concern', label: 'Concern' },
+  { value: 'blocker', label: 'Blocker' },
+  { value: 'note', label: 'Note' },
+];
+
+export const LOG_KIND_LABELS = Object.fromEntries(
+  LOG_KIND_OPTIONS.map((k) => [k.value, k.label])
+);
+
+export const LOG_KIND_COLORS = {
+  strength: 'bg-emerald-100 text-emerald-700',
+  concern: 'bg-amber-100 text-amber-700',
+  incident: 'bg-orange-100 text-orange-700',
+  blocker: 'bg-rose-100 text-rose-700',
+  note: 'bg-gray-100 text-gray-700',
+  project_checkin: 'bg-blue-100 text-blue-700',
+};

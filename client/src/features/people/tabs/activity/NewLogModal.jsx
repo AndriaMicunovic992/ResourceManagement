@@ -2,25 +2,16 @@ import { useMemo, useState } from 'react';
 import Modal from '../../../../components/ui/Modal';
 import { api } from '../../../../lib/api';
 import { useData } from '../../../../contexts/DataContext';
-
-const OBSERVER_KINDS = [
-  { value: 'observation', label: 'Observation' },
-  { value: 'good', label: 'Good' },
-  { value: 'bad', label: 'Bad' },
-  { value: 'incident', label: 'Incident' },
-];
-
-const EMPLOYEE_KINDS = [
-  { value: 'win', label: 'Win' },
-  { value: 'down', label: 'Down' },
-  { value: 'blocker', label: 'Blocker' },
-];
+import {
+  LOG_KIND_OPTIONS,
+  EMPLOYEE_LOG_KIND_OPTIONS,
+} from '../../../../lib/constants';
 
 export default function NewLogModal({ resourceId, onCancel, onCreated }) {
   const { customers, projects, logCategories } = useData();
   const [content, setContent] = useState('');
   const [perspective, setPerspective] = useState('observer');
-  const [kind, setKind] = useState('observation');
+  const [kind, setKind] = useState('strength');
   const [customerId, setCustomerId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [jiraUrl, setJiraUrl] = useState('');
@@ -44,11 +35,12 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
     return Array.from(groups.entries()).map(([grouping, categories]) => ({ grouping, categories }));
   }, [logCategories]);
 
-  const kindOptions = perspective === 'employee' ? EMPLOYEE_KINDS : OBSERVER_KINDS;
+  const kindOptions =
+    perspective === 'employee' ? EMPLOYEE_LOG_KIND_OPTIONS : LOG_KIND_OPTIONS;
 
   const handlePerspectiveChange = (next) => {
     setPerspective(next);
-    setKind(next === 'employee' ? 'win' : 'observation');
+    setKind('strength');
   };
 
   const handleCustomerChange = (e) => {

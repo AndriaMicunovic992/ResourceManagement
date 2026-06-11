@@ -8,17 +8,9 @@ import EmptyState from '../../../../components/ui/EmptyState';
 import LogInlineEditor from '../oneonones/LogInlineEditor';
 import NewLogModal from './NewLogModal';
 import LogCard from './LogCard';
+import { LOG_KIND_OPTIONS } from '../../../../lib/constants';
 
-const KINDS = [
-  { value: '', label: 'All kinds' },
-  { value: 'observation', label: 'Observation' },
-  { value: 'good', label: 'Good' },
-  { value: 'bad', label: 'Bad' },
-  { value: 'incident', label: 'Incident' },
-  { value: 'win', label: 'Win' },
-  { value: 'down', label: 'Down' },
-  { value: 'blocker', label: 'Blocker' },
-];
+const KINDS = [{ value: '', label: 'All kinds' }, ...LOG_KIND_OPTIONS];
 
 export default function PersonActivity() {
   const { resource } = useOutletContext();
@@ -232,6 +224,8 @@ export default function PersonActivity() {
                 log={log}
                 currentUserId={user?.id}
                 resourceId={resource.id}
+                subjectUserId={resource.userId}
+                canComment={isAdmin}
                 onEdit={() => setEditingLogId(log.id)}
                 onDelete={() => handleDeleteLog(log.id)}
               />

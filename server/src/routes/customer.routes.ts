@@ -80,6 +80,31 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
       orgId: req.orgId,
       OR: orClauses,
     };
+    const restrictions: Prisma.LogWhereInput[] = [];
+    if (!req.visibility.isAdmin) {
+      // Project check-ins (1:1 per-project boxes) are visible here only to
+      // admins and the responsible person of that project/customer.
+      const respProjects = projectIds.filter((p) => req.visibility.responsibleProjectIds.has(p));
+      restrictions.push({
+        OR: [
+          { kind: { not: 'project_checkin' } },
+          ...(respProjects.length > 0
+            ? [{ kind: 'project_checkin', projectId: { in: respProjects } }]
+            : []),
+        ],
+      });
+      // Entries about the requester authored by others (PM/manager notes about
+      // them) stay hidden, same as on their own person page.
+      if (req.visibility.selfResourceId) {
+        restrictions.push({
+          OR: [
+            { resourceId: { not: req.visibility.selfResourceId } },
+            { authorUserId: req.userId },
+          ],
+        });
+      }
+    }
+    if (restrictions.length > 0) where.AND = restrictions;
     if (filters.kind) where.kind = filters.kind;
     if (filters.categoryId) where.categoryId = filters.categoryId;
     if (filters.projectId) where.projectId = filters.projectId;

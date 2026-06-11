@@ -4,17 +4,14 @@ import { useAuth } from '../../../../contexts/AuthContext';
 import { useData } from '../../../../contexts/DataContext';
 import LogInlineEditor from './LogInlineEditor';
 
-const OBSERVER_SECTIONS = [
-  { kind: 'good', label: 'Good sides' },
-  { kind: 'bad', label: 'Bad sides' },
+// One combined list — perspective is carried by authorship, not by kind.
+const SECTIONS = [
+  { kind: 'strength', label: 'Strengths' },
+  { kind: 'concern', label: 'Concerns' },
   { kind: 'incident', label: 'Incidents' },
-  { kind: 'observation', label: 'Observations' },
-];
-
-const EMPLOYEE_SECTIONS = [
-  { kind: 'win', label: 'Wins' },
-  { kind: 'down', label: 'Downs' },
   { kind: 'blocker', label: 'Blockers' },
+  { kind: 'note', label: 'Notes' },
+  { kind: 'project_checkin', label: 'Project check-ins' },
 ];
 
 function formatDate(value) {
@@ -136,15 +133,9 @@ export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = fals
     };
   }, [expanded, record.id, record.resourceId]);
 
-  const byKind = {
-    good: logs.filter((l) => l.kind === 'good'),
-    bad: logs.filter((l) => l.kind === 'bad'),
-    incident: logs.filter((l) => l.kind === 'incident'),
-    observation: logs.filter((l) => l.kind === 'observation'),
-    win: logs.filter((l) => l.kind === 'win'),
-    down: logs.filter((l) => l.kind === 'down'),
-    blocker: logs.filter((l) => l.kind === 'blocker'),
-  };
+  const byKind = Object.fromEntries(
+    SECTIONS.map(({ kind }) => [kind, logs.filter((l) => l.kind === kind)])
+  );
 
   const handleCreateLog = async (data) => {
     const payload = {
@@ -208,6 +199,22 @@ export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = fals
 
       {expanded && (
         <div className="px-4 pb-4 pt-1 border-t border-border-light space-y-4">
+          {(record.overallScore != null || record.workSatisfaction != null) && (
+            <div className="flex flex-wrap gap-6">
+              {record.overallScore != null && (
+                <Section label="Overall score (pulse)" value={`${record.overallScore} / 5`} />
+              )}
+              {record.workSatisfaction != null && (
+                <Section
+                  label="Work satisfaction (self-reported)"
+                  value={`${record.workSatisfaction} / 5`}
+                />
+              )}
+            </div>
+          )}
+          <Section label="What went well" value={record.wentWell} />
+          <Section label="What went bad" value={record.wentBad} />
+          {/* Legacy fields from pre-cockpit records (read-only). */}
           <Section label="General status" value={record.generalStatus} />
           {!readOnly && <Section label="Personal notes" value={record.personalNotes} />}
           <Section label="Career development" value={record.careerDevelopment} />
@@ -219,10 +226,10 @@ export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = fals
           {!readOnly && (
           <div>
             <div className="text-[10px] uppercase tracking-wider text-text-mid font-bold mb-2">
-              Manager / customer perspective
+              Entries from this 1:1
             </div>
             <div className="space-y-3">
-              {OBSERVER_SECTIONS.map(({ kind, label }) => (
+              {SECTIONS.map(({ kind, label }) => (
                 <div key={kind}>
                   <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1.5">
                     {label}
@@ -280,69 +287,6 @@ export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = fals
             </div>
           </div>
           )}
-
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-text-mid font-bold mb-2">
-              Employee perspective
-            </div>
-            <div className="space-y-3">
-              {EMPLOYEE_SECTIONS.map(({ kind, label }) => (
-                <div key={kind}>
-                  <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1.5">
-                    {label}
-                  </div>
-                  {logsLoading ? (
-                    <div className="text-[11px] text-text-light italic">Loading…</div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {byKind[kind].length === 0 && addingKind !== kind && (
-                        <div className="text-[11px] text-text-light italic">No entries.</div>
-                      )}
-                      {byKind[kind].map((log) =>
-                        editingLogId === log.id ? (
-                          <LogInlineEditor
-                            key={log.id}
-                            initial={log}
-                            customers={customers}
-                            projects={projects}
-                            onCancel={() => setEditingLogId(null)}
-                            onSave={(data) => handleUpdateLog(log.id, data)}
-                          />
-                        ) : (
-                          <LogEntry
-                            key={log.id}
-                            log={log}
-                            currentUserId={user?.id}
-                            onEdit={() => setEditingLogId(log.id)}
-                            onDelete={() => handleDeleteLog(log.id)}
-                          />
-                        )
-                      )}
-                      {addingKind === kind ? (
-                        <LogInlineEditor
-                          initial={null}
-                          customers={customers}
-                          projects={projects}
-                          onCancel={() => setAddingKind(null)}
-                          onSave={handleCreateLog}
-                        />
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setEditingLogId(null);
-                            setAddingKind(kind);
-                          }}
-                          className="text-[11px] font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
-                        >
-                          + Add
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
 
           {hasPrivate && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">

@@ -9,34 +9,66 @@ function toDateInputValue(value) {
   return d.toISOString().slice(0, 10);
 }
 
-const TEXTAREA_FIELDS = [
-  { key: 'generalStatus', label: 'General status' },
-  { key: 'personalNotes', label: 'Personal notes' },
-  { key: 'careerDevelopment', label: 'Career development' },
+// Pre-cockpit fields: only shown when editing an old record that has content
+// in them, so legacy 1:1s stay readable/editable. New records don't write them.
+const LEGACY_FIELDS = [
+  { key: 'generalStatus', label: 'General status (legacy)' },
+  { key: 'personalNotes', label: 'Personal notes (legacy)' },
+  { key: 'careerDevelopment', label: 'Career development (legacy)' },
+  { key: 'managerPersonalNotes', label: 'My personal notes (legacy, private)' },
 ];
+
+function RatingPicker({ label, hint, value, onChange }) {
+  return (
+    <div>
+      <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
+        {label}
+      </label>
+      {hint && <div className="text-[10px] text-text-light mb-1">{hint}</div>}
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(value === n ? null : n)}
+            className={`w-8 h-8 rounded-lg border text-xs font-bold cursor-pointer ${
+              value === n
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-text-mid border-border hover:border-primary'
+            }`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function OneOnOneForm({ initial, onCancel, onSave }) {
   const { user } = useAuth();
   const isEdit = !!initial;
   // On create, the current user will become the author, so they can always
-  // set the private fields. On edit, only the original author can.
+  // set the private note. On edit, only the original author can.
   const isAuthor = !isEdit || (user?.id && initial?.authorUserId === user.id);
+
   const [meetingDate, setMeetingDate] = useState(toDateInputValue(initial?.meetingDate));
-  const [fields, setFields] = useState(() => {
+  const [overallScore, setOverallScore] = useState(initial?.overallScore ?? null);
+  const [workSatisfaction, setWorkSatisfaction] = useState(initial?.workSatisfaction ?? null);
+  const [wentWell, setWentWell] = useState(initial?.wentWell || '');
+  const [wentBad, setWentBad] = useState(initial?.wentBad || '');
+  const [privateNote, setPrivateNote] = useState(initial?.privateNote || '');
+  const [legacy, setLegacy] = useState(() => {
     const base = {};
-    for (const f of TEXTAREA_FIELDS) base[f.key] = initial?.[f.key] || '';
+    for (const f of LEGACY_FIELDS) base[f.key] = initial?.[f.key] || '';
     return base;
   });
-  const [managerPersonalNotes, setManagerPersonalNotes] = useState(
-    initial?.managerPersonalNotes || ''
-  );
-  const [privateNote, setPrivateNote] = useState(initial?.privateNote || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const handleFieldChange = (key) => (e) => {
-    setFields((prev) => ({ ...prev, [key]: e.target.value }));
-  };
+  const legacyFieldsToShow = isEdit
+    ? LEGACY_FIELDS.filter((f) => (initial?.[f.key] || '') !== '')
+    : [];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,14 +79,17 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
     setSaving(true);
     setError('');
     try {
-      const payload = { meetingDate };
-      for (const f of TEXTAREA_FIELDS) {
-        payload[f.key] = fields[f.key].trim() ? fields[f.key] : null;
+      const payload = {
+        meetingDate,
+        overallScore,
+        workSatisfaction,
+        wentWell: wentWell.trim() ? wentWell : null,
+        wentBad: wentBad.trim() ? wentBad : null,
+      };
+      for (const f of legacyFieldsToShow) {
+        payload[f.key] = legacy[f.key].trim() ? legacy[f.key] : null;
       }
       if (isAuthor) {
-        payload.managerPersonalNotes = managerPersonalNotes.trim()
-          ? managerPersonalNotes
-          : null;
         payload.privateNote = privateNote.trim() ? privateNote : null;
       }
       await onSave(payload);
@@ -84,14 +119,56 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
           />
         </div>
 
-        {TEXTAREA_FIELDS.map((f) => (
+        <div className="grid grid-cols-2 gap-3">
+          <RatingPicker
+            label="Overall score (pulse)"
+            hint="Your read on this period — distinct from formal evaluations."
+            value={overallScore}
+            onChange={setOverallScore}
+          />
+          <RatingPicker
+            label="Work satisfaction"
+            hint="As reported by the employee in the meeting."
+            value={workSatisfaction}
+            onChange={setWorkSatisfaction}
+          />
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
+            What went well
+          </label>
+          <textarea
+            value={wentWell}
+            onChange={(e) => setWentWell(e.target.value)}
+            rows={3}
+            maxLength={10000}
+            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
+            What went bad
+          </label>
+          <textarea
+            value={wentBad}
+            onChange={(e) => setWentBad(e.target.value)}
+            rows={3}
+            maxLength={10000}
+            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+          />
+        </div>
+
+        {legacyFieldsToShow.map((f) => (
           <div key={f.key}>
             <label className="block text-[10px] font-semibold text-text-mid mb-1 uppercase tracking-wider">
               {f.label}
             </label>
             <textarea
-              value={fields[f.key]}
-              onChange={handleFieldChange(f.key)}
+              value={legacy[f.key]}
+              onChange={(e) =>
+                setLegacy((prev) => ({ ...prev, [f.key]: e.target.value }))
+              }
               rows={3}
               maxLength={5000}
               className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
@@ -104,32 +181,11 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
             <div className="flex items-center gap-1.5 mb-1">
               <span className="text-amber-700">🔒</span>
               <label className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold">
-                My personal notes (private to me)
+                Private note (only you)
               </label>
             </div>
             <div className="text-[10px] text-amber-800/80 mb-1">
-              Only you can see this. Other admins will not.
-            </div>
-            <textarea
-              value={managerPersonalNotes}
-              onChange={(e) => setManagerPersonalNotes(e.target.value)}
-              rows={3}
-              maxLength={5000}
-              className="w-full px-2 py-1.5 border border-amber-300 rounded text-xs text-text outline-none focus:border-amber-500 bg-white resize-y"
-            />
-          </div>
-        )}
-
-        {isAuthor && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-amber-700">🔒</span>
-              <label className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold">
-                Private note (author only)
-              </label>
-            </div>
-            <div className="text-[10px] text-amber-800/80 mb-1">
-              A second private field, only visible to you.
+              Visible only to you — not to other admins, and hidden during "view as".
             </div>
             <textarea
               value={privateNote}

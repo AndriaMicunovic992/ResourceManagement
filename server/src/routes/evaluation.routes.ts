@@ -6,6 +6,7 @@ import {
   updateScoreSchema,
   finalizeEvaluationSchema,
   listEvaluationsQuerySchema,
+  compensationSchema,
 } from '../schemas/evaluation.schema.js';
 import { evaluationService } from '../services/evaluation.service.js';
 import { performanceService } from '../services/performance.service.js';
@@ -63,6 +64,17 @@ export const evaluationRoutes: FastifyPluginAsync = async (app) => {
       req.userId,
       req.role,
       body
+    );
+  });
+
+  app.patch('/evaluations/:id/compensation', async (req) => {
+    const { id } = req.params as { id: string };
+    const body = compensationSchema.parse(req.body);
+    return evaluationService.setCompensationSatisfaction(
+      req.orgId,
+      id,
+      req.userId,
+      body.compensationSatisfaction
     );
   });
 

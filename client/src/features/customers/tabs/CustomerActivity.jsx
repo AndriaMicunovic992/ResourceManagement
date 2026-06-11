@@ -3,17 +3,9 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../../../lib/api';
 import { useData } from '../../../contexts/DataContext';
 import LogCard from '../../people/tabs/activity/LogCard';
+import { LOG_KIND_OPTIONS } from '../../../lib/constants';
 
-const KIND_OPTIONS = [
-  { value: '', label: 'All kinds' },
-  { value: 'good', label: 'Good' },
-  { value: 'bad', label: 'Bad' },
-  { value: 'incident', label: 'Incident' },
-  { value: 'observation', label: 'Observation' },
-  { value: 'win', label: 'Win' },
-  { value: 'down', label: 'Down' },
-  { value: 'blocker', label: 'Blocker' },
-];
+const KIND_OPTIONS = [{ value: '', label: 'All kinds' }, ...LOG_KIND_OPTIONS];
 
 export default function CustomerActivity() {
   const { customer } = useOutletContext();

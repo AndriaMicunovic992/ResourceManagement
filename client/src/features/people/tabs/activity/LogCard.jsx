@@ -1,18 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-
-const KIND_COLORS = {
-  good: 'bg-green-100 text-green-700',
-  bad: 'bg-red-100 text-red-700',
-  incident: 'bg-orange-100 text-orange-700',
-  observation: 'bg-gray-100 text-gray-700',
-  win: 'bg-emerald-100 text-emerald-700',
-  down: 'bg-amber-100 text-amber-700',
-  blocker: 'bg-rose-100 text-rose-700',
-};
-
-// Employee-reported kinds (the subject logging their own wins/downs/blockers).
-// Anything else is an observer entry (manager / admin / responsible).
-const EMPLOYEE_KINDS = new Set(['win', 'down', 'blocker']);
+import { api } from '../../../../lib/api';
+import { LOG_KIND_COLORS, LOG_KIND_LABELS } from '../../../../lib/constants';
 
 function formatDate(value) {
   if (!value) return '';
@@ -25,15 +14,46 @@ function formatDate(value) {
   });
 }
 
-export default function LogCard({ log, currentUserId, resourceId, onEdit, onDelete }) {
+export default function LogCard({
+  log,
+  currentUserId,
+  resourceId,
+  subjectUserId,
+  canComment = false,
+  onEdit,
+  onDelete,
+}) {
   const isAuthor = log.authorUserId === currentUserId;
   const showActions = isAuthor && (onEdit || onDelete);
-  const isEmployeeInput = EMPLOYEE_KINDS.has(log.kind);
+  // Kinds are shared between self-journal and observer entries, so the source
+  // badge is authorship-based: did the subject write this about themselves?
+  const isEmployeeInput = !!subjectUserId && log.authorUserId === subjectUserId;
   const sourceBorder = isEmployeeInput ? 'border-l-blue-400' : 'border-l-purple-400';
   const sourceBadge = isEmployeeInput
     ? 'bg-blue-50 text-blue-700 border border-blue-200'
     : 'bg-purple-50 text-purple-700 border border-purple-200';
   const sourceLabel = isEmployeeInput ? 'Employee' : 'Manager';
+
+  const [comments, setComments] = useState(log.comments || []);
+  const [newComment, setNewComment] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [commentError, setCommentError] = useState('');
+
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    setPosting(true);
+    setCommentError('');
+    try {
+      const created = await api.addLogComment(resourceId, log.id, newComment.trim());
+      setComments((prev) => [...prev, created]);
+      setNewComment('');
+    } catch (err) {
+      setCommentError(err.message || 'Failed to comment');
+    }
+    setPosting(false);
+  };
+
   return (
     <div className={`bg-white rounded-xl border border-border border-l-4 ${sourceBorder} p-4`}>
       <div className="flex flex-wrap gap-1.5 mb-2">
@@ -44,10 +64,10 @@ export default function LogCard({ log, currentUserId, resourceId, onEdit, onDele
         </span>
         <span
           className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${
-            KIND_COLORS[log.kind] || KIND_COLORS.observation
+            LOG_KIND_COLORS[log.kind] || LOG_KIND_COLORS.note
           }`}
         >
-          {log.kind}
+          {LOG_KIND_LABELS[log.kind] || log.kind}
         </span>
       </div>
       <div className="text-sm text-text whitespace-pre-wrap mb-2">{log.content}</div>
@@ -122,6 +142,46 @@ export default function LogCard({ log, currentUserId, resourceId, onEdit, onDele
           </div>
         )}
       </div>
+
+      {/* Thread: PM ↔ manager correspondence about this entry. */}
+      {(comments.length > 0 || canComment) && (
+        <div className="mt-3 pt-2 border-t border-border-light">
+          {comments.map((c) => (
+            <div key={c.id} className="flex items-start gap-2 py-1.5">
+              <div className="w-1 self-stretch rounded bg-border-light" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] text-text-light">
+                  {c.authorUser?.name || c.authorUser?.email || 'Unknown'} ·{' '}
+                  {formatDate(c.createdAt)}
+                </div>
+                <div className="text-xs text-text whitespace-pre-wrap">{c.content}</div>
+              </div>
+            </div>
+          ))}
+          {canComment && (
+            <form onSubmit={handleAddComment} className="flex items-center gap-2 mt-1">
+              <input
+                type="text"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Reply…"
+                maxLength={2000}
+                className="flex-1 px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              />
+              <button
+                type="submit"
+                disabled={posting || !newComment.trim()}
+                className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+              >
+                {posting ? '…' : 'Reply'}
+              </button>
+            </form>
+          )}
+          {commentError && (
+            <div className="text-[10px] text-danger mt-1">{commentError}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
