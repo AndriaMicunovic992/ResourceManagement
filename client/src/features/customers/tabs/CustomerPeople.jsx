@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useData } from '../../../contexts/DataContext';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
 import TimeRangePicker from '../../planner/toolbar/TimeRangePicker';
+import ClientSignalsSection from './ClientSignalsSection';
 
 export default function CustomerPeople() {
   const { customer } = useOutletContext();
@@ -128,6 +129,8 @@ export default function CustomerPeople() {
           </table>
         </div>
       )}
+
+      <ClientSignalsSection customer={customer} />
     </div>
   );
 }
