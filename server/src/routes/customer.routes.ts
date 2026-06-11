@@ -108,6 +108,7 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
     if (filters.kind) where.kind = filters.kind;
     if (filters.categoryId) where.categories = { some: { id: filters.categoryId } };
     if (filters.projectId) where.projectId = filters.projectId;
+    if (filters.customerReviewId) where.customerReviewId = filters.customerReviewId;
     if (filters.from || filters.to) {
       const createdAt: Prisma.DateTimeFilter = {};
       if (filters.from) createdAt.gte = parseBoundaryDate(filters.from, false);

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { api } from '../../../lib/api';
 import { useData } from '../../../contexts/DataContext';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
 import TimeRangePicker from '../../planner/toolbar/TimeRangePicker';
@@ -11,6 +12,35 @@ export default function CustomerPeople() {
   const { isAdmin, responsibleCustomerIds } = useVisibility();
   const canReview = isAdmin || responsibleCustomerIds.has(customer.id);
   const navigate = useNavigate();
+  const [reviews, setReviews] = useState([]);
+  const [startingReview, setStartingReview] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+
+  useEffect(() => {
+    if (!canReview) return;
+    let cancelled = false;
+    api
+      .listCustomerReviews(customer.id)
+      .then((data) => {
+        if (!cancelled) setReviews(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [canReview, customer.id]);
+
+  const handleStartReview = async () => {
+    setStartingReview(true);
+    setReviewError('');
+    try {
+      const created = await api.createCustomerReview(customer.id);
+      navigate(`/customers/${customer.id}/reviews/${created.id}/cockpit`);
+    } catch (err) {
+      setReviewError(err.message || 'Failed to start review');
+      setStartingReview(false);
+    }
+  };
 
   // "Currently" = allocated in the month window right now; "Ever" = any month
   // within the selected range. Default range is the last 12 months.
@@ -89,14 +119,45 @@ export default function CustomerPeople() {
           )}
           {canReview && (
             <button
-              onClick={() => navigate(`/customers/${customer.id}/review`)}
-              className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90"
+              onClick={handleStartReview}
+              disabled={startingReview}
+              className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
             >
-              ▶ PM review
+              {startingReview ? 'Starting…' : '▶ Start PM review'}
             </button>
           )}
         </div>
       </div>
+
+      {reviewError && (
+        <div className="text-xs text-danger bg-danger-bg p-2 rounded">{reviewError}</div>
+      )}
+
+      {canReview && reviews.length > 0 && (
+        <div className="bg-white rounded-xl border border-border shadow-card p-4">
+          <h3 className="text-xs font-bold text-text uppercase tracking-wider m-0 mb-2">
+            Past PM reviews
+          </h3>
+          <div className="space-y-1">
+            {reviews.map((r) => (
+              <div key={r.id} className="flex items-center justify-between py-1 px-2 rounded-lg hover:bg-primary-bg/40">
+                <span className="text-xs text-text">
+                  {new Date(r.reviewDate).toLocaleDateString(undefined, {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                  })}
+                  <span className="text-text-light"> · by {r.authorUser?.name || '—'}</span>
+                </span>
+                <button
+                  onClick={() => navigate(`/customers/${customer.id}/reviews/${r.id}/cockpit`)}
+                  className="text-[11px] font-semibold text-primary bg-transparent border-0 cursor-pointer hover:underline"
+                >
+                  Open ›
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="bg-white rounded-xl border border-border shadow-card p-8 text-center text-sm text-text-light">

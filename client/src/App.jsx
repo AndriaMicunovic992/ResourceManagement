@@ -105,7 +105,10 @@ export default function App() {
                 <Route path="performance" element={<PersonPerformance />} />
               </Route>
               {/* Full-width PM review cockpit — outside the customer tab shell. */}
-              <Route path="/customers/:customerId/review" element={<CustomerReviewCockpit />} />
+              <Route
+                path="/customers/:customerId/reviews/:reviewId/cockpit"
+                element={<CustomerReviewCockpit />}
+              />
               <Route path="/customers/:id" element={<CustomerPage />}>
                 <Route index element={<CustomerOverview />} />
                 <Route path="projects" element={<CustomerProjects />} />

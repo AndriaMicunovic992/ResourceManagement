@@ -43,6 +43,7 @@ model Organization {
   careerEntries CareerEntry[]
   clientSignals ClientSignal[]
   reminderDismissals ReminderDismissal[]
+  customerReviews CustomerReview[]
 }
 
 model User {
@@ -72,6 +73,7 @@ model User {
   authoredCareerEntries CareerEntry[]  @relation("AuthoredCareerEntries")
   authoredClientSignals ClientSignal[] @relation("AuthoredClientSignals")
   reminderDismissals    ReminderDismissal[] @relation("ReminderDismissals")
+  authoredCustomerReviews CustomerReview[] @relation("AuthoredCustomerReviews")
 }
 
 model OrgMember {
@@ -125,6 +127,7 @@ model Customer {
   logs        Log[]
   evaluations Evaluation[]
   clientSignals ClientSignal[]
+  reviews     CustomerReview[]
 
   @@index([orgId])
   @@index([responsiblePersonId])
@@ -378,6 +381,8 @@ model Log {
   jiraUrl         String?
   oneOnOneId      String?
   oneOnOne        OneOnOne? @relation(fields: [oneOnOneId], references: [id], onDelete: Cascade)
+  customerReviewId String?
+  customerReview   CustomerReview? @relation(fields: [customerReviewId], references: [id], onDelete: SetNull)
   evaluationId    String?
   evaluation      Evaluation? @relation("EvaluationLogs", fields: [evaluationId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
@@ -389,6 +394,7 @@ model Log {
   @@index([resourceId])
   @@index([authorUserId])
   @@index([oneOnOneId])
+  @@index([customerReviewId])
   @@index([evaluationId])
 }
 
@@ -599,4 +605,24 @@ model ReminderDismissal {
   createdAt  DateTime @default(now())
 
   @@index([orgId, userId])
+}
+
+// A dated PM review session for one customer — the customer-side analog of a
+// OneOnOne. Entries logged during the session link back via Log.customerReviewId.
+model CustomerReview {
+  id           String   @id @default(cuid())
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  authorUserId String
+  authorUser   User     @relation("AuthoredCustomerReviews", fields: [authorUserId], references: [id], onDelete: Restrict)
+  reviewDate   DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  logs Log[]
+
+  @@index([orgId])
+  @@index([customerId])
 }
