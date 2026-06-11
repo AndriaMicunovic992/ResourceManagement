@@ -482,6 +482,60 @@ function CareerPanel({ personId, oneOnOneId, entries, setEntries }) {
   );
 }
 
+/** Compact reply thread on a context-panel entry. */
+function MiniThread({ personId, log, onUpdated }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const comments = log.comments || [];
+
+  const send = async (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setBusy(true);
+    setErr('');
+    try {
+      const created = await api.addLogComment(personId, log.id, text.trim());
+      onUpdated({ ...log, comments: [...comments, created] });
+      setText('');
+    } catch (error) {
+      setErr(error.message || 'Failed to reply');
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="mt-1.5 pt-1.5 border-t border-border-light">
+      {comments.map((c) => (
+        <div key={c.id} className="text-[11px] text-text py-0.5">
+          <span className="font-semibold text-text-mid">
+            {c.authorUser?.name || '—'}:
+          </span>{' '}
+          {c.content}
+        </div>
+      ))}
+      <form onSubmit={send} className="flex items-center gap-1 mt-1">
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Reply…"
+          maxLength={2000}
+          className="flex-1 min-w-0 px-2 py-1 border border-border rounded text-[11px] text-text outline-none focus:border-primary bg-white"
+        />
+        <button
+          type="submit"
+          disabled={busy || !text.trim()}
+          className="text-[10px] font-semibold text-white bg-primary border-0 rounded px-2 py-1 cursor-pointer hover:opacity-90 disabled:opacity-40"
+        >
+          ↩
+        </button>
+      </form>
+      {err && <div className="text-[10px] text-danger mt-0.5">{err}</div>}
+    </div>
+  );
+}
+
 /** Quick-add an entry attached to this 1:1. */
 function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
   const kinds = LOG_KIND_OPTIONS.filter((k) => k.value !== 'project_checkin');
@@ -502,7 +556,7 @@ function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
       const created = await api.createLog(personId, {
         content: content.trim(),
         kind,
-        categoryId: categoryId || null,
+        categoryIds: categoryId ? [categoryId] : [],
         oneOnOneId,
       });
       onCreated(created);
@@ -515,11 +569,11 @@ function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
 
   return (
     <form onSubmit={handleAdd} className="space-y-1.5 pt-2 border-t border-border-light">
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 min-w-0">
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value)}
-          className="px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
+          className="shrink-0 max-w-[110px] px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
         >
           {kinds.map((k) => (
             <option key={k.value} value={k.value}>
@@ -530,7 +584,7 @@ function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
         <select
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
-          className="flex-1 px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
+          className="flex-1 min-w-0 w-full px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
         >
           <option value="">No category</option>
           {activeCategories.map((c) => (
@@ -776,11 +830,14 @@ export default function OneOnOneCockpit() {
                     >
                       {LOG_KIND_LABELS[log.kind] || log.kind}
                     </span>
-                    {log.category && (
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">
-                        {log.category.name}
+                    {(log.categories || []).map((c) => (
+                      <span
+                        key={c.id}
+                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary"
+                      >
+                        {c.name}
                       </span>
-                    )}
+                    ))}
                     {log.customer && (
                       <span className="text-[9px] text-text-light">{log.customer.name}</span>
                     )}
@@ -789,6 +846,15 @@ export default function OneOnOneCockpit() {
                   <div className="text-[10px] text-text-light mt-0.5">
                     {log.authorUser?.name || '—'} · {formatDate(log.createdAt)}
                   </div>
+                  <MiniThread
+                    personId={personId}
+                    log={log}
+                    onUpdated={(updated) =>
+                      setRecentLogs((prev) =>
+                        prev.map((l) => (l.id === updated.id ? updated : l))
+                      )
+                    }
+                  />
                 </div>
               ))}
             </div>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useData } from '../../../../contexts/DataContext';
+import CategoryMultiPicker from '../../../../components/forms/CategoryMultiPicker';
 
 export default function LogInlineEditor({ initial, customers, projects, onCancel, onSave }) {
   const { logCategories } = useData();
@@ -7,32 +8,11 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
   const [customerId, setCustomerId] = useState(initial?.customerId || '');
   const [projectId, setProjectId] = useState(initial?.projectId || '');
   const [jiraUrl, setJiraUrl] = useState(initial?.jiraUrl || '');
-  const [categoryId, setCategoryId] = useState(initial?.categoryId || '');
+  const [categoryIds, setCategoryIds] = useState(
+    (initial?.categories || []).map((c) => c.id)
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  const visibleCategories = useMemo(() => {
-    const active = logCategories.filter((c) => c.active !== false);
-    // Keep the currently selected category visible even if it's now inactive,
-    // so saving doesn't accidentally clear the tag.
-    if (initial?.category && initial.category.active === false) {
-      if (!active.some((c) => c.id === initial.category.id)) {
-        return [...active, initial.category];
-      }
-    }
-    return active;
-  }, [logCategories, initial?.category]);
-
-  const groupedCategories = useMemo(() => {
-    // Preserve the DataContext ordering (grouping/sortOrder/name) by bucketing in order.
-    const groups = new Map();
-    for (const c of visibleCategories) {
-      const g = c.grouping || '';
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g).push(c);
-    }
-    return Array.from(groups.entries()).map(([grouping, categories]) => ({ grouping, categories }));
-  }, [visibleCategories]);
 
   const availableProjects = useMemo(() => {
     if (!projects) return [];
@@ -54,7 +34,7 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
         customerId: customerId || null,
         projectId: projectId || null,
         jiraUrl: jiraUrl.trim() || null,
-        categoryId: categoryId || null,
+        categoryIds,
       });
     } catch (err) {
       setError(err.message || 'Failed to save log');
@@ -124,27 +104,12 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
           maxLength={500}
           className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
         />
-        <select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
-        >
-          <option value="">Category: None</option>
-          {groupedCategories.map((group) => (
-            group.grouping ? (
-              <optgroup key={group.grouping} label={group.grouping}>
-                {group.categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </optgroup>
-            ) : (
-              group.categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))
-            )
-          ))}
-        </select>
       </div>
+      <CategoryMultiPicker
+        logCategories={logCategories}
+        value={categoryIds}
+        onChange={setCategoryIds}
+      />
       <div className="flex items-center justify-end gap-1.5">
         <button
           type="button"

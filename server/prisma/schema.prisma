@@ -367,8 +367,8 @@ model Log {
   authorUser      User     @relation("AuthoredLogs", fields: [authorUserId], references: [id], onDelete: Restrict)
   content         String
   kind            String
-  categoryId      String?
-  category        PerformanceLogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // One incident can evidence several dimensions — many-to-many by design.
+  categories      PerformanceLogCategory[] @relation("LogCategories")
   customerId      String?
   customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   projectId       String?
@@ -387,7 +387,6 @@ model Log {
   @@index([resourceId])
   @@index([authorUserId])
   @@index([oneOnOneId])
-  @@index([categoryId])
   @@index([evaluationId])
 }
 
@@ -493,7 +492,7 @@ model PerformanceLogCategory {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  logs                Log[]
+  logs                Log[] @relation("LogCategories")
   evaluationSnapshots EvaluationCategorySnapshot[]
 
   @@unique([orgId, grouping, name])

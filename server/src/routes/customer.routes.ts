@@ -106,7 +106,7 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
     }
     if (restrictions.length > 0) where.AND = restrictions;
     if (filters.kind) where.kind = filters.kind;
-    if (filters.categoryId) where.categoryId = filters.categoryId;
+    if (filters.categoryId) where.categories = { some: { id: filters.categoryId } };
     if (filters.projectId) where.projectId = filters.projectId;
     if (filters.from || filters.to) {
       const createdAt: Prisma.DateTimeFilter = {};
