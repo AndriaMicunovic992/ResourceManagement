@@ -4,7 +4,7 @@ import NeedLabel from './NeedLabel';
 import EmptyProjectLabel from './EmptyProjectLabel';
 import { LW } from '../../../../lib/constants';
 
-export default function LabelColumn({ rows, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, canEdit, needHeights }) {
+export default function LabelColumn({ rows, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, onSuggestNeed, canEdit, needHeights }) {
   return (
     <div className="sticky left-0 z-[5] bg-[#FAFBFD]" style={{ width: LW, minWidth: LW }}>
       <div style={{ height: 38 }} /> {/* spacer for header (36px + 2px border) */}
@@ -22,6 +22,7 @@ export default function LabelColumn({ rows, onEditCustomer, onDeleteCustomer, on
         if (row.type === 'need') {
           return <NeedLabel key={`n-${row.data.id}`} need={row.data} project={row.project} customer={row.customer}
             onEdit={() => onEditNeed(row.data, row.project)} onDelete={() => onDeleteNeed(row.data.id)}
+            onSuggest={onSuggestNeed ? (e) => onSuggestNeed(row.data, row.project, row.customer, e) : undefined}
             canEdit={canEdit} height={needHeights?.[row.data.id]} />;
         }
         return <EmptyProjectLabel key={`e-${row.data.id}`} />;

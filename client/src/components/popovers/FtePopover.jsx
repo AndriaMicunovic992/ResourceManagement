@@ -41,6 +41,30 @@ function FteRow({ label, value, hours, maxFte, onFteChange, onHoursChange, onKey
   );
 }
 
+function QuickChips({ maxFte, onPick }) {
+  const presets = [0.2, 0.5, 0.8, 1.0].filter((v) => v <= maxFte + 0.001);
+  return (
+    <div className="flex gap-1 mb-2">
+      {presets.map((v) => (
+        <button
+          key={v}
+          onClick={() => onPick(v)}
+          className="px-1.5 py-0.5 rounded border border-border bg-white text-[10px] font-mono font-bold text-text-mid cursor-pointer hover:border-primary hover:text-primary"
+        >
+          {v.toFixed(1)}
+        </button>
+      ))}
+      <button
+        onClick={() => onPick(Math.round(maxFte * 100) / 100)}
+        className="px-1.5 py-0.5 rounded border border-primary bg-primary-light text-[10px] font-bold text-primary cursor-pointer hover:bg-primary hover:text-white"
+        title={`Fill the remaining gap (${maxFte.toFixed(2)})`}
+      >
+        Fill gap
+      </button>
+    </div>
+  );
+}
+
 export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, showRemove, showNeedEdit, needFte, onSave, onSaveNeed, onRemove, onClose }) {
   const [value, setValue] = useState(currentFte || 0.5);
   const [hours, setHours] = useState(fteToHours(currentFte || 0.5));
@@ -102,6 +126,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
           <div className="text-[10px] font-semibold text-text-mid mb-2">
             {title || `FTE (max ${maxFte.toFixed(1)})`}
           </div>
+          <QuickChips maxFte={maxFte} onPick={(v) => onSave(v)} />
           <div className="flex gap-2 items-center">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1">
@@ -162,6 +187,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
             onKeyDown={handleKeyDown} onSave={() => onSave(parseFloat(value))}
             inputRef={inputRef} accent
           />
+          <QuickChips maxFte={maxFte} onPick={(v) => onSave(v)} />
           <div className="border-t border-border-light pt-2">
             <FteRow
               label="Need" value={needValue} hours={needHours} maxFte={2.0}

@@ -2,7 +2,7 @@ import BarAvatar from './BarAvatar';
 import { shortName, initials } from '../../../../lib/resourceUtils';
 import { CW } from '../../../../lib/constants';
 
-export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, showLabel = isFirst, onClickMonth }) {
+export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, showLabel = isFirst, overloadMonths, onClickMonth }) {
   const width = segment.months.length * CW;
   const hasLeftSeparator = !isFirst && totalSegments > 1;
 
@@ -33,6 +33,17 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
           onClick={(e) => { e.stopPropagation(); onClickMonth(m, e); }}
         />
       ))}
+      {/* Cross-project overload ticks */}
+      {segment.months.map((m, mi) =>
+        overloadMonths?.has(m) ? (
+          <span
+            key={`ov-${m}`}
+            className="absolute w-1.5 h-1.5 rounded-full bg-danger pointer-events-none"
+            style={{ left: mi * CW + CW - 7, top: 2 }}
+            title="Over capacity this month across all projects"
+          />
+        ) : null
+      )}
       {/* Visual content (non-interactive overlay) */}
       <div className="flex items-center gap-1 px-1 w-full pointer-events-none" style={{ height: barHeight }}>
         {showLabel && (

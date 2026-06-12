@@ -66,10 +66,20 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
       {visibleAssignments.map((a, idx) => {
         const resource = resources.find((r) => r.id === a.resourceId);
         if (!resource) return null;
+        // Months where this person's TOTAL load (all projects) exceeds their
+        // capacity — surfaced as a red tick on the bar.
+        const cap = resource.capacity ?? 1;
+        const own = assignments.filter((x) => x.resourceId === a.resourceId);
+        const overloadMonths = new Set(
+          months.filter(
+            (m) => own.reduce((s, x) => s + ((x.monthAllocations || {})[m] || 0), 0) > cap + 0.001
+          )
+        );
         return (
           <div key={a.id} className="absolute left-0 right-0" style={{ top: idx * (barH + barGap) + 2 }}>
             <AssignmentBar
               assignment={a} need={need} resource={resource} months={months}
+              overloadMonths={overloadMonths}
               onClickSegment={(seg, month, e) => onBarClick(a, seg, month, e)}
             />
           </div>

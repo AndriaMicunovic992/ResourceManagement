@@ -8,7 +8,7 @@ import { useData } from '../../../../contexts/DataContext';
 
 const BAR_H = 24;
 
-export default function AssignmentBar({ assignment, need, resource, months, onClickSegment }) {
+export default function AssignmentBar({ assignment, need, resource, months, overloadMonths, onClickSegment }) {
   const { assignments, deleteAssignment, upsertAssignment } = useData();
   const segments = useMemo(() => buildSegments(assignment), [assignment]);
   const color = domainColor(need.domain);
@@ -180,6 +180,7 @@ export default function AssignmentBar({ assignment, need, resource, months, onCl
             isFirst={i === 0 && !clippedLeft}
             isLast={i === visibleSegments.length - 1 && !clippedRight}
             showLabel={i === 0}
+            overloadMonths={overloadMonths}
             totalSegments={visibleSegments.length}
             onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}
           />
