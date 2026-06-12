@@ -9,7 +9,7 @@ export default function LabelColumn({ rows, onEditCustomer, onDeleteCustomer, on
     <div className="sticky left-0 z-[5] bg-white" style={{ width: LW, minWidth: LW }}>
       {/* Frozen corner: matches the grid header's stickiness so labels never
           slide under it. */}
-      <div className="sticky top-0 z-[7] bg-white" style={{ height: 46 }} />
+      <div className="sticky top-0 z-[7] bg-white" style={{ height: 44 }} />
       {rows.map((row, i) => {
         if (row.type === 'customer') {
           return <CustomerLabel key={`c-${row.data.id}`} customer={row.data}
