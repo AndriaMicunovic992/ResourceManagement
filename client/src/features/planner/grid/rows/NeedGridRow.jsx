@@ -157,35 +157,52 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
           />
         );
       })}
-      {/* Completely unstaffed need: a dashed "open" pill spanning the gap. */}
+      {/* Unstaffed need: a dashed segmented "need bar" spanning the demanded
+          months, sectioned where the monthly FTE differs (like assignment
+          bars). Decorative — clicks and paint pass through. */}
       {visibleAssignments.length === 0 && (() => {
-        const open = months.filter(
-          (m) =>
-            needMonths.includes(m) &&
-            (nf[m]?.needed || 0) > 0.001 &&
-            (nf[m]?.filled || 0) < (nf[m]?.needed || 0) - 0.001
-        );
-        if (open.length === 0) return null;
-        const i0 = months.indexOf(open[0]);
-        const i1 = months.indexOf(open[open.length - 1]);
-        const avg = open.reduce((s, m) => s + ((nf[m].needed || 0) - (nf[m].filled || 0)), 0) / open.length;
-        return (
-          <div
-            className="absolute pointer-events-none flex items-center justify-center"
-            style={{
-              left: i0 * CW + 5, width: (i1 - i0 + 1) * CW - 10, top: 7, height: 28,
-              borderRadius: 999, border: '1.5px dashed #F5A623', color: '#F5A623',
-              background: 'rgba(255,246,232,0.6)',
-            }}
-          >
-            <span className="text-[9.5px] font-mono font-bold">{avg.toFixed(1)} FTE open</span>
-          </div>
-        );
+        const active = months
+          .map((m, i) => ({ i, v: nf[m]?.needed || 0, in: needMonths.includes(m) }))
+          .filter((x) => x.in && x.v > 0.001);
+        if (active.length === 0) return null;
+        // Contiguous runs of equal FTE become fused segments.
+        const runs = [];
+        for (const x of active) {
+          const last = runs[runs.length - 1];
+          if (last && x.i === last.endI + 1 && Math.abs(x.v - last.v) < 0.005) last.endI = x.i;
+          else runs.push({ startI: x.i, endI: x.i, v: x.v });
+        }
+        const top = Math.max(4, Math.round((height - 28) / 2));
+        return runs.map((r, k) => {
+          const prevContig = k > 0 && runs[k - 1].endI === r.startI - 1;
+          const nextContig = k < runs.length - 1 && runs[k + 1].startI === r.endI + 1;
+          const left = r.startI * CW + (prevContig ? 0 : 5);
+          const width = (r.endI - r.startI + 1) * CW - (prevContig ? 0 : 5) - (nextContig ? 0 : 5);
+          return (
+            <div
+              key={k}
+              className="absolute pointer-events-none flex items-center justify-center"
+              style={{
+                left, width, top, height: 28,
+                border: '1.5px dashed #F5A623',
+                borderLeft: prevContig ? '1px dashed #F5C872' : '1.5px dashed #F5A623',
+                borderRadius: `${prevContig ? 0 : 999}px ${nextContig ? 0 : 999}px ${nextContig ? 0 : 999}px ${prevContig ? 0 : 999}px`,
+                color: '#F5A623',
+              }}
+            >
+              <span className="text-[9.5px] font-mono font-bold whitespace-nowrap">
+                {r.v.toFixed(2)}{runs.length === 1 ? ' FTE open' : ''}
+              </span>
+            </div>
+          );
+        });
       })()}
-      {/* Assignment bars overlay — always positioned by raw month index */}
+      {/* Assignment bars overlay — stack vertically centered in the row */}
       {visibleAssignments.map((a, idx) => {
         const resource = resources.find((r) => r.id === a.resourceId);
         if (!resource) return null;
+        const stackH = visibleAssignments.length * (barH + barGap) - barGap;
+        const stackTop = Math.max(4, Math.round((height - stackH) / 2));
         // Months where this person's TOTAL load (all projects) exceeds their
         // capacity — surfaced as a red tick on the bar.
         const cap = resource.capacity ?? 1;
@@ -196,7 +213,7 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
           )
         );
         return (
-          <div key={a.id} className="absolute left-0 right-0" style={{ top: idx * (barH + barGap) + 2 }}>
+          <div key={a.id} className="absolute left-0 right-0" style={{ top: stackTop + idx * (barH + barGap) }}>
             <AssignmentBar
               assignment={a} need={need} resource={resource} months={months}
               overloadMonths={overloadMonths}

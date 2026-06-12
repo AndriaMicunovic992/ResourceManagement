@@ -25,15 +25,14 @@ export default function NeedLabel({ need, project, customer, onEdit, onDelete, o
     const gaps = Object.keys(need.monthAllocations || {})
       .map((m) => Math.max(0, (nf[m]?.needed || 0) - (nf[m]?.filled || 0)))
       .filter((g) => g > 0.001);
-    return gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 0;
+    // Max, not average — averages mislead when the demand varies by month.
+    return gaps.length ? Math.max(...gaps) : 0;
   }, [ok, need, assignments]);
 
   return (
     <div className="flex items-stretch" style={{ minHeight: height || 56, paddingLeft: 22, paddingRight: 8 }}>
       <div
-        className={`group flex items-center gap-1.5 flex-1 my-[3px] rounded-xl px-2.5 bg-white ${
-          ok ? '' : 'bg-[#FFFDF8]'
-        }`}
+        className="group flex items-center gap-1.5 flex-1 my-[3px] rounded-xl px-2.5 bg-white"
         style={{
           border: ok ? '1px solid #F1F5F9' : '1.5px dashed #F5C872',
           boxShadow: ok ? '0 3px 10px rgba(44,62,80,0.06)' : 'none',

@@ -26,15 +26,12 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, hel
   const isEditable = canPlace === undefined && needed > 0;
   const isClickable = canPlace === true || isEditable;
 
-  // The bar is the signal — cells stay quiet. Only an open gap gets a whisper
-  // of amber; exact numbers live on hover.
+  // The bar is the signal — cells stay quiet; exact numbers live on hover.
   const bg = paintActive
     ? '#4CBAD433'
     : canPlace
       ? '#E0F4FA40'
-      : hasGap
-        ? 'rgba(245,166,35,0.05)'
-        : 'transparent';
+      : 'transparent';
   const cursor = canPlace ? 'cell' : isEditable ? 'pointer' : 'default';
 
   return (
