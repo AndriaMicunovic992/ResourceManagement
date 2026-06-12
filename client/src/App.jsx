@@ -113,6 +113,8 @@ export default function App() {
               />
               <Route path="/customers/:id" element={<CustomerPage />}>
                 <Route index element={<CustomerOverview />} />
+                {/* Reminder links land here; reviews start from the People tab. */}
+                <Route path="review" element={<Navigate to="../people" replace />} />
                 <Route path="projects" element={<CustomerProjects />} />
                 <Route path="people" element={<CustomerPeople />} />
                 <Route path="activity" element={<CustomerActivity />} />

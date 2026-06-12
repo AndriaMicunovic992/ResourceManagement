@@ -10,7 +10,7 @@ export default function AppLayout() {
       <Header />
       <div className="flex-1 min-h-0 flex">
         <Sidebar />
-        <div className="flex-1 min-w-0 overflow-auto">
+        <div className="flex-1 min-w-0 overflow-auto scroll-smooth">
           <Outlet />
         </div>
       </div>
