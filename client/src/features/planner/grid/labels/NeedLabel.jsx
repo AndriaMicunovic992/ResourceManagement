@@ -30,9 +30,9 @@ export default function NeedLabel({ need, project, customer, onEdit, onDelete, o
   }, [ok, need, assignments]);
 
   return (
-    <div className="flex items-stretch" style={{ minHeight: height || 56, paddingLeft: 22, paddingRight: 8 }}>
+    <div className="flex items-stretch" style={{ height: height || 56, paddingLeft: 22, paddingRight: 8 }}>
       <div
-        className="group flex items-center gap-1.5 flex-1 my-[3px] rounded-xl px-2.5 bg-white"
+        className="group flex items-center gap-1.5 flex-1 min-h-0 overflow-hidden my-[3px] rounded-xl px-2.5 bg-white"
         style={{
           border: ok ? '1px solid #F1F5F9' : '1.5px dashed #F5C872',
           boxShadow: ok ? '0 3px 10px rgba(44,62,80,0.06)' : 'none',
