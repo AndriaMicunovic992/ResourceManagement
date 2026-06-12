@@ -1,10 +1,11 @@
-import BarAvatar from './BarAvatar';
 import { shortName, initials } from '../../../../lib/resourceUtils';
 import { CW } from '../../../../lib/constants';
 
-export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, showLabel = isFirst, overloadMonths, onClickMonth }) {
+/** Hero pill segment: saturated gradient, white label, avatar inside,
+ * white FTE chip. contLeft/contRight mark continuation beyond the window. */
+export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, showLabel = isFirst, contLeft, contRight, overloadMonths, onClickMonth }) {
   const width = segment.months.length * CW;
-  const hasLeftSeparator = !isFirst && totalSegments > 1;
+  const hasLeftSeparator = !isFirst && totalSegments > 1 && !contLeft;
 
   return (
     <div
@@ -12,24 +13,21 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
       style={{
         width,
         height: barHeight,
-        backgroundColor: domainColor + '33',
-        borderTop: `1.5px solid ${domainColor}55`,
-        borderBottom: `1.5px solid ${domainColor}55`,
-        borderLeft: isFirst ? `1.5px solid ${domainColor}55` : 'none',
-        borderRight: isLast ? `1.5px solid ${domainColor}55` : 'none',
-        borderRadius: isFirst && isLast ? 12 : isFirst ? '12px 0 0 12px' : isLast ? '0 12px 12px 0' : 0,
-        boxShadow: '0 2px 6px rgba(44,62,80,0.12)',
+        background: `linear-gradient(100deg, ${domainColor}, color-mix(in srgb, ${domainColor} 72%, white))`,
+        borderRadius:
+          isFirst && isLast ? 999 : isFirst ? '999px 0 0 999px' : isLast ? '0 999px 999px 0' : 0,
+        boxShadow: `0 4px 10px -3px ${domainColor}99`,
       }}
     >
       {/* Segment separator line */}
       {hasLeftSeparator && (
-        <div className="absolute left-0 top-[3px] bottom-[3px] w-[1px]" style={{ backgroundColor: domainColor + '40' }} />
+        <div className="absolute left-0 top-[4px] bottom-[4px] w-[1px] bg-white/40" />
       )}
       {/* Per-month click zones */}
       {segment.months.map((m, mi) => (
         <div
           key={m}
-          className="absolute top-0 bottom-0 cursor-pointer hover:bg-black/[0.04] transition-colors"
+          className="absolute top-0 bottom-0 cursor-pointer hover:bg-white/10 transition-colors"
           style={{ left: mi * CW, width: CW }}
           onClick={(e) => { e.stopPropagation(); onClickMonth(m, e); }}
         />
@@ -40,26 +38,43 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
           <span
             key={`ov-${m}`}
             className="absolute w-1.5 h-1.5 rounded-full bg-danger pointer-events-none"
-            style={{ left: mi * CW + CW - 7, top: 2 }}
+            style={{ left: mi * CW + CW - 8, top: 2, boxShadow: '0 0 0 1.5px #fff' }}
             title="Over capacity this month across all projects"
           />
         ) : null
       )}
       {/* Visual content (non-interactive overlay) */}
-      <div className="flex items-center gap-1 px-1 w-full pointer-events-none" style={{ height: barHeight }}>
+      <div className="flex items-center gap-1.5 px-1.5 w-full pointer-events-none" style={{ height: barHeight }}>
+        {contLeft && <span className="text-white/90 text-[10px] font-bold -ml-0.5">‹</span>}
         {showLabel && (
           <>
-            <BarAvatar name={resource.name} color={domainColor} size={18} />
-            <span className="text-[9px] font-semibold truncate" style={{ color: domainColor }}>
-              {segment.months.length === 1 ? initials(resource.name) : shortName(resource.name)}
+            <span
+              className="flex items-center justify-center rounded-full text-white shrink-0"
+              style={{
+                width: 17, height: 17, fontSize: 7.5, fontWeight: 700,
+                background: 'rgba(255,255,255,0.28)', border: '1.5px solid rgba(255,255,255,0.85)',
+              }}
+            >
+              {initials(resource.name)}
             </span>
+            {segment.months.length > 1 && (
+              <span
+                className="text-[10px] font-bold truncate text-white"
+                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.18)' }}
+              >
+                {shortName(resource.name)}
+              </span>
+            )}
           </>
         )}
         <div className="flex-1" />
-        <span className="text-[8.5px] font-mono font-bold px-1.5 rounded-full shrink-0"
-          style={{ backgroundColor: 'rgba(255,255,255,0.8)', color: domainColor }}>
-          {segment.fte.toFixed(2)}{isLast ? ' ›' : ''}
+        <span
+          className="text-[8.5px] font-mono font-bold px-1.5 rounded-full shrink-0"
+          style={{ backgroundColor: 'rgba(255,255,255,0.92)', color: domainColor }}
+        >
+          {segment.fte.toFixed(2)}
         </span>
+        {contRight && <span className="text-white/90 text-[10px] font-bold -mr-0.5">›</span>}
       </div>
     </div>
   );

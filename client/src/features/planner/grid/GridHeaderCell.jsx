@@ -14,18 +14,14 @@ export default function GridHeaderCell({ period, isFullyStaffed, gap = 0 }) {
       <span className="font-mono text-[10.5px] font-bold" style={{ color }}>
         {period.label}
       </span>
-      {gap > 0.001 ? (
+      {gap > 0.001 && (
         <span
           className="px-1.5 rounded-md bg-danger-bg text-danger text-[8.5px] font-mono font-bold leading-[13px]"
           title={`${gap.toFixed(1)} FTE unfilled in this period`}
         >
           −{gap.toFixed(1)}
         </span>
-      ) : isCurrent ? (
-        <span className="px-1.5 py-0 rounded-md bg-primary text-white text-[7px] font-extrabold tracking-wider leading-[13px]">
-          TODAY
-        </span>
-      ) : null}
+      )}
       {isFullyStaffed && (
         <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-success" />
       )}

@@ -96,13 +96,20 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
   const periodGap = (periodMonths) =>
     periodMonths.reduce((s, m) => s + (monthGaps[m] || 0), 0);
 
-  // Full-height "today" column: faint tint + a thin rule at its left edge.
+  // Full-height "today" marker: faint column tint plus a precise line at the
+  // current day's position within the month, with a floating Today pill.
   const todayOverlay = useMemo(() => {
     const cm = currentMonth();
     let left = 0;
     for (const p of periods) {
       const w = p.months.length * CW;
-      if (p.months.includes(cm)) return { left, width: w };
+      if (p.months.includes(cm)) {
+        const now = new Date();
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const monthIdx = p.months.indexOf(cm);
+        const lineX = left + monthIdx * CW + ((now.getDate() - 1) / daysInMonth) * CW;
+        return { left, width: w, lineX };
+      }
       left += w;
     }
     return null;
@@ -129,15 +136,31 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
       />
       <div className="flex-1 min-w-0 relative">
         {todayOverlay && (
-          <div
-            className="absolute top-0 bottom-0 pointer-events-none"
-            style={{
-              left: todayOverlay.left,
-              width: todayOverlay.width,
-              background: 'rgba(76,186,212,0.05)',
-              borderLeft: '1.5px solid rgba(76,186,212,0.55)',
-            }}
-          />
+          <>
+            <div
+              className="absolute top-0 bottom-0 pointer-events-none"
+              style={{
+                left: todayOverlay.left,
+                width: todayOverlay.width,
+                background: 'rgba(76,186,212,0.045)',
+              }}
+            />
+            <div
+              className="absolute top-0 bottom-0 pointer-events-none z-[6]"
+              style={{ left: todayOverlay.lineX, width: 1.5, background: 'rgba(76,186,212,0.75)' }}
+            >
+              <span
+                className="absolute w-[7px] h-[7px] rounded-full bg-primary"
+                style={{ top: 46, left: -2.7 }}
+              />
+              <span
+                className="absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-white text-primary text-[9px] font-bold px-2.5 py-[2px]"
+                style={{ top: 56, left: 1, border: '1.5px solid #4CBAD4', boxShadow: '0 2px 8px rgba(76,186,212,0.3)' }}
+              >
+                Today
+              </span>
+            </div>
+          </>
         )}
         <GridHeader
           periods={periods}

@@ -152,6 +152,30 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
           />
         );
       })}
+      {/* Completely unstaffed need: a dashed "open" pill spanning the gap. */}
+      {visibleAssignments.length === 0 && (() => {
+        const open = months.filter(
+          (m) =>
+            needMonths.includes(m) &&
+            (nf[m]?.needed || 0) > 0.001 &&
+            (nf[m]?.filled || 0) < (nf[m]?.needed || 0) - 0.001
+        );
+        if (open.length === 0) return null;
+        const i0 = months.indexOf(open[0]);
+        const i1 = months.indexOf(open[open.length - 1]);
+        const avg = open.reduce((s, m) => s + ((nf[m].needed || 0) - (nf[m].filled || 0)), 0) / open.length;
+        return (
+          <div
+            className="absolute pointer-events-none flex items-center justify-center"
+            style={{
+              left: i0 * CW + 5, width: (i1 - i0 + 1) * CW - 10, top: 9, height: 24,
+              borderRadius: 999, border: '1.5px dashed #F5C872', color: '#F5A623',
+            }}
+          >
+            <span className="text-[9.5px] font-mono font-bold">{avg.toFixed(1)} FTE open</span>
+          </div>
+        );
+      })()}
       {/* Assignment bars overlay — always positioned by raw month index */}
       {visibleAssignments.map((a, idx) => {
         const resource = resources.find((r) => r.id === a.resourceId);
