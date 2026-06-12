@@ -4,6 +4,7 @@ import { UndoIcon } from '../../components/ui/icons';
 import ResourcePool from './pool/ResourcePool';
 import PlannerToolbar from './toolbar/PlannerToolbar';
 import PlannerGrid from './grid/PlannerGrid';
+import SuggestPopover from './SuggestPopover';
 import FtePopover from '../../components/popovers/FtePopover';
 import CustomerForm from '../../components/forms/CustomerForm';
 import ProjectForm from '../../components/forms/ProjectForm';
@@ -12,6 +13,31 @@ import EmptyState from '../../components/ui/EmptyState';
 import { useData } from '../../contexts/DataContext';
 import { useOrg } from '../../contexts/OrgContext';
 import { currentMonth, addMonths } from '../../lib/dateUtils';
+
+/**
+ * Smart auto-fill: per month, assign min(remaining gap on the need, the
+ * person's remaining capacity). Returns null when nothing can be placed.
+ */
+function buildAutoFill(need, resource, assignments) {
+  const needAllocs = need.monthAllocations || {};
+  const needMonths = Object.keys(needAllocs).sort();
+  if (needMonths.length === 0) return null;
+  const needAssigns = assignments.filter((a) => a.needId === need.id);
+  const resourceAssigns = assignments.filter((a) => a.resourceId === resource.id);
+  const monthAllocations = {};
+  let hasAny = false;
+  for (const m of needMonths) {
+    const needed = needAllocs[m] || 0;
+    const filled = needAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+    const gap = needed - filled;
+    const used = resourceAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+    const cap = Math.max(0, (resource.capacity ?? 1.0) - used);
+    const fte = Math.round(Math.max(0, Math.min(gap, cap)) * 100) / 100;
+    monthAllocations[m] = fte;
+    if (fte > 0) hasAny = true;
+  }
+  return hasAny ? monthAllocations : null;
+}
 
 export default function PlannerView() {
   const { customers, needs, assignments, updateCustomer, deleteCustomer, addProject, updateProject, deleteProject, addNeed, updateNeed, deleteNeed, upsertAssignment, deleteAssignment } = useData();
@@ -102,31 +128,12 @@ export default function PlannerView() {
 
   const handleCellClick = useCallback((need, month, periodMonths, e) => {
     if (heldResource) {
-      const needAllocs = need.monthAllocations || {};
-      const needMonths = Object.keys(needAllocs).sort();
-      if (needMonths.length === 0) return;
-
       // Already assigned — use resize handles to adjust
       const existing = assignments.find((a) => a.needId === need.id && a.resourceId === heldResource.id);
       if (existing) return;
 
-      // New assignment: compute per-month FTE to handle variable need
-      const needAssigns = assignments.filter((a) => a.needId === need.id);
-      const resourceAssigns = assignments.filter((a) => a.resourceId === heldResource.id);
-      const monthAllocations = {};
-      let hasAny = false;
-      for (const m of needMonths) {
-        const needed = needAllocs[m] || 0;
-        const filled = needAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
-        const gap = needed - filled;
-        const resourceUsed = resourceAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
-        // Cap by the person's actual capacity (part-timers aren't 1.0).
-        const cap = Math.max(0, (heldResource.capacity ?? 1.0) - resourceUsed);
-        const fte = Math.round(Math.max(0, Math.min(gap, cap)) * 100) / 100;
-        monthAllocations[m] = fte;
-        if (fte > 0) hasAny = true;
-      }
-      if (!hasAny) return;
+      const monthAllocations = buildAutoFill(need, heldResource, assignments);
+      if (!monthAllocations) return;
 
       const heldName = heldResource.name;
       Promise.resolve(
@@ -216,6 +223,28 @@ export default function PlannerView() {
     setPopover(null);
   };
 
+  // "Suggest people" popover for an unfilled need.
+  const [suggest, setSuggest] = useState(null);
+  const handleSuggestNeed = useCallback((need, project, customer, e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setSuggest({ need, project, customer, x: rect.right + 8, y: rect.top });
+  }, []);
+
+  const handleSuggestAssign = async (resource) => {
+    if (!suggest) return;
+    const alloc = buildAutoFill(suggest.need, resource, assignments);
+    setSuggest(null);
+    if (!alloc) return;
+    const created = await upsertAssignment({
+      needId: suggest.need.id,
+      resourceId: resource.id,
+      monthAllocations: alloc,
+    });
+    if (created?.id) {
+      pushUndo(`Assigned ${resource.name}`, () => deleteAssignment(created.id));
+    }
+  };
+
   const handleEditCustomer = (customer) => setEditModal({ type: 'customer', data: customer });
   const handleDeleteCustomer = async (id) => { if (confirm('Delete this customer?')) await deleteCustomer(id); };
   const handleAddProject = (customer) => setEditModal({ type: 'project', customer });
@@ -244,6 +273,7 @@ export default function PlannerView() {
             heldResource={heldResource} timeRange={timeRange} aggregation={aggregation}
             showUnassignedOnly={showUnassignedOnly} customerSort={customerSort} filterIds={filterIds}
             onCellClick={handleCellClick} onBarClick={handleBarClick}
+            onSuggestNeed={handleSuggestNeed}
             onEditCustomer={handleEditCustomer} onDeleteCustomer={handleDeleteCustomer}
             onAddProject={handleAddProject} onEditProject={handleEditProject} onDeleteProject={handleDeleteProject}
             onAddNeed={handleAddNeed} onEditNeed={handleEditNeed} onDeleteNeed={handleDeleteNeed}
@@ -262,6 +292,17 @@ export default function PlannerView() {
           onSave={handleFteSave}
           onSaveNeed={handleNeedFteSave}
           onClose={() => setPopover(null)}
+        />
+      )}
+
+      {suggest && (
+        <SuggestPopover
+          need={suggest.need}
+          customer={suggest.customer}
+          x={suggest.x}
+          y={suggest.y}
+          onAssign={handleSuggestAssign}
+          onClose={() => setSuggest(null)}
         />
       )}
 
