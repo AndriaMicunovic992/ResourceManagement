@@ -10,6 +10,7 @@ import LoginPage from './features/auth/LoginPage';
 import SignupPage from './features/auth/SignupPage';
 import AuthCallback from './features/auth/AuthCallback';
 import AppLayout from './layouts/AppLayout';
+import HomeDashboard from './features/home/HomeDashboard';
 import PlannerView from './features/planner/PlannerView';
 import DashboardView from './features/dashboard/DashboardView';
 import SettingsView from './features/settings/SettingsView';
@@ -34,19 +35,17 @@ import CustomerPerformance from './features/customers/tabs/CustomerPerformance';
 
 /**
  * Landing redirect: role-aware.
- *   - admin/owner  → /planner
- *   - member       → /people
+ *   - admin/member → /home (the dashboard)
  *   - viewer       → their own person page (or /people if no resource yet)
  */
 function LandingRedirect() {
-  const { loading, isAdmin, role, selfResourceId } = useVisibility();
+  const { loading, role, selfResourceId } = useVisibility();
   if (loading) return null;
-  if (isAdmin) return <Navigate to="/planner" replace />;
   if (role === 'viewer') {
     if (selfResourceId) return <Navigate to={`/people/${selfResourceId}`} replace />;
     return <Navigate to="/people" replace />;
   }
-  return <Navigate to="/people" replace />;
+  return <Navigate to="/home" replace />;
 }
 
 /**
@@ -89,6 +88,7 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route path="/" element={<LandingRedirect />} />
+              <Route path="/home" element={<HomeDashboard />} />
               <Route path="/planner" element={<PlannerView />} />
               <Route path="/dashboard" element={<DashboardView />} />
               <Route path="/people" element={<PeopleListRoute />} />
@@ -113,6 +113,8 @@ export default function App() {
               />
               <Route path="/customers/:id" element={<CustomerPage />}>
                 <Route index element={<CustomerOverview />} />
+                {/* Reminder links land here; reviews start from the People tab. */}
+                <Route path="review" element={<Navigate to="../people" replace />} />
                 <Route path="projects" element={<CustomerProjects />} />
                 <Route path="people" element={<CustomerPeople />} />
                 <Route path="activity" element={<CustomerActivity />} />

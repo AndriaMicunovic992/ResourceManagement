@@ -7,6 +7,7 @@ import { viewAs } from '../../lib/impersonation';
 import { DEFAULT_SKILLS } from '../../lib/defaultSkills';
 import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
+import PageHeader from '../../components/ui/PageHeader';
 
 const ROLES = ['viewer', 'member', 'admin'];
 
@@ -28,6 +29,7 @@ export default function SettingsView() {
   const [newRole, setNewRole] = useState('member');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState('account');
   const [teamName, setTeamName] = useState('');
   const [teamManagerId, setTeamManagerId] = useState('');
   const [teamError, setTeamError] = useState('');
@@ -497,12 +499,45 @@ export default function SettingsView() {
     }
   };
 
-  return (
-    <div className="max-w-[600px] mx-auto px-5 py-6">
-      <h2 className="text-xl font-bold text-text mb-6">Settings</h2>
+  const NAV_SECTIONS = [
+    { id: 'account', label: 'Your account' },
+    { id: 'organization', label: 'Organization' },
+    ...(isAdmin
+      ? [
+          { id: 'planning', label: 'Planning range' },
+          { id: 'reminders', label: 'Reminders' },
+          { id: 'trend', label: 'Performance trend' },
+          { id: 'teams', label: 'Teams' },
+          { id: 'skills', label: 'Skills' },
+          { id: 'categories', label: 'Log categories' },
+        ]
+      : []),
+    { id: 'members', label: 'Members' },
+  ];
 
+  return (
+    <div className="max-w-[920px] mx-auto px-5 py-6">
+      <PageHeader title="Settings" subtitle={`${currentOrg?.name || ''} · organization`} />
+      <div className="flex gap-6 items-start">
+        {/* section anchor nav */}
+        <nav className="hidden md:flex flex-col gap-0.5 w-[150px] shrink-0 sticky top-4">
+          {NAV_SECTIONS.map((sec) => (
+            <a
+              key={sec.id}
+              href={`#${sec.id}`}
+              onClick={() => setActiveSection(sec.id)}
+              className={`text-[11px] font-bold rounded-lg px-3 py-2 no-underline transition-colors ${
+                activeSection === sec.id ? 'text-primary bg-primary-light' : 'text-text-mid hover:bg-white'
+              }`}
+            >
+              {sec.label}
+            </a>
+          ))}
+        </nav>
+
+        <div className="flex-1 min-w-0">
       {/* Your account — sign-in methods for the current user (all roles). */}
-      <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+      <div id="account" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-1">Your account</h3>
         <p className="text-xs text-text-mid mb-3">{user?.email}</p>
         {justLinkedMicrosoft && (
@@ -529,7 +564,7 @@ export default function SettingsView() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+      <div id="organization" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-3">Organization</h3>
         <div className="text-xs text-text-mid">
           <p><strong>Name:</strong> {currentOrg?.name}</p>
@@ -538,7 +573,7 @@ export default function SettingsView() {
       </div>
 
       {isAdmin && (
-        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+        <div id="planning" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Planning Date Range</h3>
           <p className="text-[10px] text-text-light mb-3">
             Set the minimum and maximum months available for planning. Leave empty for no restriction.
@@ -568,7 +603,7 @@ export default function SettingsView() {
       )}
 
       {isAdmin && (
-        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+        <div id="reminders" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Reminders</h3>
           <p className="text-[10px] text-text-light mb-3">
             In-app reminders shown to managers and responsible people on the People page. A
@@ -629,7 +664,7 @@ export default function SettingsView() {
       )}
 
       {isAdmin && (
-        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+        <div id="trend" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Performance Trend</h3>
           <p className="text-[10px] text-text-light mb-3">
             Default time window used on the Person Performance tab for the overall grade, trend chart, and category breakdown. Choose a rolling window or a calendar-aligned period. Viewers can still override this on the tab.
@@ -695,7 +730,7 @@ export default function SettingsView() {
       )}
 
       {isAdmin && (
-        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+        <div id="teams" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Teams</h3>
           <p className="text-[10px] text-text-light mb-3">
             Group people into teams. A person can belong to multiple teams. Each team can have a manager whose ownership is inherited by all team members.
@@ -805,7 +840,7 @@ export default function SettingsView() {
       )}
 
       {isAdmin && (
-        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+        <div id="skills" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Skills</h3>
           <p className="text-[10px] text-text-light mb-3">
             Define the skill vocabulary for your organization. Skills can later be assigned to people with proficiency levels.
@@ -925,7 +960,7 @@ export default function SettingsView() {
       )}
 
       {isAdmin && (
-        <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
+        <div id="categories" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Performance log categories</h3>
           <p className="text-[10px] text-text-light mb-3">
             Categories tag performance logs so you can group and filter them. Optionally use a grouping (e.g. "Technical", "Soft skills") to organise related categories together.
@@ -1152,7 +1187,7 @@ export default function SettingsView() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-border shadow-card p-5">
+      <div id="members" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5">
         <h3 className="text-sm font-bold text-text mb-4">Members</h3>
 
         {error && (
@@ -1260,6 +1295,8 @@ export default function SettingsView() {
             </Button>
           </form>
         )}
+      </div>
+        </div>
       </div>
     </div>
   );

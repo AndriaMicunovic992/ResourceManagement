@@ -38,6 +38,7 @@ export default function PersonPage() {
         resource={resource}
         canEdit={effectiveCanEdit}
         onEdit={() => setEditing(true)}
+        viewMode={viewMode}
       />
       <PersonPageTabs resourceId={resource.id} viewMode={viewMode} />
       <Outlet context={{ resource, viewMode }} />
