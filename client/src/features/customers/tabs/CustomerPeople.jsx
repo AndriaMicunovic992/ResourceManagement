@@ -5,6 +5,7 @@ import { useData } from '../../../contexts/DataContext';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
 import TimeRangePicker from '../../planner/toolbar/TimeRangePicker';
 import { useVisibility } from '../../../contexts/VisibilityContext';
+import { PlayIcon } from '../../../components/ui/icons';
 
 export default function CustomerPeople() {
   const { customer } = useOutletContext();
@@ -121,9 +122,9 @@ export default function CustomerPeople() {
             <button
               onClick={handleStartReview}
               disabled={startingReview}
-              className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
             >
-              {startingReview ? 'Starting…' : '▶ Start PM review'}
+              <PlayIcon size={11} /> {startingReview ? 'Starting…' : 'Start PM review'}
             </button>
           )}
         </div>

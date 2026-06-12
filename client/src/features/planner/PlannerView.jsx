@@ -78,7 +78,8 @@ export default function PlannerView() {
         const filled = needAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
         const gap = needed - filled;
         const resourceUsed = resourceAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
-        const cap = Math.max(0, 1.0 - resourceUsed);
+        // Cap by the person's actual capacity (part-timers aren't 1.0).
+        const cap = Math.max(0, (heldResource.capacity ?? 1.0) - resourceUsed);
         const fte = Math.round(Math.max(0, Math.min(gap, cap)) * 100) / 100;
         monthAllocations[m] = fte;
         if (fte > 0) hasAny = true;

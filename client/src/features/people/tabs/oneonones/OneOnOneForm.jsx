@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Modal from '../../../../components/ui/Modal';
 import { useAuth } from '../../../../contexts/AuthContext';
+import { LockIcon } from '../../../../components/ui/icons';
 
 function toDateInputValue(value) {
   if (!value) return new Date().toISOString().slice(0, 10);
@@ -131,7 +132,7 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
         {isAuthor && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-amber-700">🔒</span>
+              <LockIcon size={12} className="text-amber-700" />
               <label className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold">
                 Private note (only you)
               </label>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../../lib/api';
+import { ReplyIcon } from './icons';
 
 /** Compact reply thread on an entry (used in the 1:1 and PM review cockpits). */
 export default function MiniThread({ personId, log, onUpdated }) {
@@ -43,9 +44,10 @@ export default function MiniThread({ personId, log, onUpdated }) {
         <button
           type="submit"
           disabled={busy || !text.trim()}
-          className="text-[10px] font-semibold text-white bg-primary border-0 rounded px-2 py-1 cursor-pointer hover:opacity-90 disabled:opacity-40"
+          aria-label="Send reply"
+          className="text-white bg-primary border-0 rounded px-2 py-1 cursor-pointer hover:opacity-90 disabled:opacity-40"
         >
-          ↩
+          <ReplyIcon size={12} />
         </button>
       </form>
       {err && <div className="text-[10px] text-danger mt-0.5">{err}</div>}
