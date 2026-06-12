@@ -10,7 +10,7 @@ export default function ProjectGridRow({ project, periods }) {
       {periods.map((p) => {
         const inRange = p.months.some((m) => projMonths.includes(m));
         const bg = inRange ? '#F8FBFC' : 'transparent';
-        return <div key={p.label} className="shrink-0 border-r border-border-light" style={{ width: p.months.length * CW, background: bg }} />;
+        return <div key={p.label} className="shrink-0" style={{ width: p.months.length * CW, background: bg }} />;
       })}
     </div>
   );

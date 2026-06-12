@@ -12,12 +12,13 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
       style={{
         width,
         height: barHeight,
-        backgroundColor: domainColor + '18',
-        borderTop: `1.5px solid ${domainColor}40`,
-        borderBottom: `1.5px solid ${domainColor}40`,
-        borderLeft: isFirst ? `1.5px solid ${domainColor}40` : 'none',
-        borderRight: isLast ? `1.5px solid ${domainColor}40` : 'none',
+        backgroundColor: domainColor + '33',
+        borderTop: `1.5px solid ${domainColor}55`,
+        borderBottom: `1.5px solid ${domainColor}55`,
+        borderLeft: isFirst ? `1.5px solid ${domainColor}55` : 'none',
+        borderRight: isLast ? `1.5px solid ${domainColor}55` : 'none',
         borderRadius: isFirst && isLast ? 12 : isFirst ? '12px 0 0 12px' : isLast ? '0 12px 12px 0' : 0,
+        boxShadow: '0 2px 6px rgba(44,62,80,0.12)',
       }}
     >
       {/* Segment separator line */}
@@ -55,9 +56,9 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
           </>
         )}
         <div className="flex-1" />
-        <span className="text-[8px] font-mono px-0.5 rounded shrink-0"
-          style={{ backgroundColor: domainColor + '15', color: domainColor }}>
-          {segment.fte.toFixed(2)}
+        <span className="text-[8.5px] font-mono font-bold px-1.5 rounded-full shrink-0"
+          style={{ backgroundColor: 'rgba(255,255,255,0.8)', color: domainColor }}>
+          {segment.fte.toFixed(2)}{isLast ? ' ›' : ''}
         </span>
       </div>
     </div>

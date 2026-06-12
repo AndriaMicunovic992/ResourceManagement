@@ -7,7 +7,7 @@ import { LW } from '../../../../lib/constants';
 export default function LabelColumn({ rows, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, onSuggestNeed, canEdit, needHeights }) {
   return (
     <div className="sticky left-0 z-[5] bg-[#FAFBFD]" style={{ width: LW, minWidth: LW }}>
-      <div style={{ height: 38 }} /> {/* spacer for header (36px + 2px border) */}
+      <div style={{ height: 46 }} /> {/* spacer for header (44px + 2px border) */}
       {rows.map((row, i) => {
         if (row.type === 'customer') {
           return <CustomerLabel key={`c-${row.data.id}`} customer={row.data}
