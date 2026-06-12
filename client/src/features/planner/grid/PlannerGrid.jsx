@@ -202,25 +202,36 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
         onAddNeed={onAddNeed} onEditNeed={onEditNeed} onDeleteNeed={onDeleteNeed}
         onSuggestNeed={onSuggestNeed}
       />
-      <div className="flex-1 min-w-0 relative">
+      <div
+        className="flex-1 min-w-0 relative"
+        style={
+          todayOverlay
+            ? {
+                // The today line is painted as a background, not an overlay —
+                // backgrounds span the element's full height by definition, so
+                // no stacking context or row quirk can ever cut it short.
+                backgroundImage: `linear-gradient(to right, transparent ${todayOverlay.lineX}px, rgba(76,186,212,0.65) ${todayOverlay.lineX}px, rgba(76,186,212,0.65) ${todayOverlay.lineX + 1.5}px, transparent ${todayOverlay.lineX + 1.5}px)`,
+                backgroundRepeat: 'no-repeat',
+              }
+            : undefined
+        }
+      >
         {todayOverlay && (
-          <>
-            <div
-              className="absolute top-0 bottom-0 pointer-events-none z-[6]"
-              style={{ left: todayOverlay.lineX, width: 1.5, background: 'rgba(76,186,212,0.75)' }}
+          <div
+            className="absolute pointer-events-none z-[25]"
+            style={{ left: todayOverlay.lineX, top: 44 }}
+          >
+            <span
+              className="absolute w-[7px] h-[7px] rounded-full bg-primary"
+              style={{ top: 0, left: -2.7 }}
+            />
+            <span
+              className="absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-white text-primary text-[9px] font-bold px-2.5 py-[2px]"
+              style={{ top: 10, left: 1, border: '1.5px solid #4CBAD4', boxShadow: '0 2px 8px rgba(76,186,212,0.3)' }}
             >
-              <span
-                className="absolute w-[7px] h-[7px] rounded-full bg-primary"
-                style={{ top: 46, left: -2.7 }}
-              />
-              <span
-                className="absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-white text-primary text-[9px] font-bold px-2.5 py-[2px]"
-                style={{ top: 56, left: 1, border: '1.5px solid #4CBAD4', boxShadow: '0 2px 8px rgba(76,186,212,0.3)' }}
-              >
-                Today
-              </span>
-            </div>
-          </>
+              Today
+            </span>
+          </div>
         )}
         <GridHeader
           periods={periods}
