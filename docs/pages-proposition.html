@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>databob — page archetypes proposition</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#4CBAD4; --primary-soft:#E0F4FA; --ink:#22313F; --mid:#6B8A9E; --faint:#A8BDCB;
+    --canvas:#EEF1F5; --line:#EDF2F7;
+    --green:#34C98E; --green-soft:#E7F8F0; --red:#E8636F; --red-soft:#FDECEE;
+    --amber:#F5A623; --amber-soft:#FFF4E2; --violet:#8B5CF6; --blue:#3B82F6;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--canvas);color:var(--ink);padding:26px;display:flex;flex-direction:column;align-items:center;gap:30px}
+  .mono{font-family:'DM Mono',monospace}
+  .page{max-width:1060px;width:100%;background:#fff;border-radius:24px;box-shadow:0 18px 50px rgba(34,49,63,.10);padding:26px 30px}
+  .tag{font:800 9px 'DM Sans';letter-spacing:.12em;text-transform:uppercase;color:var(--primary);background:var(--primary-soft);border-radius:999px;padding:4px 12px;display:inline-block;margin-bottom:14px}
+
+  /* shared */
+  .av{border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex:none}
+  .phead{display:flex;align-items:flex-start;margin-bottom:18px}
+  .phead h1{font-size:22px;letter-spacing:-.02em}
+  .phead p{font:500 11.5px 'DM Sans';color:var(--mid);margin-top:3px}
+  .phead .sp{flex:1}
+  .btn{border:0;border-radius:11px;font:700 11.5px 'DM Sans';padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn.pri{background:var(--primary);color:#fff;box-shadow:0 3px 10px rgba(76,186,212,.35)}
+  .btn.ghost{background:#fff;color:var(--mid);border:1px solid var(--line)}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 17px}
+  .chip{font:700 9.5px 'DM Sans';border-radius:999px;padding:3px 9px}
+  .h3{font-size:13.5px;margin-bottom:10px;display:flex;align-items:center}
+  .h3 span{margin-left:auto;font:600 10px 'DM Sans';color:var(--primary)}
+
+  /* ── A: PERSON PROFILE ── */
+  .profile{display:flex;gap:16px;align-items:center;background:linear-gradient(120deg,#F4FBFD,#fff);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:16px}
+  .profile .av{width:58px;height:58px;font-size:18px;background:var(--blue);box-shadow:0 6px 16px rgba(59,130,246,.35)}
+  .profile h2{font-size:18px}
+  .roles{display:flex;gap:5px;margin-top:5px}
+  .roles i{font:600 9.5px 'DM Mono';font-style:normal;color:var(--blue);background:#EBF2FF;border-radius:7px;padding:2px 7px}
+  .pstats{display:flex;gap:26px;margin-left:auto;text-align:center}
+  .pstats b{font-size:17px;display:block}
+  .pstats span{font:600 9.5px 'DM Sans';color:var(--faint)}
+  .pstats .spark{display:block;margin:2px auto 0}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px}
+  .tabs a{font:700 11.5px 'DM Sans';color:var(--mid);text-decoration:none;padding:9px 13px;border-radius:10px 10px 0 0;position:relative}
+  .tabs a.on{color:var(--primary)}
+  .tabs a.on::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2.5px;border-radius:2px;background:var(--primary)}
+  .grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px}
+  .score{display:flex;align-items:center;gap:14px}
+  .ring{position:relative;width:64px;height:64px}
+  .ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .catbar{margin-top:9px}
+  .catbar .r{display:flex;align-items:center;gap:8px;font:600 10.5px 'DM Sans';color:var(--mid);padding:3px 0}
+  .catbar .bar{flex:1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+  .catbar .bar i{display:block;height:100%;border-radius:3px;background:var(--primary)}
+  .catbar b{font:700 10px 'DM Mono';color:var(--ink);width:24px;text-align:right}
+  .fup{display:flex;align-items:flex-start;gap:8px;padding:6px 0;font:600 11.5px 'DM Sans'}
+  .fup input{accent-color:var(--primary);margin-top:2px}
+  .fup small{display:block;font:500 9.5px 'DM Mono';color:var(--faint);font-weight:400}
+  .entry{border:1px solid var(--line);border-radius:13px;padding:10px 12px;margin-bottom:8px}
+  .entry .k{display:flex;gap:6px;align-items:center;margin-bottom:5px}
+  .entry p{font:500 11.5px 'DM Sans';line-height:1.5}
+  .entry .meta{font:500 9.5px 'DM Mono';color:var(--faint);margin-top:5px}
+  .reply{display:flex;gap:7px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+  .reply input{flex:1;border:1px solid var(--line);border-radius:9px;font:500 10.5px 'DM Sans';padding:6px 9px;outline:none}
+
+  /* ── B: PEOPLE LIST ── */
+  .toolrow{display:flex;gap:9px;margin-bottom:14px}
+  .search{flex:1;max-width:260px;display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:11px;padding:8px 11px;color:var(--faint);font:500 11.5px 'DM Sans'}
+  .seg{display:flex;background:var(--canvas);border-radius:11px;padding:3px}
+  .seg a{font:700 10.5px 'DM Sans';color:var(--mid);text-decoration:none;padding:6px 12px;border-radius:8px}
+  .seg a.on{background:#fff;color:var(--primary);box-shadow:0 1px 4px rgba(34,49,63,.12)}
+  .prow{display:flex;align-items:center;gap:13px;padding:11px 14px;border-radius:14px;margin-bottom:4px}
+  .prow:hover{background:#F7FAFC}
+  .prow.hot{background:#fff;box-shadow:0 8px 22px rgba(34,49,63,.10);border:1px solid var(--line)}
+  .prow .av{width:34px;height:34px;font-size:11px}
+  .prow .nm{font:700 12.5px 'DM Sans'}
+  .prow .rl{font:500 9.5px 'DM Mono';color:var(--faint)}
+  .util{width:120px}
+  .util .lab{display:flex;justify-content:space-between;font:600 9px 'DM Mono';color:var(--faint);margin-bottom:3px}
+  .util .bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+  .util .bar i{display:block;height:100%;border-radius:3px}
+  .teamchip{font:600 9.5px 'DM Sans';color:var(--mid);background:var(--canvas);border-radius:999px;padding:3px 9px}
+  .kebab{color:var(--faint);font-weight:800;letter-spacing:1px;padding:0 4px}
+
+  /* ── C: SETTINGS ── */
+  .set{display:grid;grid-template-columns:190px 1fr;gap:22px}
+  .setnav a{display:block;font:700 11.5px 'DM Sans';color:var(--mid);text-decoration:none;padding:8px 11px;border-radius:10px;margin-bottom:2px}
+  .setnav a.on{color:var(--primary);background:var(--primary-soft)}
+  .field{margin-bottom:12px}
+  .field label{display:block;font:700 10px 'DM Sans';letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+  .field .ctl{display:flex;gap:8px;align-items:center}
+  .inp{border:1px solid var(--line);border-radius:10px;font:600 11.5px 'DM Sans';padding:8px 11px;color:var(--ink);background:#fff}
+  .inp.sm{width:64px;font-family:'DM Mono';text-align:center}
+  .mrow{display:flex;align-items:center;gap:11px;padding:9px 4px;border-top:1px solid var(--line)}
+  .mrow:first-of-type{border-top:0}
+  .mrow .av{width:28px;height:28px;font-size:9px}
+  .mrow .nm{font:700 11.5px 'DM Sans'}
+  .mrow .em{font:500 9.5px 'DM Mono';color:var(--faint)}
+  .roledd{margin-left:auto;font:700 10.5px 'DM Sans';color:var(--mid);background:var(--canvas);border-radius:9px;padding:5px 10px}
+  .wsum{font:700 10px 'DM Mono';border-radius:999px;padding:3px 10px;margin-left:auto}
+
+  .note{max-width:1060px;font-size:11px;color:var(--mid);line-height:1.55}
+</style>
+</head>
+<body>
+
+<!-- ════ A: PERSON PROFILE (entity-detail archetype — customers follow the same pattern) ════ -->
+<div class="page">
+  <span class="tag">A · Person page — entity detail archetype</span>
+  <div class="profile">
+    <span class="av">MC</span>
+    <div>
+      <h2>Mladen Comic</h2>
+      <div class="roles"><i>Dat BE · Sr</i><i>Dat PM · Mid</i><i style="color:var(--mid);background:var(--canvas)">Core team</i></div>
+    </div>
+    <div class="pstats">
+      <div><b>0.9</b><span>capacity</span></div>
+      <div><b>92%</b><span>utilized · Jun</span></div>
+      <div>
+        <b style="color:var(--green)">4.3</b><span>last eval</span>
+        <svg class="spark" width="56" height="14" viewBox="0 0 56 14"><path d="M1 10 L12 8 23 9 34 5 45 6 55 3" fill="none" stroke="#34C98E" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-left:22px">
+      <button class="btn pri">▶ Start 1:1</button>
+      <button class="btn ghost">⋯</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <a href="#">Overview</a><a class="on" href="#">Performance</a><a href="#">Allocation</a><a href="#">1:1s</a><a href="#">Activity</a><a href="#">Skills</a>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="h3">Overall · Q2 <span>change window</span></div>
+        <div class="score">
+          <div class="ring">
+            <svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#EDF2F7" stroke-width="7"/><circle cx="32" cy="32" r="26" fill="none" stroke="#34C98E" stroke-width="7" stroke-dasharray="140 163" stroke-linecap="round" transform="rotate(-90 32 32)"/></svg>
+            <b>4.3</b>
+          </div>
+          <div style="flex:1">
+            <div class="catbar">
+              <div class="r">Delivery<span class="bar"><i style="width:88%"></i></span><b>4.4</b></div>
+              <div class="r">Technical<span class="bar"><i style="width:92%"></i></span><b>4.6</b></div>
+              <div class="r">Communication<span class="bar"><i style="width:72%;background:var(--amber)"></i></span><b>3.6</b></div>
+              <div class="r">Ownership<span class="bar"><i style="width:86%"></i></span><b>4.3</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="h3">Recent entries <span>add entry</span></div>
+        <div class="entry">
+          <div class="k"><span class="chip" style="background:var(--green-soft);color:var(--green)">STRENGTH</span><span class="chip" style="background:var(--primary-soft);color:var(--primary)">Delivery</span><span style="font:500 9.5px 'DM Mono';color:var(--faint)">CH Media</span></div>
+          <p>Shipped the ingestion refactor a sprint early; client demo went flawlessly.</p>
+          <div class="meta">Andria M. · 10 Jun</div>
+          <div class="reply"><input placeholder="Reply…"><button class="btn pri" style="padding:6px 10px">↩</button></div>
+        </div>
+        <div class="entry">
+          <div class="k"><span class="chip" style="background:var(--amber-soft);color:var(--amber)">CONCERN</span><span class="chip" style="background:var(--primary-soft);color:var(--primary)">Communication</span></div>
+          <p>Standup updates too thin during the migration week — PM had to chase context twice.</p>
+          <div class="meta">Sinisa K. · 4 Jun · 2 replies</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="h3">Open follow-ups <span>2</span></div>
+        <div class="fup"><input type="checkbox"><div>Pair with Nikola on review etiquette<small>from 1:1 · 28 May</small></div></div>
+        <div class="fup"><input type="checkbox"><div>Draft the Q3 on-call proposal<small>from 1:1 · 28 May</small></div></div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="h3">Career</div>
+        <div class="fup"><span class="chip" style="background:var(--primary-soft);color:var(--primary)">GOAL</span><div>Lead a project end-to-end by Q4<small>active · set 12 Mar</small></div></div>
+        <div class="fup"><span class="chip" style="background:var(--canvas);color:var(--mid)">NOTE</span><div>Interested in data-platform architecture track</div></div>
+      </div>
+      <div class="card">
+        <div class="h3">Client signals</div>
+        <svg width="100%" height="56" viewBox="0 0 220 56"><path d="M10 38 L52 30 94 34 136 18 178 22 212 14" fill="none" stroke="#4CBAD4" stroke-width="2"/><g font-family="DM Mono" font-size="8" fill="#A8BDCB"><text x="6" y="52">Jan</text><text x="90" y="52">Mar</text><text x="174" y="52">May</text></g><circle cx="212" cy="14" r="3.5" fill="#34C98E"/></svg>
+        <div style="font:500 10px 'DM Mono';color:var(--faint)">CH Media · last: <b style="color:var(--green)">5</b></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ B: PEOPLE LIST (list archetype — customers list identical) ════ -->
+<div class="page">
+  <span class="tag">B · People — list archetype</span>
+  <div class="phead">
+    <div><h1>People</h1><p>14 people · 3 over capacity in June</p></div>
+    <div class="sp"></div>
+    <div class="toolrow" style="margin:0">
+      <span class="search">⌕ Search people…</span>
+      <span class="seg"><a class="on" href="#">All</a><a href="#">Core</a><a href="#">Data team</a><a href="#">External</a></span>
+      <button class="btn pri">＋ Person</button>
+    </div>
+  </div>
+
+  <div class="prow">
+    <span class="av" style="background:var(--blue)">MC</span>
+    <div style="width:190px"><div class="nm">Mladen Comic</div><div class="rl">Dat BE·Sr · Dat PM·Mid</div></div>
+    <span class="teamchip">Core</span>
+    <div class="util" style="margin-left:auto"><div class="lab"><span>Jun</span><span>92%</span></div><div class="bar"><i style="width:92%;background:var(--green)"></i></div></div>
+    <span class="chip" style="background:var(--green-soft);color:var(--green)">pulse 4/5</span>
+    <span class="kebab">⋮</span>
+  </div>
+  <div class="prow hot">
+    <span class="av" style="background:var(--web,#F97316);background:#F97316">NS</span>
+    <div style="width:190px"><div class="nm">Nikola Stamenkovic</div><div class="rl">Web FE·Mid · Dat BE·Sr</div></div>
+    <span class="teamchip">Data team</span>
+    <div class="util" style="margin-left:auto"><div class="lab"><span>Jun</span><span style="color:var(--red);font-weight:700">112%</span></div><div class="bar"><i style="width:100%;background:var(--red)"></i></div></div>
+    <span class="chip" style="background:var(--red-soft);color:var(--red)">pulse 2/5 · 1:1 overdue</span>
+    <span class="kebab">⋮</span>
+  </div>
+  <div class="prow">
+    <span class="av" style="background:var(--violet)">AT</span>
+    <div style="width:190px"><div class="nm">Aleksa Topalovic</div><div class="rl">Dat BE·Sr · Dat FE·Mid</div></div>
+    <span class="teamchip">Core</span>
+    <div class="util" style="margin-left:auto"><div class="lab"><span>Jun</span><span>40%</span></div><div class="bar"><i style="width:40%;background:#94A3B8"></i></div></div>
+    <span class="chip" style="background:var(--green-soft);color:var(--green)">pulse 5/5</span>
+    <span class="kebab">⋮</span>
+  </div>
+  <div class="prow">
+    <span class="av" style="background:#0ea5e9">ZG</span>
+    <div style="width:190px"><div class="nm">Zorana Gajic</div><div class="rl">Dat FE·Mid</div></div>
+    <span class="teamchip">External</span>
+    <div class="util" style="margin-left:auto"><div class="lab"><span>Jun</span><span>80%</span></div><div class="bar"><i style="width:80%;background:var(--green)"></i></div></div>
+    <span class="chip" style="background:var(--canvas);color:var(--mid)">no 1:1 yet</span>
+    <span class="kebab">⋮</span>
+  </div>
+</div>
+
+<!-- ════ C: SETTINGS (admin archetype) ════ -->
+<div class="page">
+  <span class="tag">C · Settings — admin archetype</span>
+  <div class="phead"><div><h1>Settings</h1><p>databob · organization</p></div></div>
+  <div class="set">
+    <nav class="setnav">
+      <a href="#">Organization</a>
+      <a class="on" href="#">Reminders</a>
+      <a href="#">Members</a>
+      <a href="#">Teams</a>
+      <a href="#">Skills</a>
+      <a href="#">Categories</a>
+    </nav>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="h3">Reminder schedules</div>
+        <div class="field">
+          <label>1:1 reminder</label>
+          <div class="ctl">every <span class="inp sm">3</span><span class="inp">weeks ▾</span> starting <span class="inp">Mon, 02 Jun 2026</span><span class="chip" style="background:var(--green-soft);color:var(--green);margin-left:6px">active</span></div>
+        </div>
+        <div class="field">
+          <label>PM update reminder</label>
+          <div class="ctl">every <span class="inp sm">2</span><span class="inp">weeks ▾</span> starting <span class="inp">Mon, 02 Jun 2026</span><span class="chip" style="background:var(--green-soft);color:var(--green);margin-left:6px">active</span></div>
+        </div>
+        <p style="font:500 10px 'DM Sans';color:var(--faint)">Client-signal reminders are always monthly. Items fire on each tick and clear when the 1:1 / update happens.</p>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <div class="h3">Members <span>＋ invite</span></div>
+        <div class="mrow"><span class="av" style="background:var(--primary)">AM</span><div><div class="nm">Andria Micunovic</div><div class="em">andria@databob.ch · Microsoft</div></div><span class="chip" style="background:var(--primary-soft);color:var(--primary);margin-left:auto">owner</span></div>
+        <div class="mrow"><span class="av" style="background:var(--violet)">SK</span><div><div class="nm">Sinisa Komlen</div><div class="em">sinisa@databob.ch · Microsoft</div></div><span class="roledd">admin ▾</span><span class="kebab">⋮</span></div>
+        <div class="mrow" style="opacity:.75"><span class="av" style="background:var(--faint)">?</span><div><div class="nm">luka@databob.ch</div><div class="em">invited as member · awaiting first sign-in</div></div><span class="chip" style="background:var(--amber-soft);color:var(--amber);margin-left:auto">pending</span><span class="kebab">⋮</span></div>
+      </div>
+
+      <div class="card">
+        <div class="h3">Performance categories <span class="wsum" style="background:var(--green-soft);color:var(--green)">Σ 100</span></div>
+        <div class="catbar">
+          <div class="r" style="color:var(--ink)">Delivery<span class="bar"><i style="width:30%"></i></span><b>30</b></div>
+          <div class="r" style="color:var(--ink)">Technical<span class="bar"><i style="width:30%"></i></span><b>30</b></div>
+          <div class="r" style="color:var(--ink)">Communication<span class="bar"><i style="width:20%"></i></span><b>20</b></div>
+          <div class="r" style="color:var(--ink)">Ownership<span class="bar"><i style="width:20%"></i></span><b>20</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="note"><b>Three archetypes cover the rest of the app.</b> A — entity detail (person shown; customer pages reuse it: profile card → customer card with responsible/status, tabs → overview/projects/people/activity/performance, right column → signals chart + PM reviews list). B — lists (people shown; customers identical with status/responsible/projects columns). C — settings (section nav left, cards right; reminders as sentence-style controls, members with invite-pending state, categories with live weight sum). Everything sits inside the shell from the previous mockup. Cockpits keep their existing two-column design, restyled to these tokens.</p>
+</body>
+</html>
