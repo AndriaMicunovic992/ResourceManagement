@@ -10,8 +10,8 @@ import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
 import { LW, CW } from '../../../lib/constants';
 
-const BAR_H = 24;
-const BAR_GAP = 2;
+const BAR_H = 28;
+const BAR_GAP = 3;
 
 const STATUS_ORDER = { realised: 0, potential: 1 };
 

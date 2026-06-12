@@ -8,9 +8,7 @@ export default function ProjectGridRow({ project, periods }) {
   return (
     <div className="flex h-[34px]">
       {periods.map((p) => {
-        const inRange = p.months.some((m) => projMonths.includes(m));
-        const bg = inRange ? '#F8FBFC' : 'transparent';
-        return <div key={p.label} className="shrink-0" style={{ width: p.months.length * CW, background: bg }} />;
+        return <div key={p.label} className="shrink-0" style={{ width: p.months.length * CW }} />;
       })}
     </div>
   );

@@ -6,7 +6,7 @@ import { domainColor } from '../../../../lib/resourceUtils';
 import { CW } from '../../../../lib/constants';
 import { useData } from '../../../../contexts/DataContext';
 
-const BAR_H = 24;
+const BAR_H = 28;
 
 export default function AssignmentBar({ assignment, need, resource, months, overloadMonths, onUndoable, onClickSegment }) {
   const { assignments, deleteAssignment, upsertAssignment } = useData();
