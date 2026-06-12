@@ -8,6 +8,7 @@ import { resourceMatchesNeed } from '../../../lib/resourceUtils';
 import { monthRange, computePeriods, currentMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
+import { useVisibility } from '../../../contexts/VisibilityContext';
 import { LW, CW } from '../../../lib/constants';
 
 const BAR_H = 28;
@@ -27,9 +28,10 @@ function sortCustomers(customers, sort) {
   }
 }
 
-export default function PlannerGrid({ heldResource, timeRange, aggregation, showUnassignedOnly, customerSort, filterIds, onCellClick, onBarClick, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, onSuggestNeed, onPaintNeed, onPaintAssign, onUndoable }) {
+export default function PlannerGrid({ heldResource, timeRange, aggregation, showUnassignedOnly, customerSort, filterIds, resourceFilterIds, myProjectsOnly, onCellClick, onBarClick, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, onSuggestNeed, onPaintNeed, onPaintAssign, onUndoable }) {
   const { customers, projects, needs, assignments } = useData();
   const { canEdit } = useOrg();
+  const { selfResourceId } = useVisibility();
 
   const months = useMemo(() => monthRange(timeRange.start, timeRange.end), [timeRange]);
   const periods = useMemo(() => computePeriods(months, aggregation), [months, aggregation]);
@@ -46,25 +48,76 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
     });
   }, [allRows, filterIds]);
 
+  // "My projects": only projects where I'm the responsible person (directly,
+  // or via being the customer's responsible).
+  const myRows = useMemo(() => {
+    if (!myProjectsOnly || !selfResourceId) return filteredRows;
+    const isMine = (project, customer) =>
+      project?.responsiblePersonId === selfResourceId ||
+      customer?.responsiblePersonId === selfResourceId;
+    const keptProjectIds = new Set();
+    const keptCustomerIds = new Set();
+    for (const row of filteredRows) {
+      if (row.type === 'project' && isMine(row.data, row.customer)) {
+        keptProjectIds.add(row.data.id);
+        keptCustomerIds.add(row.customer.id);
+      }
+    }
+    return filteredRows.filter((row) => {
+      if (row.type === 'customer') return keptCustomerIds.has(row.data.id);
+      if (row.type === 'project') return keptProjectIds.has(row.data.id);
+      if (row.type === 'need') return keptProjectIds.has(row.project.id);
+      return keptProjectIds.has(row.data.id);
+    });
+  }, [filteredRows, myProjectsOnly, selfResourceId]);
+
+  // Employee filter: only needs the selected people are assigned to.
+  const peopleRows = useMemo(() => {
+    if (!resourceFilterIds || resourceFilterIds.size === 0) return myRows;
+    const keptNeedIds = new Set();
+    const keptProjectIds = new Set();
+    const keptCustomerIds = new Set();
+    for (const row of myRows) {
+      if (row.type !== 'need') continue;
+      const hit = assignments.some(
+        (a) =>
+          a.needId === row.data.id &&
+          resourceFilterIds.has(a.resourceId) &&
+          Object.values(a.monthAllocations || {}).some((v) => v > 0)
+      );
+      if (hit) {
+        keptNeedIds.add(row.data.id);
+        keptProjectIds.add(row.project.id);
+        keptCustomerIds.add(row.customer.id);
+      }
+    }
+    return myRows.filter((row) => {
+      if (row.type === 'customer') return keptCustomerIds.has(row.data.id);
+      if (row.type === 'project') return keptProjectIds.has(row.data.id);
+      if (row.type === 'need') return keptNeedIds.has(row.data.id);
+      return keptProjectIds.has(row.data.id);
+    });
+  }, [myRows, resourceFilterIds, assignments]);
+
   const rows = useMemo(() => {
-    if (!showUnassignedOnly) return filteredRows;
+    if (!showUnassignedOnly) return peopleRows;
     const unfilledNeedIds = new Set();
     const unfilledProjectIds = new Set();
     const unfilledCustomerIds = new Set();
-    for (const row of filteredRows) {
+    for (const row of peopleRows) {
       if (row.type === 'need' && !isNeedOk(row.data, assignments)) {
         unfilledNeedIds.add(row.data.id);
         unfilledProjectIds.add(row.project.id);
         unfilledCustomerIds.add(row.customer.id);
       }
     }
-    return filteredRows.filter((row) => {
+    return peopleRows.filter((row) => {
       if (row.type === 'customer') return unfilledCustomerIds.has(row.data.id);
       if (row.type === 'project') return unfilledProjectIds.has(row.data.id);
       if (row.type === 'need') return unfilledNeedIds.has(row.data.id);
       return unfilledProjectIds.has(row.data.id);
     });
-  }, [filteredRows, showUnassignedOnly, assignments]);
+  }, [peopleRows, showUnassignedOnly, assignments]);
 
   // Compute need row heights centrally so labels and grid stay in sync
   const needHeights = useMemo(() => {

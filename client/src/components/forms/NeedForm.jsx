@@ -86,12 +86,12 @@ export default function NeedForm({ initial, project, onSave, onClose }) {
         <div className="flex gap-4">
           <Field label="Start">
             <input type="month" value={startMonth} onChange={(e) => setStartMonth(e.target.value)}
-              min={project?.startMonth} max={project?.endMonth}
+             
               className="px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary" />
           </Field>
           <Field label="End">
             <input type="month" value={endMonth} onChange={(e) => setEndMonth(e.target.value)}
-              min={project?.startMonth} max={project?.endMonth}
+             
               className="px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary" />
           </Field>
         </div>

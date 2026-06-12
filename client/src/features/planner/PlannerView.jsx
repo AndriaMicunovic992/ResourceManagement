@@ -90,6 +90,8 @@ export default function PlannerView() {
   const [aggregation, setAggregation] = useState('M');
   const [editModal, setEditModal] = useState(null);
   const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
+  const [resourceFilterIds, setResourceFilterIds] = useState(() => new Set());
+  const [myProjectsOnly, setMyProjectsOnly] = useState(false);
   const [customerSort, setCustomerSort] = useState('name-asc');
   const [searchParams, setSearchParams] = useSearchParams();
   const [filterIds, setFilterIds] = useState(() => {
@@ -322,6 +324,8 @@ export default function PlannerView() {
           onToggleUnassigned={() => setShowUnassignedOnly((v) => !v)}
           customerSort={customerSort} onCustomerSortChange={setCustomerSort}
           filterIds={filterIds} onFilterChange={setFilterIds}
+          resourceFilterIds={resourceFilterIds} onResourceFilterChange={setResourceFilterIds}
+          myProjectsOnly={myProjectsOnly} onToggleMyProjects={() => setMyProjectsOnly((v) => !v)}
         />
         {customers.length === 0 ? (
           <EmptyState icon="📅" message="Create a customer to start planning" />
@@ -329,6 +333,7 @@ export default function PlannerView() {
           <PlannerGrid
             heldResource={heldResource} timeRange={timeRange} aggregation={aggregation}
             showUnassignedOnly={showUnassignedOnly} customerSort={customerSort} filterIds={filterIds}
+            resourceFilterIds={resourceFilterIds} myProjectsOnly={myProjectsOnly}
             onCellClick={handleCellClick} onBarClick={handleBarClick}
             onSuggestNeed={handleSuggestNeed}
             onPaintNeed={handlePaintNeed} onPaintAssign={handlePaintAssign}

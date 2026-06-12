@@ -23,7 +23,12 @@ export const projectService = {
     // Verify customer belongs to org
     const customer = await prisma.customer.findFirst({ where: { id: data.customerId, orgId } });
     if (!customer) throw new NotFoundError('Customer not found');
-    return prisma.project.create({ data: { ...data, orgId } });
+    // Dates are inherited from needs (spreadsheet model); seed with the
+    // current month until the first need defines the real range.
+    const now = new Date().toISOString().slice(0, 7);
+    return prisma.project.create({
+      data: { ...data, startMonth: data.startMonth || now, endMonth: data.endMonth || now, orgId },
+    });
   },
 
   async update(orgId: string, id: string, data: UpdateProjectInput) {
