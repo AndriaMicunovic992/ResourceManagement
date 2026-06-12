@@ -22,7 +22,7 @@ export default function CustomerLabel({ customer, index, onEdit, onDelete, onAdd
   const dotColor = ok ? '#5BC68A' : hasNeeds ? '#F5A623' : borderColor;
 
   return (
-    <div className="group flex items-center gap-2 px-3.5 h-10 mt-2" style={{ borderLeft: `4px solid ${borderColor}`, background: bg }}>
+    <div className="group flex items-center gap-2 px-3.5 h-10 mt-2">
       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
       {canOpen ? (
         <button
@@ -38,7 +38,7 @@ export default function CustomerLabel({ customer, index, onEdit, onDelete, onAdd
         <span className="text-sm font-bold text-text truncate flex-1">{customer.name}</span>
       )}
       <StatusBadge status={customer.status} />
-      <span className="text-[10px] text-text-light font-mono">{projCount}p</span>
+      <span className="text-[9px] font-mono font-bold text-text-mid bg-border-light rounded-full px-1.5 py-0.5">{projCount}</span>
       {canEdit && (
         <>
           <button onClick={onAddProject}

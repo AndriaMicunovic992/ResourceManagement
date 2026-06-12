@@ -20,14 +20,19 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
     [project]
   );
 
-  const visibleAssignments = useMemo(() =>
-    assignments.filter((a) => a.needId === need.id && Object.values(a.monthAllocations || {}).some((v) => v > 0)),
-    [assignments, need.id]);
+  const visibleAssignments = useMemo(() => {
+    const monthSet = new Set(months);
+    return assignments.filter(
+      (a) =>
+        a.needId === need.id &&
+        Object.entries(a.monthAllocations || {}).some(([m, v]) => v > 0 && monthSet.has(m))
+    );
+  }, [assignments, need.id, months]);
 
   const canHeldPlace = heldResource && resourceMatchesNeed(heldResource, need);
   const barH = 28;
   const barGap = 3;
-  const height = rowHeight || 42;
+  const height = rowHeight || 56;
 
   // Held person's free capacity per month (across all their assignments) —
   // shown as a hint in placeable cells.
