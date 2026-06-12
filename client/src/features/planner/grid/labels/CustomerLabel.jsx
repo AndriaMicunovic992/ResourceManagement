@@ -22,7 +22,7 @@ export default function CustomerLabel({ customer, index, onEdit, onDelete, onAdd
   const dotColor = ok ? '#5BC68A' : hasNeeds ? '#F5A623' : borderColor;
 
   return (
-    <div className="group flex items-center gap-2 px-3.5 h-10" style={{ borderLeft: `4px solid ${borderColor}`, background: bg }}>
+    <div className="group flex items-center gap-2 px-3.5 h-10 mt-2" style={{ borderLeft: `4px solid ${borderColor}`, background: bg }}>
       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
       {canOpen ? (
         <button

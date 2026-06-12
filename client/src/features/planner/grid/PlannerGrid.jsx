@@ -5,10 +5,10 @@ import GridBody from './rows/GridBody';
 import HeldCapacityFooter from './HeldCapacityFooter';
 import { buildRows, isNeedOk, computeNeedFulfillment } from '../../../lib/gridUtils';
 import { resourceMatchesNeed } from '../../../lib/resourceUtils';
-import { monthRange, computePeriods } from '../../../lib/dateUtils';
+import { monthRange, computePeriods, currentMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
-import { LW } from '../../../lib/constants';
+import { LW, CW } from '../../../lib/constants';
 
 const BAR_H = 24;
 const BAR_GAP = 2;
@@ -96,6 +96,18 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
   const periodGap = (periodMonths) =>
     periodMonths.reduce((s, m) => s + (monthGaps[m] || 0), 0);
 
+  // Full-height "today" column: faint tint + a thin rule at its left edge.
+  const todayOverlay = useMemo(() => {
+    const cm = currentMonth();
+    let left = 0;
+    for (const p of periods) {
+      const w = p.months.length * CW;
+      if (p.months.includes(cm)) return { left, width: w };
+      left += w;
+    }
+    return null;
+  }, [periods]);
+
   const isPeriodFullyStaffed = (periodMonths) => {
     return needs.length > 0 && periodMonths.every((month) =>
       needs.every((n) => {
@@ -115,7 +127,18 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
         onAddNeed={onAddNeed} onEditNeed={onEditNeed} onDeleteNeed={onDeleteNeed}
         onSuggestNeed={onSuggestNeed}
       />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 relative">
+        {todayOverlay && (
+          <div
+            className="absolute top-0 bottom-0 pointer-events-none"
+            style={{
+              left: todayOverlay.left,
+              width: todayOverlay.width,
+              background: 'rgba(76,186,212,0.05)',
+              borderLeft: '1.5px solid rgba(76,186,212,0.55)',
+            }}
+          />
+        )}
         <GridHeader
           periods={periods}
           isPeriodFullyStaffed={isPeriodFullyStaffed}

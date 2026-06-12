@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>databob — Planner redesign suggestion (Pass A+B)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#4CBAD4; --primary-soft:#E0F4FA; --bg:#FAFBFD;
+    --success:#5BC68A; --success-soft:#EAFAF0;
+    --warning:#F5A623; --warning-soft:#FFF6E8;
+    --danger:#E8636F; --danger-soft:#FDE8EA;
+    --text:#2C3E50; --mid:#6B8A9E; --faint:#A0BCC9;
+    --line:#E8F0F5; --line-q:#D8E8EF;
+    --data:#3B82F6; --web:#F97316; --gen:#8B5CF6;
+    --cw:92px; --lw:250px;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);padding:18px}
+  .mono{font-family:'DM Mono',monospace}
+  .note{font-size:11px;color:var(--mid);margin:0 0 14px}
+  .frame{background:#fff;border:1px solid var(--line-q);border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(76,186,212,.08)}
+
+  /* ───── Toolbar: one control language, grouped clusters ───── */
+  .toolbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line-q);background:#fff}
+  .cluster{display:flex;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:2px;height:32px}
+  .seg{height:26px;padding:0 12px;border-radius:8px;border:0;background:transparent;color:var(--mid);font:600 11px 'DM Sans';cursor:pointer;display:flex;align-items:center;gap:5px}
+  .seg.on{background:#fff;color:var(--primary);box-shadow:0 1px 3px rgba(44,62,80,.10)}
+  .range{font:500 11px 'DM Mono';color:var(--text);padding:0 10px;display:flex;align-items:center;gap:6px}
+  .range b{color:var(--faint);font-weight:400}
+  .spacer{flex:1}
+  .btn-primary{height:32px;padding:0 14px;border:0;border-radius:10px;background:var(--primary);color:#fff;font:700 11.5px 'DM Sans';cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(76,186,212,.35)}
+
+  .layout{display:flex}
+
+  /* ───── Pool: compact, recedes; red reserved for overallocation ───── */
+  .pool{width:218px;border-right:1px solid var(--line-q);padding:12px 10px;background:#fff}
+  .pool h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:0 0 8px 4px}
+  .person{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:10px;cursor:pointer}
+  .person:hover{background:var(--primary-soft)}
+  .person.held{background:var(--primary-soft);box-shadow:inset 0 0 0 1.5px var(--primary)}
+  .av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font:700 9.5px 'DM Sans';flex:none}
+  .pname{font:600 12px 'DM Sans';line-height:1.15}
+  .proles{font:500 9.5px 'DM Mono';color:var(--mid)}
+  .pfree{margin-left:auto;font:500 10px 'DM Mono';color:var(--mid)}
+  .pfree.over{color:var(--danger);font-weight:700}
+  .ubar{height:3px;border-radius:2px;background:var(--line);margin:3px 8px 6px 42px;overflow:hidden}
+  .ubar i{display:block;height:100%;border-radius:2px}
+
+  /* ───── Grid ───── */
+  .grid{flex:1;overflow-x:auto}
+  .ghead{display:flex;margin-left:var(--lw);border-bottom:2px solid var(--line-q)}
+  .gh{width:var(--cw);flex:none;height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative}
+  .gh .m{font:700 10.5px 'DM Mono';color:var(--mid)}
+  .gh .gap{font:700 8.5px 'DM Mono';color:var(--danger);background:var(--danger-soft);padding:0 5px;border-radius:6px}
+  .gh.today .m{color:var(--primary)}
+  .gh.today::after{content:'TODAY';font:800 7px 'DM Sans';letter-spacing:.08em;color:#fff;background:var(--primary);border-radius:5px;padding:1.5px 5px}
+
+  /* customer blocks: accent rail + air between blocks, no inner lattice */
+  .block{margin:10px 12px 4px 0;border-radius:0 14px 14px 0;position:relative;background:#fff}
+  .block::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px;background:var(--accent)}
+  .crow{display:flex;align-items:center;gap:8px;height:34px;padding-left:14px}
+  .crow .cname{font:800 13px 'DM Sans'}
+  .crow .meta{font:500 9.5px 'DM Mono';color:var(--faint)}
+  .pill{font:700 8px 'DM Sans';letter-spacing:.05em;padding:2px 6px;border-radius:6px}
+  .pill.pot{background:var(--warning-soft);color:var(--warning)}
+  .pill.ok{background:var(--success-soft);color:var(--success)}
+  .prow{display:flex;align-items:center;gap:7px;height:26px;padding-left:26px;font:700 11.5px 'DM Sans';color:var(--text)}
+  .prow .meta{font:500 9px 'DM Mono';color:var(--faint);font-weight:400}
+
+  .nrow{display:flex;position:relative;min-height:44px}
+  .nlabel{width:var(--lw);flex:none;display:flex;align-items:center;gap:6px;padding-left:40px}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .chip{display:flex;align-items:center;gap:4px;font:600 10px 'DM Sans';color:var(--text)}
+  .chip b{font-weight:700}
+  .chip .sen{color:var(--faint);font-weight:500}
+  .cells{display:flex;position:relative}
+  .cell{width:var(--cw);flex:none;position:relative;border-right:1px solid transparent}
+  .cell.q{border-right:1px solid var(--line-q)}     /* quarter rhythm only */
+  .cell.today-col{background:rgba(76,186,212,.055)}
+  .cell .meter{position:absolute;left:7px;right:7px;bottom:5px;height:2.5px;border-radius:2px;background:var(--line)}
+  .cell .meter i{display:block;height:100%;border-radius:2px;background:var(--success)}
+  .cell.gapc{background:rgba(245,166,35,.06)}
+  .cell.fillc{background:rgba(91,198,138,.07)}
+  .cell .frac{position:absolute;top:5px;left:50%;transform:translateX(-50%);font:500 9px 'DM Mono';color:var(--mid);background:#fff;border:1px solid var(--line);border-radius:5px;padding:0 4px;opacity:0;transition:opacity .12s}
+  .cell:hover .frac{opacity:1}
+
+  /* hero bars */
+  .bar{position:absolute;top:8px;height:28px;border-radius:10px;display:flex;align-items:center;gap:6px;padding:0 8px 0 4px;box-shadow:0 2px 6px rgba(44,62,80,.12);cursor:grab}
+  .bar .bav{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font:700 8px 'DM Sans'}
+  .bar .bn{font:700 10.5px 'DM Sans';white-space:nowrap}
+  .bar .fte{margin-left:auto;font:700 9.5px 'DM Mono';background:rgba(255,255,255,.75);border-radius:5px;padding:1px 5px}
+  .bar.clip-l{border-top-left-radius:2px;border-bottom-left-radius:2px}
+  .bar .tick{position:absolute;top:3px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px #fff}
+  .seg-div{position:absolute;top:5px;bottom:5px;width:1px;background:rgba(44,62,80,.18)}
+
+  /* callouts */
+  .co{position:absolute;width:17px;height:17px;border-radius:50%;background:var(--text);color:#fff;font:800 10px 'DM Sans';display:flex;align-items:center;justify-content:center;z-index:5;box-shadow:0 0 0 2.5px #fff}
+  .legend{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 26px;padding:16px 20px;border-top:1px solid var(--line-q);background:var(--bg)}
+  .legend div{font:500 11px 'DM Sans';color:var(--mid);display:flex;gap:8px;align-items:baseline}
+  .legend b{color:var(--text);font-weight:800;flex:none}
+</style>
+</head>
+<body>
+<p class="note"><b>Planner redesign suggestion</b> — same data &amp; interactions, new visual hierarchy. Hover any cell to see the exact filled/needed numbers (they're no longer printed on every cell). Numbered dots mark what changed.</p>
+
+<div class="frame">
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="cluster"><button class="seg on">M</button><button class="seg">Q</button><button class="seg">Y</button></div>
+    <div class="cluster"><span class="range">Jun 2026 <b>→</b> Dec 2026</span></div>
+    <div class="cluster"><button class="seg on">● Unassigned</button><button class="seg">⚲ Filter</button><button class="seg">Name A–Z ▾</button></div>
+    <div class="spacer"></div>
+    <div class="co" style="position:static">7</div>
+    <button class="btn-primary">＋ Customer</button>
+  </div>
+
+  <div class="layout">
+    <!-- POOL -->
+    <div class="pool" style="position:relative">
+      <div class="co" style="top:8px;right:8px">5</div>
+      <h3>People</h3>
+      <div class="person held"><span class="av" style="background:var(--data)">AS</span><div><div class="pname">Andrijana Stanic</div><div class="proles">Dat FE·Sr</div></div><span class="pfree">+0.4</span></div>
+      <div class="ubar"><i style="width:60%;background:var(--primary)"></i></div>
+      <div class="person"><span class="av" style="background:var(--data)">MC</span><div><div class="pname">Mladen Comic</div><div class="proles">Dat BE·Sr</div></div><span class="pfree">+0.7</span></div>
+      <div class="ubar"><i style="width:30%;background:#94A3B8"></i></div>
+      <div class="person"><span class="av" style="background:var(--web)">NS</span><div><div class="pname">Nikola Stamenkovic</div><div class="proles">Web FE·Mid</div></div><span class="pfree over">−0.2</span></div>
+      <div class="ubar"><i style="width:100%;background:var(--danger)"></i></div>
+      <div class="person"><span class="av" style="background:var(--gen)">DE</span><div><div class="pname">Djordje Eric</div><div class="proles">Gen Cons·Sr</div></div><span class="pfree">0.0</span></div>
+      <div class="ubar"><i style="width:100%;background:var(--success)"></i></div>
+    </div>
+
+    <!-- GRID -->
+    <div class="grid" style="position:relative">
+      <div class="ghead" style="position:relative">
+        <div class="co" style="top:-2px;left:-26px">3</div>
+        <div class="gh today"><span class="m">Jun '26</span></div>
+        <div class="gh"><span class="m">Jul '26</span><span class="gap">−1.5</span></div>
+        <div class="gh"><span class="m">Aug '26</span><span class="gap">−1.5</span></div>
+        <div class="gh"><span class="m">Sep '26</span><span class="gap">−0.5</span></div>
+        <div class="gh"><span class="m">Oct '26</span></div>
+        <div class="gh"><span class="m">Nov '26</span></div>
+        <div class="gh"><span class="m">Dec '26</span></div>
+      </div>
+
+      <!-- EGI -->
+      <div class="block" style="--accent:#6366f1;position:relative">
+        <div class="co" style="top:10px;left:-9px">4</div>
+        <div class="crow"><span class="cname">EGI</span><span class="meta">3 projects</span><span class="pill ok">STAFFED</span></div>
+        <div class="prow">Forecasting data <span class="meta">Apr '26 →</span></div>
+        <div class="nrow">
+          <div class="nlabel"><span class="dot" style="background:var(--success)"></span><span class="chip" style="color:var(--data)"><b>Data BE</b><span class="sen">· Mid</span></span></div>
+          <div class="cells" style="position:relative">
+            <div class="cell today-col fillc"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc q"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc q"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <!-- clipped hero bar: started Apr, continues — squared left edge -->
+            <div class="bar clip-l" style="left:2px;width:368px;background:#DBEAFE;border:1px solid #93C5FD;position:absolute">
+              <span class="co" style="top:-9px;left:120px">1</span>
+              <span class="bav" style="background:var(--data)">MC</span><span class="bn" style="color:#1D4ED8">Mladen C.</span>
+              <span class="fte" style="color:#1D4ED8">0.10</span>
+            </div>
+          </div>
+        </div>
+        <div class="prow">Purchasing data <span class="meta">Apr '26 →</span></div>
+        <div class="nrow">
+          <div class="nlabel"><span class="dot" style="background:var(--success)"></span><span class="chip" style="color:var(--data)"><b>Data BE</b><span class="sen">· Mid</span></span></div>
+          <div class="cells" style="position:relative">
+            <div class="cell today-col fillc"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc q"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc"><span class="frac">0.10/0.10</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell"><span class="frac">—</span></div>
+            <div class="cell q"><span class="frac">—</span></div>
+            <div class="cell"><span class="frac">—</span></div>
+            <div class="bar clip-l" style="left:2px;width:276px;background:#DBEAFE;border:1px solid #93C5FD;position:absolute">
+              <span class="bav" style="background:var(--data)">AT</span><span class="bn" style="color:#1D4ED8">Aleksa T.</span>
+              <span class="seg-div" style="left:184px"></span>
+              <span class="fte" style="color:#1D4ED8">0.10</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Energie360 -->
+      <div class="block" style="--accent:#0ea5e9">
+        <div class="crow"><span class="cname">Energie360</span><span class="meta">2 projects</span></div>
+        <div class="prow">Planning Implementation <span class="meta">May '26 →</span></div>
+        <div class="nrow">
+          <div class="nlabel"><span class="dot" style="background:var(--success)"></span><span class="chip" style="color:var(--data)"><b>Data BE</b><span class="sen">· Sr</span></span></div>
+          <div class="cells" style="position:relative">
+            <div class="cell today-col fillc"><span class="frac">1.00/1.00</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc"><span class="frac">1.00/1.00</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc q"><span class="frac">1.00/1.00</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell"><span class="frac">—</span></div><div class="cell"><span class="frac">—</span></div><div class="cell q"><span class="frac">—</span></div><div class="cell"><span class="frac">—</span></div>
+            <div class="bar" style="left:4px;width:268px;background:#DBEAFE;border:1px solid #93C5FD;position:absolute">
+              <span class="bav" style="background:var(--data)">NS</span><span class="bn" style="color:#1D4ED8">Nikola S.</span>
+              <span class="tick" title="Over capacity across all projects"></span>
+              <span class="co" style="top:-9px;right:-8px">2</span>
+              <span class="fte" style="color:#1D4ED8">1.00</span>
+            </div>
+          </div>
+        </div>
+        <div class="nrow">
+          <div class="nlabel"><span class="dot" style="background:var(--warning)"></span><span class="chip" style="color:var(--data)"><b>Data FE</b><span class="sen">· Sr</span></span></div>
+          <div class="cells">
+            <div class="cell today-col gapc"><span class="frac">0.00/1.00</span><span class="meter"><i style="width:0%"></i></span></div>
+            <div class="cell gapc"><span class="frac">0.00/1.00</span><span class="meter"><i style="width:0%"></i></span></div>
+            <div class="cell gapc q"><span class="frac">0.00/1.00</span><span class="meter"><i style="width:0%"></i></span></div>
+            <div class="cell gapc"><span class="frac">0.50/1.00</span><span class="meter"><i style="width:50%"></i></span></div>
+            <div class="cell"><span class="frac">—</span></div><div class="cell q"><span class="frac">—</span></div><div class="cell"><span class="frac">—</span></div>
+          </div>
+        </div>
+        <div class="prow">Dedicated Capacity <span class="meta">Oct '26 →</span><span class="pill pot">POT</span></div>
+        <div class="nrow">
+          <div class="nlabel"><span class="dot" style="background:var(--success)"></span><span class="chip" style="color:var(--data)"><b>Data BE</b><span class="sen">· Sr</span></span></div>
+          <div class="cells" style="position:relative">
+            <div class="cell today-col"><span class="frac">—</span></div><div class="cell"><span class="frac">—</span></div><div class="cell q"><span class="frac">—</span></div><div class="cell"><span class="frac">—</span></div>
+            <div class="cell fillc"><span class="frac">0.50/0.50</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc q"><span class="frac">0.50/0.50</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="cell fillc"><span class="frac">0.50/0.50</span><span class="meter"><i style="width:100%"></i></span></div>
+            <div class="bar" style="left:372px;width:268px;background:#DBEAFE;border:1px solid #93C5FD;position:absolute;opacity:.75">
+              <span class="bav" style="background:var(--data)">AD</span><span class="bn" style="color:#1D4ED8">Andria D.</span>
+              <span class="fte" style="color:#1D4ED8">0.50</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- dataBob Support -->
+      <div class="block" style="--accent:#10b981;position:relative;margin-bottom:14px">
+        <div class="co" style="top:42px;left:64px">6</div>
+        <div class="crow"><span class="cname">dataBob Support</span><span class="meta">1 project</span><span class="pill pot">POT</span></div>
+        <div class="prow">General <span class="meta">May '26 →</span></div>
+        <div class="nrow">
+          <div class="nlabel"><span class="dot" style="background:var(--warning)"></span><span class="chip" style="color:var(--gen)"><b>Gen Agent</b><span class="sen">· Mid</span></span></div>
+          <div class="cells">
+            <div class="cell today-col gapc"><span class="frac">0.00/0.50</span><span class="meter"><i style="width:0%"></i></span></div>
+            <div class="cell gapc"><span class="frac">0.00/0.50</span><span class="meter"><i style="width:0%"></i></span></div>
+            <div class="cell gapc q"><span class="frac">0.00/0.50</span><span class="meter"><i style="width:0%"></i></span></div>
+            <div class="cell gapc"><span class="frac">0.00/0.50</span><span class="meter"><i style="width:0%"></i></span></div>
+            <div class="cell gapc"><span class="frac">0.00/0.50</span><span class="meter"><i style="width:0%"></i></span></div>
+            <div class="cell gapc q"><span class="frac">0.00/0.50</span><span class="meter"><i style="width:0%"></i></span></div>
+            <div class="cell gapc"><span class="frac">0.00/0.50</span><span class="meter"><i style="width:0%"></i></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div><b>1</b> Bars are the heroes now — solid pastel fill, shadow, readable label. Squared left edge = continues before the window.</div>
+    <div><b>2</b> Red tick = this person is over capacity that month across ALL projects.</div>
+    <div><b>3</b> Today is a full tinted column; gap chips (−1.5) sit under quiet month labels; quarter lines give rhythm.</div>
+    <div><b>4</b> Customers are blocks: accent rail + air between blocks. No cell lattice — borders almost gone.</div>
+    <div><b>5</b> Pool: compact rows, free-capacity number, thin bar. Slate = underused, red = genuinely overbooked. Held person ringed.</div>
+    <div><b>6</b> Cells encode state: amber tint = gap, green tint = filled, 2px meter shows the ratio. Numbers appear on hover (try it).</div>
+  </div>
+</div>
+</body>
+</html>

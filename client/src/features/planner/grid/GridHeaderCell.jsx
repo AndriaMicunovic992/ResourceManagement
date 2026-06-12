@@ -8,32 +8,26 @@ export default function GridHeaderCell({ period, isFullyStaffed, gap = 0 }) {
 
   return (
     <div
-      className="relative flex flex-col items-center justify-center shrink-0"
-      style={{
-        width,
-        height: 36,
-        // Today marker: a clear vertical rule at the current period's left edge.
-        boxShadow: isCurrent ? 'inset 2px 0 0 #4CBAD4' : undefined,
-      }}
+      className="relative flex flex-col items-center justify-center gap-0.5 shrink-0"
+      style={{ width, height: 44 }}
     >
-      <span className="font-mono text-[10px] font-bold" style={{ color }}>
+      <span className="font-mono text-[10.5px] font-bold" style={{ color }}>
         {period.label}
       </span>
-      {isCurrent && (
-        <span className="absolute bottom-0.5 px-1.5 py-0 rounded bg-primary text-white text-[7px] font-bold">
-          Today
-        </span>
-      )}
-      {isFullyStaffed && (
-        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-success" />
-      )}
-      {gap > 0.001 && (
+      {gap > 0.001 ? (
         <span
-          className="absolute top-0.5 left-1 px-1 rounded bg-danger-bg text-danger text-[8px] font-mono font-bold"
+          className="px-1.5 rounded-md bg-danger-bg text-danger text-[8.5px] font-mono font-bold leading-[13px]"
           title={`${gap.toFixed(1)} FTE unfilled in this period`}
         >
           −{gap.toFixed(1)}
         </span>
+      ) : isCurrent ? (
+        <span className="px-1.5 py-0 rounded-md bg-primary text-white text-[7px] font-extrabold tracking-wider leading-[13px]">
+          TODAY
+        </span>
+      ) : null}
+      {isFullyStaffed && (
+        <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-success" />
       )}
     </div>
   );

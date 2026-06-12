@@ -5,9 +5,9 @@ export default function CustomerGridRow({ customer, index, periods }) {
   const bg = customer.status === 'potential' ? '#FFF6E8' : accent + '08';
 
   return (
-    <div className="flex h-10" style={{ background: bg }}>
+    <div className="flex h-10 mt-2" style={{ background: bg }}>
       {periods.map((p) => (
-        <div key={p.label} className="shrink-0 border-r border-white/30" style={{ width: p.months.length * CW }} />
+        <div key={p.label} className="shrink-0" style={{ width: p.months.length * CW }} />
       ))}
     </div>
   );
