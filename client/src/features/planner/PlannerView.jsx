@@ -312,7 +312,7 @@ export default function PlannerView() {
   const handleDeleteNeed = async (id) => { if (confirm('Delete this need?')) await deleteNeed(id); };
 
   return (
-    <div className="flex h-[calc(100vh-52px)] bg-[#E9EFF5] gap-3 p-3">
+    <div className="flex h-full gap-3 p-3">
       <div className="flex rounded-2xl bg-white border border-border-light shadow-card overflow-hidden">
         <ResourcePool heldResource={heldResource} onHold={setHeldResource} timeRange={timeRange} />
       </div>
