@@ -2,7 +2,7 @@ import BarAvatar from './BarAvatar';
 import { shortName, initials } from '../../../../lib/resourceUtils';
 import { CW } from '../../../../lib/constants';
 
-export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, onClickMonth }) {
+export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, showLabel = isFirst, onClickMonth }) {
   const width = segment.months.length * CW;
   const hasLeftSeparator = !isFirst && totalSegments > 1;
 
@@ -35,7 +35,7 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
       ))}
       {/* Visual content (non-interactive overlay) */}
       <div className="flex items-center gap-1 px-1 w-full pointer-events-none" style={{ height: barHeight }}>
-        {isFirst && (
+        {showLabel && (
           <>
             <BarAvatar name={resource.name} color={domainColor} size={18} />
             <span className="text-[9px] font-semibold truncate" style={{ color: domainColor }}>
