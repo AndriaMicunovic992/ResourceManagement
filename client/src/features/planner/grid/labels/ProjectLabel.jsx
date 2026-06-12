@@ -14,7 +14,7 @@ export default function ProjectLabel({ project, customer, onEdit, onDelete, onAd
   const responsible = project.responsiblePersonId ? resources.find((r) => r.id === project.responsiblePersonId) : null;
 
   return (
-    <div className="group flex items-center gap-1.5 h-[34px]" style={{ paddingLeft: 28, borderLeft: `4px solid ${borderColor}`, opacity: isPotential ? 0.7 : 1 }}>
+    <div className="group flex items-center gap-1.5 h-[34px]" style={{ paddingLeft: 24, opacity: isPotential ? 0.7 : 1 }}>
       {(ok || hasNeeds) && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ok ? 'bg-success' : 'bg-warning'}`} />}
       <span className="text-xs font-semibold text-text-mid truncate flex-1">
         {project.name}
@@ -25,7 +25,7 @@ export default function ProjectLabel({ project, customer, onEdit, onDelete, onAd
       {canEdit && (
         <>
           <button onClick={onAddNeed}
-            className="opacity-0 group-hover:opacity-100 text-[10px] text-primary bg-primary-light border-0 rounded px-1 cursor-pointer hover:opacity-80">+</button>
+            className="opacity-0 group-hover:opacity-100 text-[9px] font-bold text-primary bg-primary-light border-0 rounded-full px-2 py-0.5 cursor-pointer hover:bg-primary hover:text-white transition">＋ Need</button>
           <HoverButtons onEdit={onEdit} onDelete={onDelete} size="small" />
         </>
       )}

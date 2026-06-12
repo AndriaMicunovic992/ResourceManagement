@@ -72,14 +72,21 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
     for (const row of rows) {
       if (row.type !== 'need') continue;
       const need = row.data;
-      const barCount = assignments.filter((a) => a.needId === need.id && Object.values(a.monthAllocations || {}).some((v) => v > 0)).length;
+      // Only assignments with FTE inside the visible window count — off-window
+      // ones render no bar and must not reserve a slot or suppress gap pills.
+      const monthSet = new Set(months);
+      const barCount = assignments.filter(
+        (a) =>
+          a.needId === need.id &&
+          Object.entries(a.monthAllocations || {}).some(([m, v]) => v > 0 && monthSet.has(m))
+      ).length;
       const canHeldPlace = heldResource && resourceMatchesNeed(heldResource, need);
       const needsMore = !isNeedOk(need, assignments);
       const clickPad = canHeldPlace && needsMore ? BAR_H + 8 : 0;
-      heights[need.id] = Math.max(42, barCount * (BAR_H + BAR_GAP) + 18 + clickPad);
+      heights[need.id] = Math.max(56, barCount * (BAR_H + BAR_GAP) + 18 + clickPad);
     }
     return heights;
-  }, [rows, assignments, heldResource]);
+  }, [rows, assignments, heldResource, months]);
 
   // Unfilled FTE per month across all needs → "−X.X" gap chips in the header.
   const monthGaps = useMemo(() => {
