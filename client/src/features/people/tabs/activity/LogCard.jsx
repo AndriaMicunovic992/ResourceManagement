@@ -3,6 +3,13 @@ import { Link } from 'react-router-dom';
 import { api } from '../../../../lib/api';
 import { LOG_KIND_COLORS, LOG_KIND_LABELS } from '../../../../lib/constants';
 import { CategoryChips } from '../../../../components/forms/CategoryMultiPicker';
+import {
+  BuildingIcon,
+  FolderIcon,
+  LinkIcon,
+  ChatIcon,
+  ChartIcon,
+} from '../../../../components/ui/icons';
 
 function formatDate(value) {
   if (!value) return '';
@@ -75,13 +82,13 @@ export default function LogCard({
       <div className="flex flex-wrap gap-1.5 mb-2">
         <CategoryChips categories={log.categories} />
         {log.customer && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
-            🏢 {log.customer.name}
+          <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 inline-flex items-center gap-1">
+            <BuildingIcon size={11} /> {log.customer.name}
           </span>
         )}
         {log.project && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-            📁 {log.project.name}
+          <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 inline-flex items-center gap-1">
+            <FolderIcon size={11} /> {log.project.name}
           </span>
         )}
         {log.jiraUrl && (
@@ -89,30 +96,30 @@ export default function LogCard({
             href={log.jiraUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 no-underline"
+            className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 no-underline inline-flex items-center gap-1"
           >
-            🔗 Jira
+            <LinkIcon size={11} /> Jira
           </a>
         )}
         {log.oneOnOne && resourceId && (
           <Link
             to={`/people/${resourceId}/oneonones`}
-            className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 no-underline"
+            className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 no-underline inline-flex items-center gap-1"
           >
-            💬 From 1:1 on {formatDate(log.oneOnOne.meetingDate)}
+            <ChatIcon size={11} /> From 1:1 on {formatDate(log.oneOnOne.meetingDate)}
           </Link>
         )}
         {log.evaluationId && resourceId && (
           <Link
             to={`/people/${resourceId}/performance`}
-            className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 no-underline"
+            className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 no-underline inline-flex items-center gap-1"
           >
-            📊 Tied to evaluation
+            <ChartIcon size={11} /> Tied to evaluation
           </Link>
         )}
       </div>
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[11px] text-text-light">
+        <div className="text-2xs text-text-mid">
           {log.authorUser?.name || log.authorUser?.email || 'Unknown'} ·{' '}
           {formatDate(log.createdAt)}
         </div>

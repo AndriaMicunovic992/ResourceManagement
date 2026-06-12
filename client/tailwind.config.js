@@ -15,6 +15,11 @@ export default {
         sans: ["'DM Sans'", 'sans-serif'],
         mono: ["'DM Mono'", 'monospace'],
       },
+      fontSize: {
+        // Named steps to replace arbitrary text-[10px]/text-[11px]: 2xs for
+        // chips/badges only, xs+ for anything someone actually reads.
+        '2xs': ['0.6875rem', { lineHeight: '0.9rem' }],
+      },
       boxShadow: {
         card: '0 2px 8px rgba(76,186,212,0.08)',
       },

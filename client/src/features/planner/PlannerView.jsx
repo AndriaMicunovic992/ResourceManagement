@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { UndoIcon } from '../../components/ui/icons';
 import ResourcePool from './pool/ResourcePool';
 import PlannerToolbar from './toolbar/PlannerToolbar';
 import PlannerGrid from './grid/PlannerGrid';
@@ -13,10 +14,51 @@ import { useOrg } from '../../contexts/OrgContext';
 import { currentMonth, addMonths } from '../../lib/dateUtils';
 
 export default function PlannerView() {
-  const { customers, needs, assignments, updateCustomer, deleteCustomer, addProject, updateProject, deleteProject, addNeed, updateNeed, deleteNeed, upsertAssignment } = useData();
+  const { customers, needs, assignments, updateCustomer, deleteCustomer, addProject, updateProject, deleteProject, addNeed, updateNeed, deleteNeed, upsertAssignment, deleteAssignment } = useData();
   const { currentOrg } = useOrg();
 
   const [heldResource, setHeldResource] = useState(null);
+
+  // --- Undo: every grid mutation pushes an inverse op; Ctrl+Z or the toast
+  // button pops it. Esc releases the held resource. ---
+  const historyRef = useRef([]);
+  const toastTimerRef = useRef(null);
+  const [undoToast, setUndoToast] = useState(null);
+
+  const pushUndo = useCallback((label, undoFn) => {
+    historyRef.current.push({ label, undoFn });
+    if (historyRef.current.length > 30) historyRef.current.shift();
+    setUndoToast(label);
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setUndoToast(null), 6000);
+  }, []);
+
+  const handleUndo = useCallback(async () => {
+    const entry = historyRef.current.pop();
+    setUndoToast(null);
+    if (entry) {
+      try {
+        await entry.undoFn();
+      } catch {
+        /* state refreshes on next load if the inverse fails */
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        const tag = document.activeElement?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        handleUndo();
+      } else if (e.key === 'Escape') {
+        setHeldResource(null);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUndo]);
   const [popover, setPopover] = useState(null);
   const [timeRange, setTimeRange] = useState({ start: currentMonth(), end: addMonths(currentMonth(), 11) });
   const [aggregation, setAggregation] = useState('M');
@@ -78,14 +120,22 @@ export default function PlannerView() {
         const filled = needAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
         const gap = needed - filled;
         const resourceUsed = resourceAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
-        const cap = Math.max(0, 1.0 - resourceUsed);
+        // Cap by the person's actual capacity (part-timers aren't 1.0).
+        const cap = Math.max(0, (heldResource.capacity ?? 1.0) - resourceUsed);
         const fte = Math.round(Math.max(0, Math.min(gap, cap)) * 100) / 100;
         monthAllocations[m] = fte;
         if (fte > 0) hasAny = true;
       }
       if (!hasAny) return;
 
-      upsertAssignment({ needId: need.id, resourceId: heldResource.id, monthAllocations });
+      const heldName = heldResource.name;
+      Promise.resolve(
+        upsertAssignment({ needId: need.id, resourceId: heldResource.id, monthAllocations })
+      ).then((created) => {
+        if (created?.id) {
+          pushUndo(`Assigned ${heldName}`, () => deleteAssignment(created.id));
+        }
+      });
       return;
     }
 
@@ -132,15 +182,30 @@ export default function PlannerView() {
   const handleFteSave = async (fte) => {
     if (!popover) return;
     if (popover.type === 'edit') {
+      // Snapshot the previous value so the change is undoable.
+      const prev = assignments.find((a) => a.id === popover.assignmentId);
+      const prevFte = prev ? (prev.monthAllocations || {})[popover.month] || 0 : 0;
       await upsertAssignment({
         needId: popover.needId, resourceId: popover.resourceId,
         months: popover.months, fte,
       });
+      if (prevFte !== fte) {
+        const { needId, resourceId, months } = popover;
+        pushUndo(`FTE ${prevFte.toFixed(1)} → ${fte.toFixed(1)}`, () =>
+          upsertAssignment({ needId, resourceId, months, fte: prevFte })
+        );
+      }
     } else if (popover.type === 'editNeed') {
+      const prevNeed = needs.find((n) => n.id === popover.needId);
+      const prevAllocs = { ...(prevNeed?.monthAllocations || {}) };
       const monthAllocs = {};
       const months = popover.periodMonths || [popover.month];
       for (const m of months) monthAllocs[m] = fte;
       await updateNeed(popover.needId, { monthAllocations: monthAllocs });
+      const { needId } = popover;
+      pushUndo('Need FTE changed', () =>
+        updateNeed(needId, { monthAllocations: prevAllocs })
+      );
     }
     setPopover(null);
   };
@@ -198,6 +263,18 @@ export default function PlannerView() {
           onSaveNeed={handleNeedFteSave}
           onClose={() => setPopover(null)}
         />
+      )}
+
+      {undoToast && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[9500] flex items-center gap-3 bg-text text-white rounded-xl px-4 py-2.5 shadow-2xl">
+          <span className="text-xs font-semibold">{undoToast}</span>
+          <button
+            onClick={handleUndo}
+            className="inline-flex items-center gap-1 text-xs font-bold text-primary-light bg-white/10 border border-white/20 rounded-lg px-2.5 py-1 cursor-pointer hover:bg-white/20"
+          >
+            <UndoIcon size={12} /> Undo
+          </button>
+        </div>
       )}
 
       {editModal?.type === 'customer' && (

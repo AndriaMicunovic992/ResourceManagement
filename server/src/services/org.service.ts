@@ -39,8 +39,12 @@ export const orgService = {
       performanceTrendDefaultKind?: string;
       performanceTrendDefaultFrom?: string | null;
       performanceTrendDefaultTo?: string | null;
-      oneOnOneReminderDays?: number | null;
-      pmLogReminderDays?: number | null;
+      oneOnOneReminderEvery?: number | null;
+      oneOnOneReminderUnit?: string | null;
+      oneOnOneReminderStart?: string | null;
+      pmLogReminderEvery?: number | null;
+      pmLogReminderUnit?: string | null;
+      pmLogReminderStart?: string | null;
     }
   ) {
     return prisma.organization.update({ where: { id: orgId }, data });

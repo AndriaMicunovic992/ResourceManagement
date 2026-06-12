@@ -1,6 +1,6 @@
 import { CW } from '../../../../lib/constants';
 
-export default function NeedCell({ width, needed, filled, inRange, canPlace, onClick }) {
+export default function NeedCell({ width, needed, filled, inRange, canPlace, heldFree, onClick }) {
   const cellWidth = width || CW;
 
   if (!inRange) {
@@ -22,6 +22,16 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, onC
       {needed > 0 && (
         <span className={`text-[9px] font-mono px-1 rounded border ${ok ? 'bg-success-bg text-success border-success-border' : 'bg-white text-text-mid border-border'}`}>
           {filled.toFixed(2)}/{needed.toFixed(2)}
+        </span>
+      )}
+      {canPlace && heldFree != null && (
+        <span
+          className={`absolute top-0.5 right-1 text-[8px] font-mono font-bold ${
+            heldFree > 0.001 ? 'text-primary' : 'text-danger'
+          }`}
+          title="Held person's free capacity this month"
+        >
+          {heldFree > 0.001 ? `+${heldFree.toFixed(1)}` : 'full'}
         </span>
       )}
     </div>

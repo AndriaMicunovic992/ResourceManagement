@@ -25,6 +25,16 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
   const barGap = 2;
   const height = rowHeight || 42;
 
+  // Held person's free capacity per month (across all their assignments) —
+  // shown as a hint in placeable cells.
+  const heldFreeFor = useMemo(() => {
+    if (!heldResource) return null;
+    const own = assignments.filter((a) => a.resourceId === heldResource.id);
+    const cap = heldResource.capacity ?? 1;
+    return (m) =>
+      cap - own.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+  }, [heldResource, assignments]);
+
   return (
     <div className="flex relative overflow-hidden" style={{ minHeight: height }}>
       {periods.map((p) => {
@@ -43,6 +53,11 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
             needed={needed} filled={filled}
             inRange={periodInRange}
             canPlace={!heldResource ? undefined : canHeldPlace && periodInRange ? true : false}
+            heldFree={
+              canHeldPlace && periodInRange && firstInRangeMonth && heldFreeFor
+                ? heldFreeFor(firstInRangeMonth)
+                : null
+            }
             onClick={(e) => firstInRangeMonth && onCellClick(need, firstInRangeMonth, inRangeMonths, e)}
           />
         );

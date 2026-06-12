@@ -4,6 +4,7 @@ import { api } from '../../../../lib/api';
 import EmptyState from '../../../../components/ui/EmptyState';
 import OneOnOneList from './OneOnOneList';
 import OneOnOneForm from './OneOnOneForm';
+import { PlayIcon } from '../../../../components/ui/icons';
 
 export default function PersonOneOnOnes() {
   const { resource, viewMode } = useOutletContext();
@@ -87,9 +88,9 @@ export default function PersonOneOnOnes() {
             <button
               onClick={handleStartCockpit}
               disabled={starting}
-              className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
             >
-              {starting ? 'Starting…' : '▶ Start 1:1'}
+              <PlayIcon size={11} /> {starting ? 'Starting…' : 'Start 1:1'}
             </button>
             <button
               onClick={handleCreate}

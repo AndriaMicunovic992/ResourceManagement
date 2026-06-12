@@ -12,10 +12,6 @@ type OneOnOneRecord = {
   workSatisfaction: number | null;
   wentWell: string | null;
   wentBad: string | null;
-  generalStatus: string | null;
-  personalNotes: string | null;
-  careerDevelopment: string | null;
-  managerPersonalNotes: string | null;
   privateNote: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -28,18 +24,14 @@ function isAdminRole(role: string): boolean {
 
 /**
  * Strip author-only fields from records not authored by the requesting user.
- * privateNote is only visible to the author. managerPersonalNotes was
- * already author-only in Step 12 and stays that way.
+ * privateNote is only visible to the author (and hidden during impersonation —
+ * the routes pass a viewer id that never matches).
  */
 function stripPrivateFields<
-  T extends {
-    authorUserId: string;
-    managerPersonalNotes: string | null;
-    privateNote: string | null;
-  }
+  T extends { authorUserId: string; privateNote: string | null }
 >(userId: string, record: T): T {
   if (userId === record.authorUserId) return record;
-  return { ...record, managerPersonalNotes: null, privateNote: null };
+  return { ...record, privateNote: null };
 }
 
 function parseMeetingDate(value: string): Date {
@@ -103,10 +95,6 @@ export async function createOneOnOne(
       workSatisfaction: data.workSatisfaction ?? null,
       wentWell: data.wentWell ?? null,
       wentBad: data.wentBad ?? null,
-      generalStatus: data.generalStatus ?? null,
-      personalNotes: data.personalNotes ?? null,
-      careerDevelopment: data.careerDevelopment ?? null,
-      managerPersonalNotes: data.managerPersonalNotes ?? null,
       privateNote: data.privateNote ?? null,
     },
     include: { authorUser: { select: authorSelect } },
@@ -137,12 +125,6 @@ export async function updateOneOnOne(
   if (data.workSatisfaction !== undefined) patch.workSatisfaction = data.workSatisfaction ?? null;
   if (data.wentWell !== undefined) patch.wentWell = data.wentWell ?? null;
   if (data.wentBad !== undefined) patch.wentBad = data.wentBad ?? null;
-  if (data.generalStatus !== undefined) patch.generalStatus = data.generalStatus ?? null;
-  if (data.personalNotes !== undefined) patch.personalNotes = data.personalNotes ?? null;
-  if (data.careerDevelopment !== undefined) patch.careerDevelopment = data.careerDevelopment ?? null;
-  if (data.managerPersonalNotes !== undefined) {
-    patch.managerPersonalNotes = data.managerPersonalNotes ?? null;
-  }
   // privateNote may only be set by the author. Silently ignore for admins
   // who are not the author so that an admin edit never clobbers someone
   // else's private note.

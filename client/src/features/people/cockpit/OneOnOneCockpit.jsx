@@ -7,6 +7,7 @@ import { useVisibility } from '../../../contexts/VisibilityContext';
 import Avatar from '../../../components/ui/Avatar';
 import MiniThread from '../../../components/ui/MiniThread';
 import SignalChart from '../../../components/ui/SignalChart';
+import { LockIcon } from '../../../components/ui/icons';
 import {
   LOG_KIND_OPTIONS,
   LOG_KIND_COLORS,
@@ -178,8 +179,8 @@ function MeetingPanel({ personId, record, onSaved }) {
         </div>
       </div>
       <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
-        <div className="text-[10px] uppercase tracking-wider text-amber-800 font-semibold mb-1">
-          🔒 Private note (only you)
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-amber-800 font-semibold mb-1">
+          <LockIcon size={12} /> Private note (only you)
         </div>
         <textarea
           value={privateNote}

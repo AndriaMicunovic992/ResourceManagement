@@ -104,12 +104,15 @@ export default function SettingsView() {
   const [perfTrendTo, setPerfTrendTo] = useState(currentOrg?.performanceTrendDefaultTo || '');
   const [perfTrendSaving, setPerfTrendSaving] = useState(false);
   const [perfTrendSuccess, setPerfTrendSuccess] = useState(false);
-  const [oneOnOneDays, setOneOnOneDays] = useState(
-    currentOrg?.oneOnOneReminderDays != null ? String(currentOrg.oneOnOneReminderDays) : ''
+  const scheduleFromOrg = (org, prefix) => ({
+    every: org?.[`${prefix}Every`] != null ? String(org[`${prefix}Every`]) : '',
+    unit: org?.[`${prefix}Unit`] || 'weekly',
+    start: org?.[`${prefix}Start`] || '',
+  });
+  const [oneOnOneSched, setOneOnOneSched] = useState(() =>
+    scheduleFromOrg(currentOrg, 'oneOnOneReminder')
   );
-  const [pmLogDays, setPmLogDays] = useState(
-    currentOrg?.pmLogReminderDays != null ? String(currentOrg.pmLogReminderDays) : ''
-  );
+  const [pmLogSched, setPmLogSched] = useState(() => scheduleFromOrg(currentOrg, 'pmLogReminder'));
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderSuccess, setReminderSuccess] = useState(false);
 
@@ -120,21 +123,24 @@ export default function SettingsView() {
     setPerfTrendMonths(String(currentOrg?.performanceTrendDefaultMonths ?? 12));
     setPerfTrendFrom(currentOrg?.performanceTrendDefaultFrom || '');
     setPerfTrendTo(currentOrg?.performanceTrendDefaultTo || '');
-    setOneOnOneDays(
-      currentOrg?.oneOnOneReminderDays != null ? String(currentOrg.oneOnOneReminderDays) : ''
-    );
-    setPmLogDays(
-      currentOrg?.pmLogReminderDays != null ? String(currentOrg.pmLogReminderDays) : ''
-    );
+    setOneOnOneSched(scheduleFromOrg(currentOrg, 'oneOnOneReminder'));
+    setPmLogSched(scheduleFromOrg(currentOrg, 'pmLogReminder'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrg]);
 
   const handleSaveReminders = async () => {
     setReminderSaving(true);
     setReminderSuccess(false);
+    // A schedule is "on" only when both every and start are set.
+    const pack = (s, prefix) => ({
+      [`${prefix}Every`]: s.every && s.start ? parseInt(s.every, 10) : null,
+      [`${prefix}Unit`]: s.every && s.start ? s.unit : null,
+      [`${prefix}Start`]: s.every && s.start ? s.start : null,
+    });
     try {
       await updateOrg({
-        oneOnOneReminderDays: oneOnOneDays ? parseInt(oneOnOneDays, 10) : null,
-        pmLogReminderDays: pmLogDays ? parseInt(pmLogDays, 10) : null,
+        ...pack(oneOnOneSched, 'oneOnOneReminder'),
+        ...pack(pmLogSched, 'pmLogReminder'),
       });
       setReminderSuccess(true);
       setTimeout(() => setReminderSuccess(false), 2000);
@@ -565,36 +571,59 @@ export default function SettingsView() {
         <div className="bg-white rounded-xl border border-border shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Reminders</h3>
           <p className="text-[10px] text-text-light mb-3">
-            In-app reminders shown to managers and responsible people on the People page. Leave a
-            field empty to turn that reminder off. Monthly client signals are always flagged when
-            missing for the current month.
+            In-app reminders shown to managers and responsible people on the People page. A
+            reminder fires on every Nth day/week/month from the start date; it clears once the
+            1:1 / update happens. Leave "every" or the start date empty to turn a reminder off.
+            Monthly client signals are always flagged when missing for the current month.
           </p>
-          <div className="flex gap-3 items-end flex-wrap">
-            <div className="flex-1 min-w-[160px] max-w-[220px]">
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">
-                1:1 cadence (days)
-              </label>
-              <input
-                type="number" min="1" max="365" value={oneOnOneDays}
-                onChange={(e) => setOneOnOneDays(e.target.value)}
-                placeholder="e.g. 21"
-                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
-              />
+          <div className="space-y-3">
+            {[
+              { label: '1:1 reminder', sched: oneOnOneSched, set: setOneOnOneSched },
+              { label: 'PM update reminder', sched: pmLogSched, set: setPmLogSched },
+            ].map(({ label, sched, set }) => (
+              <div key={label} className="flex gap-3 items-end flex-wrap">
+                <div className="w-[140px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
+                    {label}: every
+                  </label>
+                  <input
+                    type="number" min="1" max="365" value={sched.every}
+                    onChange={(e) => set((s) => ({ ...s, every: e.target.value }))}
+                    placeholder="N"
+                    className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="w-[120px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
+                    Frequency
+                  </label>
+                  <select
+                    value={sched.unit}
+                    onChange={(e) => set((s) => ({ ...s, unit: e.target.value }))}
+                    className="w-full px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
+                  >
+                    <option value="daily">days</option>
+                    <option value="weekly">weeks</option>
+                    <option value="monthly">months</option>
+                  </select>
+                </div>
+                <div className="w-[160px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
+                    Starting on
+                  </label>
+                  <input
+                    type="date" value={sched.start}
+                    onChange={(e) => set((s) => ({ ...s, start: e.target.value }))}
+                    className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-end">
+              <Button onClick={handleSaveReminders} disabled={reminderSaving}>
+                {reminderSaving ? 'Saving...' : reminderSuccess ? 'Saved!' : 'Save'}
+              </Button>
             </div>
-            <div className="flex-1 min-w-[160px] max-w-[220px]">
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">
-                PM update cadence (days)
-              </label>
-              <input
-                type="number" min="1" max="365" value={pmLogDays}
-                onChange={(e) => setPmLogDays(e.target.value)}
-                placeholder="e.g. 14"
-                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
-              />
-            </div>
-            <Button onClick={handleSaveReminders} disabled={reminderSaving}>
-              {reminderSaving ? 'Saving...' : reminderSuccess ? 'Saved!' : 'Save'}
-            </Button>
           </div>
         </div>
       )}

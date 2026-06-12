@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
+import { ChatIcon, PencilIcon, SignalIcon, XIcon } from '../../components/ui/icons';
 
 const TYPE_META = {
-  oneOnOne: { icon: '💬', badge: 'bg-primary-light text-primary', label: '1:1 due' },
-  pmUpdate: { icon: '📝', badge: 'bg-warning-bg text-warning', label: 'Update due' },
-  clientSignal: { icon: '📡', badge: 'bg-danger-bg text-danger', label: 'Signal missing' },
+  oneOnOne: { Icon: ChatIcon, iconClass: 'text-primary', badge: 'bg-primary-light text-primary', label: '1:1 due' },
+  pmUpdate: { Icon: PencilIcon, iconClass: 'text-warning', badge: 'bg-warning-bg text-warning', label: 'Update due' },
+  clientSignal: { Icon: SignalIcon, iconClass: 'text-danger', badge: 'bg-danger-bg text-danger', label: 'Signal missing' },
 };
 
 function daysAgo(iso) {
@@ -97,21 +98,22 @@ export default function RemindersPanel() {
               className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-primary-bg/50"
             >
               <Link to={linkFor(item)} className="flex items-center gap-2.5 min-w-0 flex-1 no-underline">
-                <span className="text-sm">{meta.icon}</span>
+                <meta.Icon size={14} className={meta.iconClass} />
                 <span
                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${meta.badge}`}
                 >
                   {meta.label}
                 </span>
                 <span className="text-xs font-semibold text-text truncate">{item.resourceName}</span>
-                <span className="text-[11px] text-text-light truncate">{describe(item)}</span>
+                <span className="text-2xs text-text-mid truncate">{describe(item)}</span>
               </Link>
               <button
                 onClick={() => handleDismiss(item)}
                 title="Dismiss (e.g. on leave) — re-arms after the next cadence window"
-                className="text-text-light hover:text-danger bg-transparent border-0 cursor-pointer text-sm leading-none shrink-0"
+                aria-label="Dismiss reminder"
+                className="text-text-light hover:text-danger bg-transparent border-0 cursor-pointer leading-none shrink-0"
               >
-                ✕
+                <XIcon size={13} />
               </button>
             </div>
           );

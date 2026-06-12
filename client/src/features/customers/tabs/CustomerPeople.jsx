@@ -5,6 +5,7 @@ import { useData } from '../../../contexts/DataContext';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
 import TimeRangePicker from '../../planner/toolbar/TimeRangePicker';
 import { useVisibility } from '../../../contexts/VisibilityContext';
+import { PlayIcon } from '../../../components/ui/icons';
 
 export default function CustomerPeople() {
   const { customer } = useOutletContext();
@@ -121,9 +122,9 @@ export default function CustomerPeople() {
             <button
               onClick={handleStartReview}
               disabled={startingReview}
-              className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
             >
-              {startingReview ? 'Starting…' : '▶ Start PM review'}
+              <PlayIcon size={11} /> {startingReview ? 'Starting…' : 'Start PM review'}
             </button>
           )}
         </div>
@@ -149,9 +150,9 @@ export default function CustomerPeople() {
                 </span>
                 <button
                   onClick={() => navigate(`/customers/${customer.id}/reviews/${r.id}/cockpit`)}
-                  className="text-[11px] font-semibold text-primary bg-transparent border-0 cursor-pointer hover:underline"
+                  className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
                 >
-                  Open ›
+                  Open
                 </button>
               </div>
             ))}
@@ -191,9 +192,9 @@ export default function CustomerPeople() {
                   <td className="px-4 py-2 text-right">
                     <button
                       onClick={() => navigate(`/people/${resource.id}`)}
-                      className="text-[11px] font-semibold text-primary bg-transparent border-0 cursor-pointer hover:underline p-0"
+                      className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
                     >
-                      Open ›
+                      Open
                     </button>
                   </td>
                 </tr>

@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import GridHeader from './GridHeader';
 import LabelColumn from './labels/LabelColumn';
 import GridBody from './rows/GridBody';
-import { buildRows, isNeedOk } from '../../../lib/gridUtils';
+import HeldCapacityFooter from './HeldCapacityFooter';
+import { buildRows, isNeedOk, computeNeedFulfillment } from '../../../lib/gridUtils';
 import { resourceMatchesNeed } from '../../../lib/resourceUtils';
 import { monthRange, computePeriods } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
@@ -80,6 +81,21 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
     return heights;
   }, [rows, assignments, heldResource]);
 
+  // Unfilled FTE per month across all needs → "−X.X" gap chips in the header.
+  const monthGaps = useMemo(() => {
+    const map = {};
+    for (const n of needs) {
+      const nf = computeNeedFulfillment(n, assignments);
+      for (const m of Object.keys(n.monthAllocations || {})) {
+        const g = Math.max(0, (nf[m]?.needed || 0) - (nf[m]?.filled || 0));
+        if (g > 0) map[m] = (map[m] || 0) + g;
+      }
+    }
+    return map;
+  }, [needs, assignments]);
+  const periodGap = (periodMonths) =>
+    periodMonths.reduce((s, m) => s + (monthGaps[m] || 0), 0);
+
   const isPeriodFullyStaffed = (periodMonths) => {
     return needs.length > 0 && periodMonths.every((month) =>
       needs.every((n) => {
@@ -99,12 +115,17 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
         onAddNeed={onAddNeed} onEditNeed={onEditNeed} onDeleteNeed={onDeleteNeed}
       />
       <div className="flex-1 min-w-0">
-        <GridHeader periods={periods} isPeriodFullyStaffed={isPeriodFullyStaffed} />
+        <GridHeader
+          periods={periods}
+          isPeriodFullyStaffed={isPeriodFullyStaffed}
+          periodGap={periodGap}
+        />
         <GridBody
           rows={rows} months={months} periods={periods}
           heldResource={heldResource} needHeights={needHeights}
           onCellClick={onCellClick} onBarClick={onBarClick}
         />
+        {heldResource && <HeldCapacityFooter resource={heldResource} periods={periods} />}
       </div>
     </div>
   );
