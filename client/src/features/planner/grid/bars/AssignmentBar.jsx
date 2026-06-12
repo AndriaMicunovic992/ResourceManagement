@@ -116,11 +116,27 @@ export default function AssignmentBar({ assignment, need, resource, months, onCl
 
   if (segments.length === 0) return null;
 
-  const firstMonth = segments[0].start;
+  // Clip segments to the visible window: an assignment that started before
+  // (or ends after) the current time range still renders its visible part —
+  // previously a bar whose first month was out of view vanished entirely.
+  const monthSet = new Set(months);
+  const visibleSegments = [];
+  for (const seg of segments) {
+    const vis = seg.months.filter((m) => monthSet.has(m));
+    if (vis.length > 0) visibleSegments.push({ ...seg, months: vis, start: vis[0] });
+  }
+  if (visibleSegments.length === 0) return null;
+
+  const allSegMonths = segments.flatMap((s) => s.months);
+  const visibleMonths = visibleSegments.flatMap((s) => s.months);
+  const clippedLeft = allSegMonths[0] !== visibleMonths[0];
+  const clippedRight = allSegMonths[allSegMonths.length - 1] !== visibleMonths[visibleMonths.length - 1];
+
+  const firstMonth = visibleSegments[0].start;
   const baseStartIdx = months.indexOf(firstMonth);
   if (baseStartIdx < 0) return null;
 
-  const baseMonthCount = segments.flatMap((s) => s.months).length;
+  const baseMonthCount = visibleMonths.length;
 
   // Apply live resize preview offsets
   let displayStartIdx = baseStartIdx;
@@ -157,12 +173,14 @@ export default function AssignmentBar({ assignment, need, resource, months, onCl
             style={{ backgroundColor: color + '15', color }}>{displayMonthCount}mo</span>
         </div>
       ) : (
-        segments.map((seg, i) => (
+        visibleSegments.map((seg, i) => (
           <AssignmentSegment
             key={i} segment={seg} resource={resource} domainColor={color}
             barHeight={BAR_H}
-            isFirst={i === 0} isLast={i === segments.length - 1}
-            totalSegments={segments.length}
+            isFirst={i === 0 && !clippedLeft}
+            isLast={i === visibleSegments.length - 1 && !clippedRight}
+            showLabel={i === 0}
+            totalSegments={visibleSegments.length}
             onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}
           />
         ))
