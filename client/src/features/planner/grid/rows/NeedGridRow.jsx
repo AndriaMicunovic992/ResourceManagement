@@ -131,7 +131,7 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
     <div
       ref={rowRef}
       className="flex relative overflow-hidden"
-      style={{ minHeight: height }}
+      style={{ height }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={() => setPaint(null)}

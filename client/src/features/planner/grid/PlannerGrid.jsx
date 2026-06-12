@@ -206,14 +206,6 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
         {todayOverlay && (
           <>
             <div
-              className="absolute top-0 bottom-0 pointer-events-none"
-              style={{
-                left: todayOverlay.left,
-                width: todayOverlay.width,
-                background: 'rgba(76,186,212,0.045)',
-              }}
-            />
-            <div
               className="absolute top-0 bottom-0 pointer-events-none z-[6]"
               style={{ left: todayOverlay.lineX, width: 1.5, background: 'rgba(76,186,212,0.75)' }}
             >
