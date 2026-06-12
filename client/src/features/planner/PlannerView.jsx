@@ -316,7 +316,7 @@ export default function PlannerView() {
       <div className="flex rounded-2xl bg-white border border-border-light shadow-card overflow-hidden">
         <ResourcePool heldResource={heldResource} onHold={setHeldResource} timeRange={timeRange} />
       </div>
-      <div className="flex-1 overflow-auto flex flex-col rounded-2xl bg-white border border-border-light shadow-card" onClick={() => setPopover(null)}>
+      <div className="flex-1 min-w-0 flex flex-col rounded-2xl bg-white border border-border-light shadow-card overflow-hidden" onClick={() => setPopover(null)}>
         <PlannerToolbar
           timeRange={timeRange} onTimeRangeChange={setTimeRange}
           aggregation={aggregation} onAggregationChange={setAggregation}

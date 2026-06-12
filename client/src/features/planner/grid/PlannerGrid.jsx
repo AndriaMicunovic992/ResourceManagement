@@ -58,6 +58,10 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
     const keptProjectIds = new Set();
     const keptCustomerIds = new Set();
     for (const row of filteredRows) {
+      // A customer I'm responsible for is mine wholesale (all its projects).
+      if (row.type === 'customer' && row.data.responsiblePersonId === selfResourceId) {
+        keptCustomerIds.add(row.data.id);
+      }
       if (row.type === 'project' && isMine(row.data, row.customer)) {
         keptProjectIds.add(row.data.id);
         keptCustomerIds.add(row.customer.id);
@@ -190,7 +194,7 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
   };
 
   return (
-    <div className="flex overflow-auto">
+    <div className="flex-1 min-h-0 overflow-auto flex">
       <LabelColumn
         rows={rows} canEdit={canEdit} needHeights={needHeights}
         onEditCustomer={onEditCustomer} onDeleteCustomer={onDeleteCustomer}
