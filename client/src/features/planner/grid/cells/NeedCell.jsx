@@ -14,7 +14,7 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, hel
         style={{
           width: cellWidth,
           background: paintActive ? '#4CBAD422' : undefined,
-          borderRight: qEnd ? '1px solid #E2ECF2' : undefined,
+          borderRight: qEnd ? '1px solid #E2ECF2' : '1px solid #F2F6FA',
         }}
         onPointerDown={onPointerDown}
       />
@@ -25,17 +25,16 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, hel
   const hasGap = needed > 0 && filled < needed;
   const isEditable = canPlace === undefined && needed > 0;
   const isClickable = canPlace === true || isEditable;
-  const ratio = needed > 0 ? Math.min(1, filled / needed) : 0;
 
+  // The bar is the signal — cells stay quiet. Only an open gap gets a whisper
+  // of amber; exact numbers live on hover.
   const bg = paintActive
     ? '#4CBAD433'
     : canPlace
       ? '#E0F4FA40'
-      : ok
-        ? 'rgba(91,198,138,0.07)'
-        : hasGap
-          ? 'rgba(245,166,35,0.07)'
-          : 'transparent';
+      : hasGap
+        ? 'rgba(245,166,35,0.05)'
+        : 'transparent';
   const cursor = canPlace ? 'cell' : isEditable ? 'pointer' : 'default';
 
   return (
@@ -45,25 +44,14 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, hel
         width: cellWidth, minHeight: 42, background: bg, cursor,
         opacity: canPlace === false ? 0.4 : 1,
         boxShadow: paintActive ? 'inset 0 0 0 1px #4CBAD4' : undefined,
-        borderRight: qEnd ? '1px solid #E2ECF2' : undefined,
+        borderRight: qEnd ? '1px solid #E2ECF2' : '1px solid #F2F6FA',
       }}
       onPointerDown={isClickable || canPlace === undefined ? onPointerDown : undefined}
     >
       {needed > 0 && (
-        <>
-          <span
-            className="absolute left-[7px] right-[7px] bottom-[5px] h-[2.5px] rounded-full bg-border-light overflow-hidden"
-            aria-hidden
-          >
-            <span
-              className={`block h-full rounded-full ${ok ? 'bg-success' : 'bg-warning'}`}
-              style={{ width: `${ratio * 100}%` }}
-            />
-          </span>
-          <span className="absolute top-1 left-1/2 -translate-x-1/2 text-[9px] font-mono px-1 rounded border bg-white text-text-mid border-border opacity-0 group-hover/cell:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-            {filled.toFixed(2)}/{needed.toFixed(2)}
-          </span>
-        </>
+        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono px-1 rounded border bg-white text-text-mid border-border opacity-0 group-hover/cell:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+          {filled.toFixed(2)}/{needed.toFixed(2)}
+        </span>
       )}
       {canPlace && heldFree != null && (
         <span

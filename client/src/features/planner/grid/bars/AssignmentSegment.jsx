@@ -15,8 +15,16 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
         height: barHeight,
         background: `linear-gradient(100deg, ${domainColor}, color-mix(in srgb, ${domainColor} 72%, white))`,
         borderRadius:
-          isFirst && isLast ? 999 : isFirst ? '999px 0 0 999px' : isLast ? '0 999px 999px 0' : 0,
-        boxShadow: `0 4px 10px -3px ${domainColor}99`,
+          isFirst && isLast
+            ? 999
+            : isFirst
+              ? '999px 0 0 999px'
+              : isLast
+                ? `${contLeft ? '8px' : '0'} 999px 999px ${contLeft ? '8px' : '0'}`
+                : contLeft
+                  ? '8px 0 0 8px'
+                  : 0,
+        boxShadow: `0 5px 12px -3px ${domainColor}99`,
       }}
     >
       {/* Segment separator line */}
@@ -45,13 +53,13 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
       )}
       {/* Visual content (non-interactive overlay) */}
       <div className="flex items-center gap-1.5 px-1.5 w-full pointer-events-none" style={{ height: barHeight }}>
-        {contLeft && <span className="text-white/90 text-[10px] font-bold -ml-0.5">‹</span>}
+        {contLeft && <span className="text-white/70 text-[11px] font-bold -ml-0.5">‹</span>}
         {showLabel && (
           <>
             <span
               className="flex items-center justify-center rounded-full text-white shrink-0"
               style={{
-                width: 17, height: 17, fontSize: 7.5, fontWeight: 700,
+                width: 20, height: 20, fontSize: 8, fontWeight: 700,
                 background: 'rgba(255,255,255,0.28)', border: '1.5px solid rgba(255,255,255,0.85)',
               }}
             >
@@ -59,7 +67,7 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
             </span>
             {segment.months.length > 1 && (
               <span
-                className="text-[10px] font-bold truncate text-white"
+                className="text-[11px] font-bold truncate text-white"
                 style={{ textShadow: '0 1px 2px rgba(0,0,0,0.18)' }}
               >
                 {shortName(resource.name)}
@@ -69,12 +77,12 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
         )}
         <div className="flex-1" />
         <span
-          className="text-[8.5px] font-mono font-bold px-1.5 rounded-full shrink-0"
+          className="text-[9.5px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0"
           style={{ backgroundColor: 'rgba(255,255,255,0.92)', color: domainColor }}
         >
           {segment.fte.toFixed(2)}
         </span>
-        {contRight && <span className="text-white/90 text-[10px] font-bold -mr-0.5">›</span>}
+        {contRight && <span className="text-white/70 text-[11px] font-bold -mr-0.5">›</span>}
       </div>
     </div>
   );
