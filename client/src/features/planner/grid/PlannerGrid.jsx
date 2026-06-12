@@ -27,7 +27,7 @@ function sortCustomers(customers, sort) {
   }
 }
 
-export default function PlannerGrid({ heldResource, timeRange, aggregation, showUnassignedOnly, customerSort, filterIds, onCellClick, onBarClick, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, onSuggestNeed }) {
+export default function PlannerGrid({ heldResource, timeRange, aggregation, showUnassignedOnly, customerSort, filterIds, onCellClick, onBarClick, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, onSuggestNeed, onPaintNeed, onPaintAssign, onUndoable }) {
   const { customers, projects, needs, assignments } = useData();
   const { canEdit } = useOrg();
 
@@ -125,6 +125,7 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
           rows={rows} months={months} periods={periods}
           heldResource={heldResource} needHeights={needHeights}
           onCellClick={onCellClick} onBarClick={onBarClick}
+          onPaintNeed={onPaintNeed} onPaintAssign={onPaintAssign} onUndoable={onUndoable}
         />
         {heldResource && <HeldCapacityFooter resource={heldResource} periods={periods} />}
       </div>

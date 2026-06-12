@@ -8,7 +8,7 @@ import { useData } from '../../../../contexts/DataContext';
 
 const BAR_H = 24;
 
-export default function AssignmentBar({ assignment, need, resource, months, overloadMonths, onClickSegment }) {
+export default function AssignmentBar({ assignment, need, resource, months, overloadMonths, onUndoable, onClickSegment }) {
   const { assignments, deleteAssignment, upsertAssignment } = useData();
   const segments = useMemo(() => buildSegments(assignment), [assignment]);
   const color = domainColor(need.domain);
@@ -106,13 +106,21 @@ export default function AssignmentBar({ assignment, need, resource, months, over
         }
       }
 
+      const prevAllocs = { ...allocs };
       await upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: newAllocs });
+      onUndoable?.(`Resized ${resource.name}`, () =>
+        upsertAssignment({
+          needId: assignment.needId,
+          resourceId: assignment.resourceId,
+          monthAllocations: prevAllocs,
+        })
+      );
       setResizePreview(null);
     };
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  }, [assignment, upsertAssignment, resizeLimits]);
+  }, [assignment, upsertAssignment, resizeLimits, onUndoable, resource.name]);
 
   if (segments.length === 0) return null;
 

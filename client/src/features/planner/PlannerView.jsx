@@ -202,6 +202,35 @@ export default function PlannerView() {
           upsertAssignment({ needId, resourceId, months, fte: prevFte })
         );
       }
+    } else if (popover.type === 'paintNeed') {
+      const prevNeed = needs.find((n) => n.id === popover.needId);
+      const prevAllocs = { ...(prevNeed?.monthAllocations || {}) };
+      const merged = { ...prevAllocs };
+      for (const m of popover.months) merged[m] = fte;
+      await updateNeed(popover.needId, { monthAllocations: merged });
+      // Restore map zeroes painted months that didn't exist before.
+      const restore = { ...prevAllocs };
+      for (const m of popover.months) if (!(m in restore)) restore[m] = 0;
+      const { needId } = popover;
+      pushUndo(`Painted need × ${popover.months.length}`, () =>
+        updateNeed(needId, { monthAllocations: restore })
+      );
+    } else if (popover.type === 'paintAssign') {
+      const { needId, months, resource } = popover;
+      const existing = assignments.find(
+        (a) => a.needId === needId && a.resourceId === resource.id
+      );
+      const prevAllocs = existing ? { ...(existing.monthAllocations || {}) } : null;
+      const created = await upsertAssignment({ needId, resourceId: resource.id, months, fte });
+      if (prevAllocs) {
+        pushUndo(`Painted ${resource.name} × ${months.length}`, () =>
+          upsertAssignment({ needId, resourceId: resource.id, monthAllocations: prevAllocs })
+        );
+      } else if (created?.id) {
+        pushUndo(`Painted ${resource.name} × ${months.length}`, () =>
+          deleteAssignment(created.id)
+        );
+      }
     } else if (popover.type === 'editNeed') {
       const prevNeed = needs.find((n) => n.id === popover.needId);
       const prevAllocs = { ...(prevNeed?.monthAllocations || {}) };
@@ -222,6 +251,32 @@ export default function PlannerView() {
     await updateNeed(popover.needId, { monthAllocations: { [popover.month]: fte } });
     setPopover(null);
   };
+
+  // Paint-fill: a drag across months opens the popover once for the range.
+  const handlePaintNeed = useCallback((need, months, pos) => {
+    setPopover({
+      x: pos.x, y: pos.y,
+      type: 'paintNeed', needId: need.id, months,
+      currentFte: (need.monthAllocations || {})[months[0]] || 0.5,
+      maxFte: 2.0,
+      title: `Need FTE × ${months.length} month${months.length > 1 ? 's' : ''}`,
+    });
+  }, []);
+
+  const handlePaintAssign = useCallback((need, months, pos) => {
+    if (!heldResource) return;
+    const existing = assignments.find(
+      (a) => a.needId === need.id && a.resourceId === heldResource.id
+    );
+    setPopover({
+      x: pos.x, y: pos.y,
+      type: 'paintAssign', needId: need.id, months,
+      resource: { id: heldResource.id, name: heldResource.name, capacity: heldResource.capacity ?? 1 },
+      currentFte: existing ? (existing.monthAllocations || {})[months[0]] || 0.5 : 0.5,
+      maxFte: heldResource.capacity ?? 1,
+      title: `${heldResource.name} × ${months.length} month${months.length > 1 ? 's' : ''}`,
+    });
+  }, [heldResource, assignments]);
 
   // "Suggest people" popover for an unfilled need.
   const [suggest, setSuggest] = useState(null);
@@ -274,6 +329,8 @@ export default function PlannerView() {
             showUnassignedOnly={showUnassignedOnly} customerSort={customerSort} filterIds={filterIds}
             onCellClick={handleCellClick} onBarClick={handleBarClick}
             onSuggestNeed={handleSuggestNeed}
+            onPaintNeed={handlePaintNeed} onPaintAssign={handlePaintAssign}
+            onUndoable={pushUndo}
             onEditCustomer={handleEditCustomer} onDeleteCustomer={handleDeleteCustomer}
             onAddProject={handleAddProject} onEditProject={handleEditProject} onDeleteProject={handleDeleteProject}
             onAddNeed={handleAddNeed} onEditNeed={handleEditNeed} onDeleteNeed={handleDeleteNeed}
