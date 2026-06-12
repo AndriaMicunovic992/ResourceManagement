@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>databob planner — v2, closer to the inspiration</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#4CBAD4; --page:#E4EAF1; --ink:#2C3E50; --mid:#6B8A9E; --faint:#A8BDCB;
+    --data:#3B82F6; --web:#F97316; --gen:#8B5CF6; --green:#34C98E; --line:#EDF2F7;
+    --cw:104px;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--page);color:var(--ink);padding:26px;display:flex;justify-content:center}
+  .mono{font-family:'DM Mono',monospace}
+  .canvas{background:#fff;border-radius:26px;box-shadow:0 18px 50px rgba(44,62,80,.10);padding:30px 34px 36px;max-width:1060px;width:100%;position:relative}
+
+  /* month header — whisper-quiet */
+  .months{display:flex;margin-left:300px;position:relative;margin-bottom:18px}
+  .mo{width:var(--cw);flex:none;text-align:center}
+  .mo .l{font:500 10px 'DM Mono';color:var(--faint);letter-spacing:.04em}
+  .mo .n{font:700 11px 'DM Mono';color:var(--mid)}
+  .mo.now .l,.mo.now .n{color:var(--primary)}
+  .mo .gap{display:inline-block;margin-top:3px;font:700 8.5px 'DM Mono';color:#E8636F;background:#FDE8EA;border-radius:7px;padding:1px 6px}
+
+  /* TODAY line */
+  .today{position:absolute;top:74px;bottom:36px;left:calc(34px + 300px + var(--cw)*0.45);width:1.5px;background:var(--primary);z-index:4;pointer-events:none}
+  .today .time{position:absolute;top:-26px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font:700 9px 'DM Mono';padding:2px 7px;border-radius:6px}
+  .today .pill{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:#fff;border:1.5px solid var(--primary);color:var(--primary);font:700 9.5px 'DM Sans';padding:2.5px 11px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 8px rgba(76,186,212,.25)}
+  .today::after{content:'';position:absolute;top:-4px;left:-2.7px;width:7px;height:7px;border-radius:50%;background:var(--primary)}
+
+  .lane{display:flex;align-items:center;margin-bottom:14px;position:relative}
+  /* faint column guides */
+  .track{flex:1;position:relative;height:56px;background:
+    repeating-linear-gradient(to right, transparent 0, transparent calc(var(--cw) - 1px), var(--line) calc(var(--cw) - 1px), var(--line) var(--cw));}
+
+  /* sidebar cards (their "task cards") */
+  .side{width:282px;flex:none;padding-right:18px}
+  .ghead{display:flex;align-items:center;gap:8px;margin:6px 0 10px 4px}
+  .ghead .t{font:800 13px 'DM Sans'}
+  .ghead .c{font:700 9.5px 'DM Mono';color:var(--mid);background:var(--line);border-radius:999px;padding:1px 8px}
+  .ghead .dot{width:8px;height:8px;border-radius:50%}
+  .card{background:#fff;border-radius:16px;box-shadow:0 6px 18px rgba(44,62,80,.08);padding:12px 14px;border:1px solid #F1F5F9}
+  .card .name{font:700 12.5px 'DM Sans';line-height:1.25}
+  .card .row2{display:flex;align-items:center;gap:6px;margin-top:8px}
+  .tag{font:700 9px 'DM Sans';padding:3px 9px;border-radius:999px}
+  .avs{display:flex;margin-left:auto}
+  .avs .a{width:20px;height:20px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font:700 7.5px 'DM Sans';margin-left:-6px}
+  .addneed{display:flex;align-items:center;justify-content:center;gap:8px;background:#EAF7FB;border:0;border-radius:14px;height:40px;width:100%;color:var(--primary);font:700 11.5px 'DM Sans';cursor:pointer;margin-top:12px}
+
+  /* HERO BARS — full saturation, white text, avatar inside, chevron chip */
+  .bar{position:absolute;top:10px;height:36px;border-radius:999px;display:flex;align-items:center;gap:7px;padding:0 6px 0 5px;color:#fff;box-shadow:0 8px 18px -4px var(--shadow,rgba(44,62,80,.35))}
+  .bar .a{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;font:700 9px 'DM Sans';background:rgba(255,255,255,.25)}
+  .bar .n{font:700 11.5px 'DM Sans';white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.12)}
+  .bar .chev{margin-left:auto;background:#fff;border-radius:999px;height:24px;display:flex;align-items:center;gap:2px;padding:0 9px;font:700 9.5px 'DM Mono'}
+  .bar .chev s{text-decoration:none;font-weight:400;opacity:.55}
+  .bar.ghosted{opacity:.55}
+  .bar .check{margin-left:auto;width:24px;height:24px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center}
+  .bar .tick{position:absolute;top:-2px;right:14px;width:9px;height:9px;border-radius:50%;background:#E8636F;border:2px solid #fff}
+  .ext{position:absolute;top:10px;height:36px;border-radius:999px;border:1.5px dashed var(--faint);display:flex;align-items:center;justify-content:center;color:var(--faint);font:700 9.5px 'DM Mono'}
+
+  /* floating FTE popover (the app's real popover, restyled) */
+  .pop{position:absolute;z-index:6;background:#fff;border-radius:16px;box-shadow:0 16px 40px rgba(44,62,80,.18);padding:12px 14px;width:200px;border:1px solid #F1F5F9}
+  .pop .t{font:700 9px 'DM Sans';letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+  .chips{display:flex;gap:5px;margin-bottom:9px}
+  .chip{flex:1;border:1px solid var(--line);background:#fff;border-radius:9px;font:700 10px 'DM Mono';color:var(--mid);padding:5px 0;text-align:center;cursor:pointer}
+  .chip.on{background:var(--primary);border-color:var(--primary);color:#fff}
+  .pop .act{display:flex;gap:6px}
+  .pop .set{flex:1;background:var(--primary);color:#fff;border:0;border-radius:9px;font:700 10.5px 'DM Sans';padding:7px 0;cursor:pointer}
+  .pop .rm{background:#FDE8EA;color:#E8636F;border:0;border-radius:9px;font:700 10.5px 'DM Sans';padding:7px 10px;cursor:pointer}
+
+  .note{max-width:1060px;font-size:11px;color:var(--mid);margin:14px auto 0;line-height:1.5}
+  .deco{position:absolute;width:34px;height:34px;border-radius:12px;background:#fff;box-shadow:0 6px 16px rgba(44,62,80,.10);display:flex;align-items:center;justify-content:center;font-size:14px}
+</style>
+</head>
+<body>
+<div>
+<div class="canvas">
+  <!-- months -->
+  <div class="months">
+    <div class="mo now"><div class="l">JUN</div><div class="n">'26</div></div>
+    <div class="mo"><div class="l">JUL</div><div class="n">'26</div><div class="gap">−1.5</div></div>
+    <div class="mo"><div class="l">AUG</div><div class="n">'26</div><div class="gap">−1.5</div></div>
+    <div class="mo"><div class="l">SEP</div><div class="n">'26</div><div class="gap">−0.5</div></div>
+    <div class="mo"><div class="l">OCT</div><div class="n">'26</div></div>
+    <div class="mo"><div class="l">NOV</div><div class="n">'26</div></div>
+    <div class="mo"><div class="l">DEC</div><div class="n">'26</div></div>
+  </div>
+  <div class="today"><span class="time">Jun 12</span><span class="pill">Today</span></div>
+
+  <!-- EGI -->
+  <div class="ghead"><span class="dot" style="background:#6366f1"></span><span class="t">EGI</span><span class="c">3</span></div>
+  <div class="lane">
+    <div class="side"><div class="card">
+      <div class="name">Forecasting data</div>
+      <div class="row2"><span class="tag" style="background:#EBF2FF;color:var(--data)">Data BE · Mid</span>
+        <div class="avs"><span class="a" style="background:var(--data)">MC</span></div></div>
+    </div></div>
+    <div class="track">
+      <div class="bar" style="left:0;width:calc(var(--cw)*4 - 10px);background:linear-gradient(100deg,#3B82F6,#5B9BFA);--shadow:rgba(59,130,246,.45);border-top-left-radius:6px;border-bottom-left-radius:6px">
+        <span class="a">MC</span><span class="n">Mladen C.</span>
+        <span class="chev" style="color:#2563EB">0.10 <s>›</s></span>
+      </div>
+      <div class="ext" style="left:calc(var(--cw)*4);width:calc(var(--cw)*3 - 10px)">continues · 0.10</div>
+    </div>
+  </div>
+  <div class="lane">
+    <div class="side"><div class="card">
+      <div class="name">Purchasing data</div>
+      <div class="row2"><span class="tag" style="background:#EBF2FF;color:var(--data)">Data BE · Mid</span>
+        <div class="avs"><span class="a" style="background:var(--data)">AT</span><span class="a" style="background:#64748B">AS</span></div></div>
+    </div></div>
+    <div class="track">
+      <div class="bar" style="left:0;width:calc(var(--cw)*4 - 10px);background:linear-gradient(100deg,#22B8A6,#3FD0BE);--shadow:rgba(34,184,166,.45);border-top-left-radius:6px;border-bottom-left-radius:6px">
+        <span class="a">AT</span><span class="n">Aleksa T.</span>
+        <span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22B8A6" stroke-width="3.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Energie360 -->
+  <div class="ghead" style="margin-top:18px"><span class="dot" style="background:#0ea5e9"></span><span class="t">Energie360</span><span class="c">2</span></div>
+  <div class="lane">
+    <div class="side"><div class="card">
+      <div class="name">Planning Implementation</div>
+      <div class="row2"><span class="tag" style="background:#EBF2FF;color:var(--data)">Data BE · Sr</span>
+        <div class="avs"><span class="a" style="background:var(--data)">NS</span></div></div>
+    </div></div>
+    <div class="track">
+      <div class="bar" style="left:0;width:calc(var(--cw)*3 - 10px);background:linear-gradient(100deg,#3B82F6,#5B9BFA);--shadow:rgba(59,130,246,.45)">
+        <span class="a">NS</span><span class="n">Nikola S.</span>
+        <span class="tick" title="over capacity across all projects"></span>
+        <span class="chev" style="color:#2563EB">1.00 <s>›</s></span>
+      </div>
+      <!-- the app's FTE popover, restyled to match -->
+      <div class="pop" style="left:calc(var(--cw)*2.2);top:48px">
+        <div class="t">Nikola S. · Aug '26</div>
+        <div class="chips"><span class="chip">0.2</span><span class="chip">0.5</span><span class="chip">0.8</span><span class="chip on">1.0</span></div>
+        <div class="act"><button class="set">Set</button><button class="rm">Remove</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="lane">
+    <div class="side"><div class="card">
+      <div class="name">Dedicated Capacity <span class="tag" style="background:#FFF6E8;color:#F5A623;margin-left:4px">POT</span></div>
+      <div class="row2"><span class="tag" style="background:#EBF2FF;color:var(--data)">Data BE · Sr</span>
+        <div class="avs"><span class="a" style="background:var(--data)">AD</span></div></div>
+    </div></div>
+    <div class="track">
+      <div class="bar ghosted" style="left:calc(var(--cw)*4);width:calc(var(--cw)*3 - 10px);background:linear-gradient(100deg,#8B5CF6,#A78BFA);--shadow:rgba(139,92,246,.40)">
+        <span class="a">AD</span><span class="n">Andria D.</span>
+        <span class="chev" style="color:#7C3AED">0.50 <s>›</s></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- dataBob Support: unfilled -->
+  <div class="ghead" style="margin-top:18px"><span class="dot" style="background:#10b981"></span><span class="t">dataBob Support</span><span class="c">1</span><span class="tag" style="background:#FFF6E8;color:#F5A623">POT</span></div>
+  <div class="lane">
+    <div class="side">
+      <div class="card" style="border:1.5px dashed #F5C872;background:#FFFDF8">
+        <div class="name">General <span style="font:500 9.5px 'DM Mono';color:#F5A623">· 0.5 FTE unfilled</span></div>
+        <div class="row2"><span class="tag" style="background:#F1ECFE;color:var(--gen)">Gen Agent · Mid</span>
+          <span class="tag" style="background:#EAF7FB;color:var(--primary);cursor:pointer">✦ Suggest</span></div>
+      </div>
+      <button class="addneed">＋ Need</button>
+    </div>
+    <div class="track">
+      <div class="ext" style="left:0;width:calc(var(--cw)*7 - 10px);border-color:#F5C872;color:#F5A623">0.5 FTE open · Jun – Dec</div>
+    </div>
+  </div>
+
+  <span class="deco" style="right:-14px;top:120px">💡</span>
+  <span class="deco" style="right:24px;bottom:-14px">✦</span>
+</div>
+
+<p class="note"><b>v2 — full inspiration treatment.</b> Saturated gradient pill bars with white labels and chevron chips · check-circle on fully-staffed bars · dashed "continues / open" segments instead of clipped edges and empty cells · Today as a line with floating date + pill · needs as sidebar cards with role tag + assigned avatars, ✦ Suggest inline, dashed amber card + "+ Need" for gaps · count-chip group headers · column guides instead of a lattice. <b>Trade-off shown honestly:</b> rows are 56px — roughly half the density of the current grid.</p>
+</div>
+</body>
+</html>
