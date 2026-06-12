@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useState, useEffect } from 'react';
 import AssignmentSegment from './AssignmentSegment';
 import ResizeHandle from './ResizeHandle';
 import { buildSegments } from '../../../../lib/gridUtils';
@@ -15,6 +15,13 @@ export default function AssignmentBar({ assignment, need, resource, months, over
 
   // Live resize preview: { side, delta } tracks how many months to add/remove
   const [resizePreview, setResizePreview] = useState(null);
+
+  // Keep the preview up until the refreshed assignment actually arrives —
+  // clearing it on API response made the bar snap back to its old position
+  // for a beat while the cache refetched.
+  useEffect(() => {
+    setResizePreview(null);
+  }, [assignment]);
 
   // Compute how far we can extend/shrink in each direction
   const resizeLimits = useMemo(() => {
@@ -107,15 +114,19 @@ export default function AssignmentBar({ assignment, need, resource, months, over
       }
 
       const prevAllocs = { ...allocs };
-      await upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: newAllocs });
-      onUndoable?.(`Resized ${resource.name}`, () =>
-        upsertAssignment({
-          needId: assignment.needId,
-          resourceId: assignment.resourceId,
-          monthAllocations: prevAllocs,
-        })
-      );
-      setResizePreview(null);
+      try {
+        await upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: newAllocs });
+        onUndoable?.(`Resized ${resource.name}`, () =>
+          upsertAssignment({
+            needId: assignment.needId,
+            resourceId: assignment.resourceId,
+            monthAllocations: prevAllocs,
+          })
+        );
+        // Preview stays on until the updated assignment renders (effect above).
+      } catch {
+        setResizePreview(null); // request failed — snap back honestly
+      }
     };
 
     document.addEventListener('mousemove', onMove);

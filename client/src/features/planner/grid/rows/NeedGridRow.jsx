@@ -43,6 +43,9 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
   // A press without horizontal movement falls back to the classic cell click.
   const rowRef = useRef(null);
   const [paint, setPaint] = useState(null); // { startIdx, endIdx, moved, cellRect }
+  // The browser fires a native click right after our pointerup handling; it
+  // must not bubble to the grid wrapper, which closes popovers on click.
+  const suppressClickRef = useRef(false);
 
   const periodIndexFromX = (clientX) => {
     const rect = rowRef.current?.getBoundingClientRect();
@@ -76,6 +79,7 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
 
   const handlePointerUp = (e) => {
     if (!paint) return;
+    suppressClickRef.current = true;
     const { startIdx, endIdx, moved, cellRect } = paint;
     setPaint(null);
     const lo = Math.min(startIdx, endIdx);
@@ -117,6 +121,12 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={() => setPaint(null)}
+      onClick={(e) => {
+        if (suppressClickRef.current) {
+          suppressClickRef.current = false;
+          e.stopPropagation();
+        }
+      }}
     >
       {periods.map((p, i) => {
         const periodInRange = p.months.some((m) => needMonths.includes(m));
