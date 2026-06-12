@@ -58,11 +58,13 @@ export default function EntityFilter({ selectedIds, onChange }) {
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all active:scale-95 ${
           activeCount > 0
             ? 'bg-primary-light text-primary border-primary/30'
-            : 'bg-white text-text-mid border-border hover:border-border-dark'
+            : 'bg-transparent text-text-mid border-transparent hover:bg-white'
         }`}
       >
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2h14l-5.5 6.5V14l-3-2V8.5z"/></svg>
-        Filter{activeCount > 0 ? ` (${activeCount})` : ''}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4M9 7h.01M15 7h.01M9 12h.01M15 12h.01" />
+        </svg>
+        Customers{activeCount > 0 ? ` (${activeCount})` : ''}
       </button>
       {open && (
         <div className="absolute top-full mt-1 right-0 bg-white rounded-xl border border-border shadow-lg z-[100] w-[260px] max-h-[340px] flex flex-col"
