@@ -80,13 +80,17 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
           a.needId === need.id &&
           Object.entries(a.monthAllocations || {}).some(([m, v]) => v > 0 && monthSet.has(m))
       ).length;
-      const canHeldPlace = heldResource && resourceMatchesNeed(heldResource, need);
-      const needsMore = !isNeedOk(need, assignments);
-      const clickPad = canHeldPlace && needsMore ? BAR_H + 8 : 0;
-      heights[need.id] = Math.max(56, barCount * (BAR_H + BAR_GAP) + 18 + clickPad);
+      // The dashed gap bar occupies its own stack slot whenever any visible
+      // month is under-filled (the held-mode click padding is obsolete now).
+      const nf = computeNeedFulfillment(need, assignments);
+      const hasVisibleGap = Object.keys(need.monthAllocations || {}).some(
+        (m) => monthSet.has(m) && (nf[m]?.needed || 0) - (nf[m]?.filled || 0) > 0.001
+      );
+      const slots = barCount + (hasVisibleGap ? 1 : 0);
+      heights[need.id] = Math.max(56, slots * (BAR_H + BAR_GAP) + 18);
     }
     return heights;
-  }, [rows, assignments, heldResource, months]);
+  }, [rows, assignments, months]);
 
   // Unfilled FTE per month across all needs → "−X.X" gap chips in the header.
   const monthGaps = useMemo(() => {

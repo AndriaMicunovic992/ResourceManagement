@@ -34,15 +34,29 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
   const barGap = 3;
   const height = rowHeight || 56;
 
-  // Held person's free capacity per month (across all their assignments) —
-  // shown as a hint in placeable cells.
-  const heldFreeFor = useMemo(() => {
-    if (!heldResource) return null;
-    const own = assignments.filter((a) => a.resourceId === heldResource.id);
-    const cap = heldResource.capacity ?? 1;
-    return (m) =>
-      cap - own.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
-  }, [heldResource, assignments]);
+  // Remaining gap per month (needed − filled) as fused runs of equal value —
+  // rendered as a dashed "open" bar in its own stack slot below the bars.
+  const gapRuns = useMemo(() => {
+    const active = months
+      .map((m, i) => ({
+        i,
+        v: Math.max(0, (nf[m]?.needed || 0) - (nf[m]?.filled || 0)),
+        in: needMonths.includes(m),
+      }))
+      .filter((x) => x.in && x.v > 0.001);
+    const runs = [];
+    for (const x of active) {
+      const last = runs[runs.length - 1];
+      if (last && x.i === last.endI + 1 && Math.abs(x.v - last.v) < 0.005) last.endI = x.i;
+      else runs.push({ startI: x.i, endI: x.i, v: x.v });
+    }
+    return runs;
+  }, [months, nf, needMonths]);
+
+  // Shared vertical stack: assignment bars first, then the gap bar slot.
+  const slotCount = visibleAssignments.length + (gapRuns.length > 0 ? 1 : 0);
+  const stackH = slotCount > 0 ? slotCount * (barH + barGap) - barGap : 0;
+  const stackTop = Math.max(4, Math.round((height - stackH) / 2));
 
   // --- Paint-fill: drag across periods to set a value for the whole range.
   // A press without horizontal movement falls back to the classic cell click.
@@ -146,36 +160,20 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
             needed={needed} filled={filled}
             inRange={periodInRange}
             canPlace={!heldResource ? undefined : canHeldPlace && periodInRange ? true : false}
-            heldFree={
-              canHeldPlace && periodInRange && firstInRangeMonth && heldFreeFor
-                ? heldFreeFor(firstInRangeMonth)
-                : null
-            }
             paintActive={inPaintRange(i)}
             qEnd={parseInt(p.months[p.months.length - 1].slice(5), 10) % 3 === 0}
             onPointerDown={handlePointerDown(i)}
           />
         );
       })}
-      {/* Unstaffed need: a dashed segmented "need bar" spanning the demanded
-          months, sectioned where the monthly FTE differs (like assignment
-          bars). Decorative — clicks and paint pass through. */}
-      {visibleAssignments.length === 0 && (() => {
-        const active = months
-          .map((m, i) => ({ i, v: nf[m]?.needed || 0, in: needMonths.includes(m) }))
-          .filter((x) => x.in && x.v > 0.001);
-        if (active.length === 0) return null;
-        // Contiguous runs of equal FTE become fused segments.
-        const runs = [];
-        for (const x of active) {
-          const last = runs[runs.length - 1];
-          if (last && x.i === last.endI + 1 && Math.abs(x.v - last.v) < 0.005) last.endI = x.i;
-          else runs.push({ startI: x.i, endI: x.i, v: x.v });
-        }
-        const top = Math.max(4, Math.round((height - 28) / 2));
-        return runs.map((r, k) => {
-          const prevContig = k > 0 && runs[k - 1].endI === r.startI - 1;
-          const nextContig = k < runs.length - 1 && runs[k + 1].startI === r.endI + 1;
+      {/* The remaining gap as a dashed segmented "open" bar — also shown when
+          a need is only PARTIALLY filled (the rest of the bar, in amber).
+          Decorative — clicks and paint pass through. */}
+      {gapRuns.length > 0 && (() => {
+        const top = stackTop + visibleAssignments.length * (barH + barGap);
+        return gapRuns.map((r, k) => {
+          const prevContig = k > 0 && gapRuns[k - 1].endI === r.startI - 1;
+          const nextContig = k < gapRuns.length - 1 && gapRuns[k + 1].startI === r.endI + 1;
           const left = r.startI * CW + (prevContig ? 0 : 5);
           const width = (r.endI - r.startI + 1) * CW - (prevContig ? 0 : 5) - (nextContig ? 0 : 5);
           return (
@@ -183,7 +181,7 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
               key={k}
               className="absolute pointer-events-none flex items-center justify-center"
               style={{
-                left, width, top, height: 28,
+                left, width, top, height: barH,
                 border: '1.5px dashed #F5A623',
                 borderLeft: prevContig ? '1px dashed #F5C872' : '1.5px dashed #F5A623',
                 borderRadius: `${prevContig ? 0 : 999}px ${nextContig ? 0 : 999}px ${nextContig ? 0 : 999}px ${prevContig ? 0 : 999}px`,
@@ -191,7 +189,8 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
               }}
             >
               <span className="text-[9.5px] font-mono font-bold whitespace-nowrap">
-                {r.v.toFixed(2)}{runs.length === 1 ? ' FTE open' : ''}
+                {r.v.toFixed(2)}
+                {gapRuns.length === 1 && visibleAssignments.length === 0 ? ' FTE open' : ' open'}
               </span>
             </div>
           );
@@ -201,8 +200,6 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
       {visibleAssignments.map((a, idx) => {
         const resource = resources.find((r) => r.id === a.resourceId);
         if (!resource) return null;
-        const stackH = visibleAssignments.length * (barH + barGap) - barGap;
-        const stackTop = Math.max(4, Math.round((height - stackH) / 2));
         // Months where this person's TOTAL load (all projects) exceeds their
         // capacity — surfaced as a red tick on the bar.
         const cap = resource.capacity ?? 1;
