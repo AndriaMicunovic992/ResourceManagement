@@ -199,6 +199,8 @@ export default function AssignmentBar({ assignment, need, resource, months, over
             isFirst={i === 0 && !clippedLeft}
             isLast={i === visibleSegments.length - 1 && !clippedRight}
             showLabel={i === 0}
+            contLeft={i === 0 && clippedLeft}
+            contRight={i === visibleSegments.length - 1 && clippedRight}
             overloadMonths={overloadMonths}
             totalSegments={visibleSegments.length}
             onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}

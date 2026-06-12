@@ -44,19 +44,19 @@ function FteRow({ label, value, hours, maxFte, onFteChange, onHoursChange, onKey
 function QuickChips({ maxFte, onPick }) {
   const presets = [0.2, 0.5, 0.8, 1.0].filter((v) => v <= maxFte + 0.001);
   return (
-    <div className="flex gap-1 mb-2">
+    <div className="flex gap-1.5 mb-2.5">
       {presets.map((v) => (
         <button
           key={v}
           onClick={() => onPick(v)}
-          className="px-1.5 py-0.5 rounded border border-border bg-white text-[10px] font-mono font-bold text-text-mid cursor-pointer hover:border-primary hover:text-primary"
+          className="flex-1 py-1.5 rounded-lg border border-border-light bg-white text-[10px] font-mono font-bold text-text-mid cursor-pointer hover:border-primary hover:text-primary transition-colors"
         >
           {v.toFixed(1)}
         </button>
       ))}
       <button
         onClick={() => onPick(Math.round(maxFte * 100) / 100)}
-        className="px-1.5 py-0.5 rounded border border-primary bg-primary-light text-[10px] font-bold text-primary cursor-pointer hover:bg-primary hover:text-white"
+        className="flex-1 py-1.5 rounded-lg border-0 bg-primary-light text-[10px] font-bold text-primary cursor-pointer hover:bg-primary hover:text-white transition-colors whitespace-nowrap px-2"
         title={`Fill the remaining gap (${maxFte.toFixed(2)})`}
       >
         Fill gap
@@ -117,13 +117,13 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
 
   return (
     <div
-      className="fixed bg-white rounded-xl border border-border shadow-lg p-3 z-[3000]"
-      style={{ left: x, top: y }}
+      className="fixed bg-white rounded-2xl border border-[#F1F5F9] p-3.5 z-[3000]"
+      style={{ left: x, top: y, boxShadow: '0 16px 40px rgba(44,62,80,0.18)' }}
       onClick={(e) => e.stopPropagation()}
     >
       {!showNeedEdit ? (
         <>
-          <div className="text-[10px] font-semibold text-text-mid mb-2">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-text-light mb-2">
             {title || `FTE (max ${maxFte.toFixed(1)})`}
           </div>
           <QuickChips maxFte={maxFte} onPick={(v) => onSave(v)} />
@@ -157,7 +157,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
             </button>
             {showRemove && (
               <button onClick={() => { if (onRemove) onRemove(); else onSave(0); }}
-                className="px-2 py-1 text-danger text-xs font-semibold cursor-pointer border border-danger/30 bg-white rounded-lg hover:bg-danger-bg active:scale-95 transition">
+                className="px-3 py-1 text-danger text-xs font-bold cursor-pointer border-0 bg-danger-bg rounded-lg hover:brightness-95 active:scale-95 transition">
                 Remove
               </button>
             )}
