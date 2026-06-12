@@ -6,6 +6,7 @@ import CustomerForm from '../../../components/forms/CustomerForm';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
 import EntityFilter from './EntityFilter';
+import ResourceFilter from './ResourceFilter';
 
 const SORT_OPTIONS = [
   { value: 'name-asc', label: 'Name A–Z' },
@@ -15,7 +16,7 @@ const SORT_OPTIONS = [
   { value: 'oldest', label: 'Oldest' },
 ];
 
-export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange, showUnassignedOnly, onToggleUnassigned, customerSort, onCustomerSortChange, filterIds, onFilterChange }) {
+export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange, showUnassignedOnly, onToggleUnassigned, customerSort, onCustomerSortChange, filterIds, onFilterChange, resourceFilterIds, onResourceFilterChange, myProjectsOnly, onToggleMyProjects }) {
   const { customers, addCustomer } = useData();
   const { canEdit, currentOrg } = useOrg();
   const [showCustomerForm, setShowCustomerForm] = useState(false);
@@ -39,7 +40,19 @@ export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregati
           <span className={`w-2 h-2 rounded-full ${showUnassignedOnly ? 'bg-warning' : 'bg-border'}`} />
           Unassigned
         </button>
+        <button
+          onClick={onToggleMyProjects}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all active:scale-95 ${
+            myProjectsOnly
+              ? 'bg-primary-light text-primary border-primary/30'
+              : 'bg-transparent text-text-mid border-transparent hover:bg-white'
+          }`}
+          title="Only projects where you are the responsible person"
+        >
+          My projects
+        </button>
         <EntityFilter selectedIds={filterIds} onChange={onFilterChange} />
+        <ResourceFilter selectedIds={resourceFilterIds} onChange={onResourceFilterChange} />
         <select
           value={customerSort}
           onChange={(e) => onCustomerSortChange(e.target.value)}

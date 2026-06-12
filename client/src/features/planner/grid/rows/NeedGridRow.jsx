@@ -15,11 +15,6 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
     const e = need.endMonth || project.endMonth;
     return monthRange(s, e);
   }, [need, project]);
-  const projectMonths = useMemo(
-    () => monthRange(project.startMonth, project.endMonth),
-    [project]
-  );
-
   const visibleAssignments = useMemo(() => {
     const monthSet = new Set(months);
     return assignments.filter(
@@ -123,9 +118,9 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
       const ms = painted.filter((m) => needMonths.includes(m));
       if (ms.length > 0) onPaintAssign?.(need, ms, pos);
     } else if (!heldResource) {
-      // Need painting may extend the need within the project's range.
-      const ms = painted.filter((m) => projectMonths.includes(m));
-      if (ms.length > 0) onPaintNeed?.(need, ms, pos);
+      // Spreadsheet model: painting freely extends the need; its start/end
+      // (and the project's range) follow the allocations server-side.
+      if (painted.length > 0) onPaintNeed?.(need, painted, pos);
     }
   };
 

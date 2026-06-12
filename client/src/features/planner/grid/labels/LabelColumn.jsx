@@ -6,8 +6,13 @@ import { LW } from '../../../../lib/constants';
 
 export default function LabelColumn({ rows, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, onSuggestNeed, canEdit, needHeights }) {
   return (
-    <div className="sticky left-0 z-[5] bg-[#FAFBFD]" style={{ width: LW, minWidth: LW }}>
-      <div style={{ height: 46 }} /> {/* spacer for header (44px + 2px border) */}
+    <div className="sticky left-0 z-[5] bg-white" style={{ width: LW, minWidth: LW }}>
+      {/* Frozen corner: matches the grid header's stickiness so labels never
+          slide under it ("the header bounces"). 53px = toolbar height. */}
+      <div
+        className="sticky z-[7] bg-white border-b-2 border-border"
+        style={{ top: 53, height: 46 }}
+      />
       {rows.map((row, i) => {
         if (row.type === 'customer') {
           return <CustomerLabel key={`c-${row.data.id}`} customer={row.data}

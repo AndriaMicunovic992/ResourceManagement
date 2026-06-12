@@ -3,6 +3,36 @@ import { NotFoundError } from '../utils/errors.js';
 import { monthRange } from '../utils/months.js';
 import type { CreateNeedInput, UpdateNeedInput } from '../schemas/need.schema.js';
 
+/** Spreadsheet model: a need's start/end follow its allocations, and the
+ * project's range is the envelope of its needs — never entered by hand. */
+function allocEnvelope(allocs: Record<string, number>) {
+  const ms = Object.keys(allocs)
+    .filter((m) => (allocs[m] || 0) > 0)
+    .sort();
+  return ms.length
+    ? { startMonth: ms[0], endMonth: ms[ms.length - 1] }
+    : { startMonth: null, endMonth: null };
+}
+
+async function syncProjectRange(orgId: string, projectId: string) {
+  const needs = await prisma.need.findMany({
+    where: { orgId, projectId },
+    select: { monthAllocations: true },
+  });
+  const months: string[] = [];
+  for (const n of needs) {
+    for (const [m, v] of Object.entries((n.monthAllocations as Record<string, number>) || {})) {
+      if ((v || 0) > 0) months.push(m);
+    }
+  }
+  if (months.length === 0) return;
+  months.sort();
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { startMonth: months[0], endMonth: months[months.length - 1] },
+  });
+}
+
 export const needService = {
   async list(orgId: string, projectId?: string) {
     const where: any = { orgId };
@@ -34,10 +64,12 @@ export const needService = {
     const monthAllocations: Record<string, number> = {};
     months.forEach((m) => { monthAllocations[m] = ftePerMonth; });
 
-    return prisma.need.create({
-      data: { ...rest, monthAllocations, orgId },
+    const created = await prisma.need.create({
+      data: { ...rest, ...allocEnvelope(monthAllocations), monthAllocations, orgId },
       include: { assignments: true, project: true },
     });
+    await syncProjectRange(orgId, created.projectId);
+    return created;
   },
 
   async update(orgId: string, id: string, data: UpdateNeedInput) {
@@ -55,15 +87,19 @@ export const needService = {
       monthAllocations = { ...monthAllocations, ...inputMonthAllocs };
     }
 
-    return prisma.need.update({
+    const updated = await prisma.need.update({
       where: { id },
-      data: { ...rest, monthAllocations },
+      data: { ...rest, ...allocEnvelope(monthAllocations), monthAllocations },
       include: { assignments: true, project: true },
     });
+    await syncProjectRange(orgId, updated.projectId);
+    return updated;
   },
 
   async delete(orgId: string, id: string) {
-    await this.getById(orgId, id);
-    return prisma.need.delete({ where: { id } });
+    const existing = await this.getById(orgId, id);
+    const result = await prisma.need.delete({ where: { id } });
+    await syncProjectRange(orgId, existing.projectId);
+    return result;
   },
 };
