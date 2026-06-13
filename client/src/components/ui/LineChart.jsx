@@ -164,8 +164,10 @@ export default function LineChart({
           {linePath && <path d={linePath} fill="none" stroke={color} strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />}
         </svg>
 
-        {/* hover guide */}
-        <div className="absolute pointer-events-none" style={{ left: `${leftPct}%`, top: yActive, bottom: 0, width: 0, borderLeft: '1px dashed', borderColor: `${color}66`, transform: 'translateX(-0.5px)' }} />
+        {/* hover guide (only while hovering — at rest the tooltip would cover the plot) */}
+        {hover != null && (
+          <div className="absolute pointer-events-none" style={{ left: `${leftPct}%`, top: yActive, bottom: 0, width: 0, borderLeft: '1px dashed', borderColor: `${color}66`, transform: 'translateX(-0.5px)' }} />
+        )}
 
         {/* persistent selected markers (comparison mode) */}
         {selectable && selectedIndices.map((i) => (
@@ -174,22 +176,24 @@ export default function LineChart({
           )
         ))}
 
-        {/* active marker */}
+        {/* marker dot — at rest sits on the latest point, follows the cursor on hover */}
         <span className="absolute pointer-events-none rounded-full" style={{ left: `${leftPct}%`, top: yActive, width: 10, height: 10, background: dotColor, border: '2px solid #fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transform: 'translate(-50%,-50%)' }} />
 
-        {/* dark tooltip */}
-        <div
-          className="absolute pointer-events-none bg-[#16323C] text-white rounded-xl px-3 py-2 shadow-lg z-10"
-          style={{ left: `clamp(4px, calc(${leftPct}% - 68px), calc(100% - 140px))`, top: Math.max(2, yActive - 52), width: 136 }}
-        >
-          <b className="text-[10.5px]">{activePoint.label}</b>
-          <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-1">
-            <i className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
-            {seriesName}
-            <b className="ml-auto">{valueFormat(activePoint.value)}</b>
+        {/* dark tooltip — hover only */}
+        {hover != null && (
+          <div
+            className="absolute pointer-events-none bg-[#16323C] text-white rounded-xl px-3 py-2 shadow-lg z-10"
+            style={{ left: `clamp(4px, calc(${leftPct}% - 68px), calc(100% - 140px))`, top: Math.max(2, yActive - 52), width: 136 }}
+          >
+            <b className="text-[10.5px]">{activePoint.label}</b>
+            <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-1">
+              <i className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
+              {seriesName}
+              <b className="ml-auto">{valueFormat(activePoint.value)}</b>
+            </div>
+            {activePoint.sub && <div className="text-[9px] opacity-70 mt-0.5">{activePoint.sub}</div>}
           </div>
-          {activePoint.sub && <div className="text-[9px] opacity-70 mt-0.5">{activePoint.sub}</div>}
-        </div>
+        )}
 
         {/* mouse capture */}
         <div
