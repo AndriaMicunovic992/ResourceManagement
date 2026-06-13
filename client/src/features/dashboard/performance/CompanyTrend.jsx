@@ -28,24 +28,24 @@ export default function CompanyTrend({ filters }) {
   }, [filters, bucket]);
 
   return (
-    <div className="bg-white rounded-2xl border border-border-light p-4">
+    <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="text-[13px] font-bold text-text">Company trend</div>
-        <div className="flex items-center gap-1">
+        <span className="flex bg-[#EEF1F5] rounded-[11px] p-[3px]">
           {['month', 'quarter'].map((b) => (
             <button
               key={b}
               onClick={() => setBucket(b)}
-              className={`text-[11px] font-semibold rounded px-2 py-1 cursor-pointer border ${
+              className={`text-[10.5px] font-bold px-3 py-1.5 rounded-lg transition-colors ${
                 bucket === b
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-white text-text-mid border-border hover:border-border-dark'
+                  ? 'bg-white text-primary shadow-[0_1px_4px_rgba(34,49,63,0.12)]'
+                  : 'text-text-mid hover:text-text'
               }`}
             >
               {b === 'month' ? 'Month' : 'Quarter'}
             </button>
           ))}
-        </div>
+        </span>
       </div>
       {loading ? (
         <div className="text-[11px] text-text-light italic py-6 text-center">Loading…</div>

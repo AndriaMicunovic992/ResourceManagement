@@ -6,27 +6,12 @@ import { useOrg } from '../../../contexts/OrgContext';
 import { currentMonth, addMonths } from '../../../lib/dateUtils';
 import StatCard from '../../dashboard/stats/StatCard';
 import LogCard from '../../people/tabs/activity/LogCard';
+import { Sparkline } from '../../../components/ui/LineChart';
 
-function Sparkline({ points }) {
+function TrendSpark({ points }) {
   const valid = points.filter((p) => p.overall != null);
   if (valid.length < 2) return null;
-  const width = 240;
-  const height = 48;
-  const minY = 1;
-  const maxY = 5;
-  const stepX = width / (valid.length - 1);
-  const path = valid
-    .map((p, i) => {
-      const x = i * stepX;
-      const y = height - ((p.overall - minY) / (maxY - minY)) * height;
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[48px]">
-      <path d={path} fill="none" stroke="#6366f1" strokeWidth="2" />
-    </svg>
-  );
+  return <Sparkline data={valid.map((p) => p.overall)} color="#6366f1" height={48} />;
 }
 
 export default function CustomerOverview() {
@@ -127,9 +112,9 @@ export default function CustomerOverview() {
       </div>
 
       {isAdmin && trend.length >= 2 && (
-        <div className="bg-white rounded-xl border border-border shadow-card p-4">
+        <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-semibold text-text-mid uppercase tracking-wider">
+            <div className="text-[13px] font-bold text-text">
               Performance trend · 12 months
             </div>
             <button
@@ -139,13 +124,13 @@ export default function CustomerOverview() {
               Open ›
             </button>
           </div>
-          <Sparkline points={trend} />
+          <TrendSpark points={trend} />
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-border shadow-card p-4">
+      <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-xs font-semibold text-text-mid uppercase tracking-wider">
+          <div className="text-[13px] font-bold text-text">
             Recent activity
           </div>
           <button
