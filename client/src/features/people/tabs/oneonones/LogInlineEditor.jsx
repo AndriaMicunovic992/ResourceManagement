@@ -68,14 +68,14 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
         rows={3}
         maxLength={5000}
         placeholder="What happened?"
-        className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+        className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
         required
       />
       <div className="grid grid-cols-2 gap-2">
         <select
           value={customerId}
           onChange={handleCustomerChange}
-          className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+          className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
         >
           <option value="">Customer: None</option>
           {customers?.map((c) => (
@@ -87,7 +87,7 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
         <select
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+          className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
         >
           <option value="">Project: None</option>
           {availableProjects.map((p) => (
@@ -102,7 +102,7 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
           onChange={(e) => setJiraUrl(e.target.value)}
           placeholder="Jira URL (optional)"
           maxLength={500}
-          className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+          className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
         />
       </div>
       <CategoryMultiPicker
@@ -122,7 +122,7 @@ export default function LogInlineEditor({ initial, customers, projects, onCancel
         <button
           type="submit"
           disabled={saving}
-          className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1 cursor-pointer hover:opacity-90 disabled:opacity-50"
+          className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1 cursor-pointer hover:brightness-105 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>

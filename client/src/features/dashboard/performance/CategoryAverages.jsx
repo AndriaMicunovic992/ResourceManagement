@@ -27,8 +27,8 @@ export default function CategoryAverages({ filters }) {
   }, [filters]);
 
   return (
-    <div className="bg-white rounded-xl border border-border p-4">
-      <div className="text-xs font-bold text-text mb-3 uppercase tracking-wider">Category averages</div>
+    <div className="bg-white rounded-2xl border border-border-light p-4">
+      <div className="text-[13px] font-bold text-text mb-3">Category averages</div>
       {loading ? (
         <div className="text-[11px] text-text-light italic py-6 text-center">Loading…</div>
       ) : error ? (
@@ -43,7 +43,7 @@ export default function CategoryAverages({ filters }) {
             return (
               <div key={i} className="flex items-center gap-2">
                 <div className="w-40 text-[11px] text-text truncate" title={label}>{label}</div>
-                <div className="flex-1 h-5 bg-bg-subtle rounded relative overflow-hidden">
+                <div className="flex-1 h-5 bg-[#EEF1F5] rounded relative overflow-hidden">
                   <div
                     className="absolute top-0 left-0 bottom-0 rounded"
                     style={{ width: `${widthPct}%`, backgroundColor: scoreColor(row.averageScore) }}

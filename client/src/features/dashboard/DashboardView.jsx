@@ -2,7 +2,14 @@ import { useState } from 'react';
 import PlanningSegment from './PlanningSegment';
 import PerformanceSegment from './performance/PerformanceSegment';
 import SkillsSegment from './SkillsSegment';
+import PageHeader from '../../components/ui/PageHeader';
 import { useOrg } from '../../contexts/OrgContext';
+
+const SUBTITLES = {
+  planning: 'staffing, capacity and gaps across the window',
+  performance: 'evaluation scores across people and dimensions',
+  skills: 'company skill coverage and individual levels',
+};
 
 export default function DashboardView() {
   const { role } = useOrg();
@@ -17,21 +24,23 @@ export default function DashboardView() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-5 py-6">
-      <div className="flex items-center gap-1 mb-5 p-1 bg-bg-subtle rounded-lg border border-border w-fit">
-        {segments.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setSegment(s.key)}
-            className={`px-4 py-1.5 rounded-md text-xs font-bold cursor-pointer border transition ${
-              segment === s.key
-                ? 'bg-white text-primary border-border shadow-sm'
-                : 'bg-transparent text-text-mid border-transparent hover:text-text'
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <PageHeader title="Insights" subtitle={SUBTITLES[segment]}>
+        <span className="flex bg-[#EEF1F5] rounded-[11px] p-[3px]">
+          {segments.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSegment(s.key)}
+              className={`text-[10.5px] font-bold px-3.5 py-1.5 rounded-lg transition-colors ${
+                segment === s.key
+                  ? 'bg-white text-primary shadow-[0_1px_4px_rgba(34,49,63,0.12)]'
+                  : 'text-text-mid hover:text-text'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </span>
+      </PageHeader>
       {segment === 'planning' && <PlanningSegment />}
       {isAdmin && segment === 'performance' && <PerformanceSegment />}
       {segment === 'skills' && <SkillsSegment />}

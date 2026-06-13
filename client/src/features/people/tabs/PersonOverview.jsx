@@ -210,19 +210,19 @@ export default function PersonOverview() {
   return (
     <div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <StatCard icon="📈" value={`${stats.avgUtilPct}%`} label="Avg utilization (3mo)" color="#5BC68A" />
-        <StatCard icon="📁" value={stats.projects} label="Projects" color="#3B82F6" />
-        <StatCard icon="🏢" value={stats.customers} label="Customers" color="#F97316" />
-        <StatCard icon="🎯" value={stats.skills} label="Skills" color="#8B5CF6" />
+        <StatCard icon="◔" value={`${stats.avgUtilPct}%`} label="Avg utilization (3mo)" color="#5BC68A" />
+        <StatCard icon="▦" value={stats.projects} label="Projects" color="#3B82F6" />
+        <StatCard icon="◑" value={stats.customers} label="Customers" color="#F97316" />
+        <StatCard icon="◆" value={stats.skills} label="Skills" color="#8B5CF6" />
       </div>
 
       {canSeePerformance && performanceLoaded && (
         <div
           onClick={() => navigate(`/people/${resource.id}/performance`)}
-          className="bg-white rounded-xl border border-border p-4 mb-4 cursor-pointer hover:bg-primary-bg/40"
+          className="bg-white rounded-2xl border border-border-light p-4 mb-4 cursor-pointer hover:bg-primary-bg/40"
         >
           <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
+            <div className="text-[13px] font-bold text-text">
               Performance
             </div>
             <div className="text-[10px] text-text-light">
@@ -250,8 +250,8 @@ export default function PersonOverview() {
       )}
 
       {isAdmin && oneOnOneLoaded && (
-        <div className="bg-white rounded-xl border border-border p-4 mb-4">
-          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">
+        <div className="bg-white rounded-2xl border border-border-light p-4 mb-4">
+          <div className="text-[13px] font-bold text-text mb-2">
             Last 1:1
           </div>
           {lastOneOnOne ? (
@@ -272,8 +272,8 @@ export default function PersonOverview() {
       )}
 
       {isAdmin && recentLogsLoaded && (
-        <div className="bg-white rounded-xl border border-border p-4 mb-4">
-          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">
+        <div className="bg-white rounded-2xl border border-border-light p-4 mb-4">
+          <div className="text-[13px] font-bold text-text mb-2">
             Recent activity
           </div>
           {recentLogs.length === 0 ? (
@@ -309,8 +309,8 @@ export default function PersonOverview() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-border p-4">
-        <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">
+      <div className="bg-white rounded-2xl border border-border-light p-4">
+        <div className="text-[13px] font-bold text-text mb-2">
           Currently engaged with
         </div>
         {activeCustomers.length === 0 ? (

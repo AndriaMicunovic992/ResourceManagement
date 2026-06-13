@@ -5,6 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 import Avatar from '../../../components/ui/Avatar';
+import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import MiniThread from '../../../components/ui/MiniThread';
 import SignalChart from '../../../components/ui/SignalChart';
 import { LockIcon } from '../../../components/ui/icons';
@@ -53,9 +54,9 @@ function toDateInput(value) {
 
 function Panel({ title, children, action }) {
   return (
-    <div className="bg-white rounded-xl border border-border shadow-card p-4">
+    <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold text-text uppercase tracking-wider m-0">{title}</h3>
+        <h3 className="text-[13px] font-bold text-text m-0">{title}</h3>
         {action}
       </div>
       {children}
@@ -130,7 +131,7 @@ function MeetingPanel({ personId, record, onSaved }) {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+            className="text-xs font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -147,7 +148,7 @@ function MeetingPanel({ personId, record, onSaved }) {
             type="date"
             value={meetingDate}
             onChange={(e) => setMeetingDate(e.target.value)}
-            className="px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+            className="px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
           />
         </div>
         <RatingPicker label="Overall score (pulse)" value={overallScore} onChange={setOverallScore} />
@@ -162,7 +163,7 @@ function MeetingPanel({ personId, record, onSaved }) {
             onChange={(e) => setWentWell(e.target.value)}
             rows={4}
             maxLength={10000}
-            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+            className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
           />
         </div>
         <div>
@@ -174,7 +175,7 @@ function MeetingPanel({ personId, record, onSaved }) {
             onChange={(e) => setWentBad(e.target.value)}
             rows={4}
             maxLength={10000}
-            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+            className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
           />
         </div>
       </div>
@@ -259,7 +260,7 @@ function ProjectCheckins({ personId, oneOnOneId, activeProjects, checkins, onCha
                   <button
                     onClick={() => handleSave({ ...project })}
                     disabled={busy[project.id] || !value.trim() || (!dirty && !!existing)}
-                    className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-2.5 py-1 cursor-pointer hover:opacity-90 disabled:opacity-40"
+                    className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-2.5 py-1 cursor-pointer hover:brightness-105 disabled:opacity-40"
                   >
                     {busy[project.id] ? '…' : existing ? 'Update' : 'Save'}
                   </button>
@@ -271,7 +272,7 @@ function ProjectCheckins({ personId, oneOnOneId, activeProjects, checkins, onCha
                 rows={2}
                 maxLength={5000}
                 placeholder="How is it going on this project?"
-                className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+                className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
               />
               {errors[project.id] && (
                 <div className="text-[10px] text-danger mt-1">{errors[project.id]}</div>
@@ -381,12 +382,12 @@ function FollowUpsPanel({ personId, oneOnOneId, followUps, setFollowUps }) {
           onChange={(e) => setNewContent(e.target.value)}
           placeholder="New follow-up…"
           maxLength={2000}
-          className="flex-1 px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+          className="flex-1 px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
         />
         <button
           type="submit"
           disabled={busy || !newContent.trim()}
-          className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-40"
+          className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-40"
         >
           Add
         </button>
@@ -477,7 +478,7 @@ function CareerPanel({ personId, oneOnOneId, entries, setEntries }) {
           rows={2}
           maxLength={5000}
           placeholder="Career note or goal…"
-          className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+          className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
         />
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-1.5 text-[11px] text-text-mid cursor-pointer">
@@ -487,7 +488,7 @@ function CareerPanel({ personId, oneOnOneId, entries, setEntries }) {
           <button
             type="submit"
             disabled={busy || !newContent.trim()}
-            className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-40"
+            className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-40"
           >
             Add
           </button>
@@ -534,7 +535,7 @@ function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value)}
-          className="shrink-0 max-w-[110px] px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
+          className="shrink-0 max-w-[110px] px-1.5 py-1 border border-border-light rounded-lg text-[11px] text-text outline-none bg-white"
         >
           {kinds.map((k) => (
             <option key={k.value} value={k.value}>
@@ -545,7 +546,7 @@ function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
         <select
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
-          className="flex-1 min-w-0 w-full px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none bg-white"
+          className="flex-1 min-w-0 w-full px-1.5 py-1 border border-border-light rounded-lg text-[11px] text-text outline-none bg-white"
         >
           <option value="">No category</option>
           {activeCategories.map((c) => (
@@ -562,12 +563,12 @@ function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
           onChange={(e) => setContent(e.target.value)}
           placeholder="Log something from this conversation…"
           maxLength={5000}
-          className="flex-1 px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+          className="flex-1 px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
         />
         <button
           type="submit"
           disabled={busy || !content.trim()}
-          className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-40"
+          className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-40"
         >
           Log
         </button>
@@ -740,27 +741,35 @@ export default function OneOnOneCockpit() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-5 py-5">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <Avatar name={person?.name || '?'} color="#4CBAD4" size={40} />
-          <div>
-            <h2 className="text-lg font-bold text-text m-0">
-              1:1 — {person?.name || 'Unknown'}
-            </h2>
-            <div className="text-[11px] text-text-mid">
+      {/* Header — entity profile-card language */}
+      <div
+        className="flex items-center gap-4 border border-border-light rounded-[18px] p-[18px] mb-4 flex-wrap"
+        style={{ background: 'linear-gradient(120deg, #F4FBFD, #fff)' }}
+      >
+        <Avatar
+          name={person?.name || '?'}
+          color={person ? domainColor(resourcePrimaryDomain(person)) : '#4CBAD4'}
+          size={48}
+          className="shadow-lg"
+        />
+        <div className="min-w-0">
+          <h2 className="text-lg font-extrabold tracking-tight text-text m-0 truncate">
+            1:1 — {person?.name || 'Unknown'}
+          </h2>
+          <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
+            <span className="text-[9.5px] font-mono font-semibold text-primary bg-primary-light rounded-[7px] px-2 py-0.5">
               {formatDate(record.meetingDate)}
-              {previousMeetingDate
-                ? ` · previous 1:1 ${formatDate(previousMeetingDate)}`
-                : ' · first recorded 1:1'}
-            </div>
+            </span>
+            <span className="text-[9.5px] font-mono font-semibold text-text-mid bg-[#EEF1F5] rounded-[7px] px-2 py-0.5">
+              {previousMeetingDate ? `previous · ${formatDate(previousMeetingDate)}` : 'first recorded 1:1'}
+            </span>
           </div>
         </div>
         <Link
           to={`/people/${personId}/oneonones`}
-          className="text-xs font-semibold text-text-mid border border-border rounded-lg px-3 py-1.5 no-underline hover:bg-primary-bg"
+          className="ml-auto rounded-[11px] font-bold text-[11.5px] px-3.5 py-2.5 no-underline bg-white text-text-mid border border-border-light hover:bg-primary-bg"
         >
-          ← Back to 1:1 list
+          ← All 1:1s
         </Link>
       </div>
 

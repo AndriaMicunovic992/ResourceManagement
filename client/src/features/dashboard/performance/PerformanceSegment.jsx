@@ -91,9 +91,9 @@ export default function PerformanceSegment() {
 
 function SummaryCard({ label, value, color }) {
   return (
-    <div className="bg-white rounded-xl border border-border p-4">
-      <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">{label}</div>
-      <div className="text-2xl font-bold" style={{ color: color ?? 'var(--color-text, #111)' }}>{value}</div>
+    <div className="bg-white rounded-2xl border border-border-light shadow-card px-4 py-3.5">
+      <div className="text-[11px] font-semibold text-text-mid">{label}</div>
+      <div className="mt-2 text-[22px] font-extrabold tracking-tight leading-none" style={{ color: color ?? '#2C3E50' }}>{value}</div>
     </div>
   );
 }

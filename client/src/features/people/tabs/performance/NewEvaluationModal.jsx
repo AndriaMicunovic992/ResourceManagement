@@ -112,7 +112,7 @@ export default function NewEvaluationModal({ resourceId, onCancel, onCreated }) 
             type="date"
             value={periodEnd}
             onChange={(e) => setPeriodEnd(e.target.value)}
-            className="px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+            className="px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
           />
         </div>
         <div>
@@ -124,7 +124,7 @@ export default function NewEvaluationModal({ resourceId, onCancel, onCreated }) 
               No allocations yet — assign this person to a project first.
             </div>
           ) : (
-            <div className="space-y-0.5 max-h-[320px] overflow-y-auto border border-border rounded p-2">
+            <div className="space-y-0.5 max-h-[320px] overflow-y-auto border border-border-light rounded-lg p-2">
               {customerGroups.map((group) => {
                 const isExpanded = expanded.has(group.customer.id);
                 const wholeSelected = isScopeSelected(group.customer.id, null);
@@ -196,14 +196,14 @@ export default function NewEvaluationModal({ resourceId, onCancel, onCreated }) 
             type="button"
             onClick={onCancel}
             disabled={saving}
-            className="text-xs font-semibold text-text-mid bg-transparent border border-border rounded px-3 py-1.5 cursor-pointer hover:bg-primary-bg"
+            className="text-xs font-bold text-text-mid bg-white border border-border-light rounded-lg px-3 py-1.5 cursor-pointer hover:bg-primary-bg"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || selected.length === 0}
-            className="text-xs font-semibold text-white bg-primary border-0 rounded px-4 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+            className="text-xs font-bold text-white bg-primary border-0 rounded-lg px-4 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-50"
           >
             {saving ? 'Creating…' : `Create ${selected.length || ''} evaluation${selected.length === 1 ? '' : 's'}`}
           </button>

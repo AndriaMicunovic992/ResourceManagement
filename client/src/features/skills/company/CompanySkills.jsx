@@ -36,7 +36,7 @@ export default function CompanySkills({ resources, skills }) {
 
   if (skills.length === 0) {
     return (
-      <div className="text-center text-text-light text-sm py-10 bg-white rounded-xl border border-border">
+      <div className="text-center text-text-light text-sm py-10 bg-white rounded-2xl border border-border-light">
         No skills defined yet. Add them from Settings.
       </div>
     );

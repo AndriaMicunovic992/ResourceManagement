@@ -29,8 +29,8 @@ export default function ScoreDistribution({ filters }) {
   const maxCount = data.reduce((m, b) => Math.max(m, b.count), 0);
 
   return (
-    <div className="bg-white rounded-xl border border-border p-4">
-      <div className="text-xs font-bold text-text mb-3 uppercase tracking-wider">Score distribution</div>
+    <div className="bg-white rounded-2xl border border-border-light p-4">
+      <div className="text-[13px] font-bold text-text mb-3">Score distribution</div>
       {loading ? (
         <div className="text-[11px] text-text-light italic py-6 text-center">Loading…</div>
       ) : error ? (

@@ -41,7 +41,7 @@ function ScoreInput({ value, disabled, onChange }) {
         const v = e.target.value === '' ? null : parseFloat(e.target.value);
         onChange(v);
       }}
-      className="w-16 px-1.5 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white disabled:bg-gray-50 disabled:text-text-light"
+      className="w-16 px-1.5 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white disabled:bg-gray-50 disabled:text-text-light"
     />
   );
 }
@@ -159,7 +159,7 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
   };
 
   return (
-    <div className="bg-white rounded-xl border border-border p-4">
+    <div className="bg-white rounded-2xl border border-border-light p-4">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <div className="text-sm font-bold text-text">
@@ -235,7 +235,7 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
                         value={getLocal(snap.id, 'employeeComment') ?? ''}
                         onChange={(e) => setLocal(snap.id, 'employeeComment', e.target.value)}
                         onBlur={(e) => persistScore(snap.id, { employeeComment: e.target.value || null })}
-                        className="mt-1 w-full px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none focus:border-primary bg-white resize-y"
+                        className="mt-1 w-full px-1.5 py-1 border border-border-light rounded-lg text-[11px] text-text outline-none focus:border-primary bg-white resize-y"
                       />
                     )}
                     {!allowEmployeeEdit && sc?.employeeComment && (
@@ -259,7 +259,7 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
                       value={getLocal(snap.id, 'responsibleComment') ?? ''}
                       onChange={(e) => setLocal(snap.id, 'responsibleComment', e.target.value)}
                       onBlur={(e) => persistScore(snap.id, { responsibleComment: e.target.value || null })}
-                      className="mt-1 w-full px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none focus:border-primary bg-white resize-y"
+                      className="mt-1 w-full px-1.5 py-1 border border-border-light rounded-lg text-[11px] text-text outline-none focus:border-primary bg-white resize-y"
                     />
                   )}
                   {!subjectFinalizedView && !allowResponsibleEdit && sc?.responsibleComment && (
@@ -275,7 +275,7 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
                         value={getLocal(snap.id, 'managerComment') ?? ''}
                         onChange={(e) => setLocal(snap.id, 'managerComment', e.target.value)}
                         onBlur={(e) => persistScore(snap.id, { managerComment: e.target.value || null })}
-                        className="w-full px-1.5 py-1 border border-border rounded text-[11px] text-text outline-none focus:border-primary bg-white resize-y"
+                        className="w-full px-1.5 py-1 border border-border-light rounded-lg text-[11px] text-text outline-none focus:border-primary bg-white resize-y"
                       />
                     ) : (
                       sc?.managerComment ? (
@@ -294,7 +294,7 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
 
       {!isSubject && eval_.logs && eval_.logs.length > 0 && (
         <div className="mt-3 border-t border-border pt-3">
-          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">
+          <div className="text-[13px] font-bold text-text mb-2">
             Activity logs ({eval_.logs.length})
           </div>
           <div className="space-y-2">
@@ -329,7 +329,7 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
               <button
                 onClick={() => handleSubmit('employee')}
                 disabled={saving}
-                className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+                className="text-xs font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-50"
               >
                 Submit self-assessment
               </button>
@@ -338,7 +338,7 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
               <button
                 onClick={() => handleSubmit('responsible')}
                 disabled={saving}
-                className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+                className="text-xs font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-50"
               >
                 Submit responsible scores
               </button>
@@ -353,19 +353,19 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
                   placeholder="Override"
                   value={overrideFinal}
                   onChange={(e) => setOverrideFinal(e.target.value)}
-                  className="w-20 px-1.5 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+                  className="w-20 px-1.5 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
                 />
                 <input
                   type="text"
                   placeholder="Reason (required if override)"
                   value={overrideReason}
                   onChange={(e) => setOverrideReason(e.target.value)}
-                  className="w-56 px-1.5 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+                  className="w-56 px-1.5 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
                 />
                 <button
                   onClick={() => handleSubmit('finalize')}
                   disabled={saving}
-                  className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+                  className="text-xs font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-50"
                 >
                   Finalize
                 </button>
@@ -375,7 +375,7 @@ export default function EvaluationDetail({ evaluation, currentUserId, onChange, 
               <button
                 onClick={handleDelete}
                 disabled={saving}
-                className="text-xs font-semibold text-danger bg-transparent border border-danger rounded px-3 py-1.5 cursor-pointer hover:bg-danger hover:text-white disabled:opacity-50"
+                className="text-xs font-bold text-danger bg-danger-bg border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-95 disabled:opacity-50"
               >
                 Delete
               </button>

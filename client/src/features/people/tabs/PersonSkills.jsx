@@ -85,7 +85,7 @@ export default function PersonSkills() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-border p-4">
+    <div className="bg-white rounded-2xl border border-border-light p-4">
       {error && (
         <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-2">{error}</div>
       )}
@@ -147,7 +147,7 @@ export default function PersonSkills() {
             <select
               value={addingSkillId}
               onChange={(e) => setAddingSkillId(e.target.value)}
-              className="w-full px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="w-full px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="">Select a skill…</option>
               {availableSkills.map((s) => (
@@ -162,7 +162,7 @@ export default function PersonSkills() {
             <select
               value={addingLevel}
               onChange={(e) => setAddingLevel(parseInt(e.target.value, 10))}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               {SKILL_LEVEL_LIST.map((n) => (
                 <option key={n} value={n}>{SKILL_LEVELS[n].label}</option>
@@ -172,7 +172,7 @@ export default function PersonSkills() {
           <button
             type="submit"
             disabled={!addingSkillId}
-            className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-3 py-1 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-xs font-bold text-text-mid bg-white border border-border-light rounded-lg px-3 py-1 cursor-pointer hover:bg-primary-bg disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Add
           </button>

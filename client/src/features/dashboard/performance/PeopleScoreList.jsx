@@ -28,8 +28,8 @@ export default function PeopleScoreList({ filters }) {
   }, [filters]);
 
   return (
-    <div className="bg-white rounded-xl border border-border p-4">
-      <div className="text-xs font-bold text-text mb-3 uppercase tracking-wider">People ranked by mean score</div>
+    <div className="bg-white rounded-2xl border border-border-light p-4">
+      <div className="text-[13px] font-bold text-text mb-3">People ranked by mean score</div>
       {loading ? (
         <div className="text-[11px] text-text-light italic py-6 text-center">Loading…</div>
       ) : error ? (
@@ -42,7 +42,7 @@ export default function PeopleScoreList({ filters }) {
             <Link
               key={p.resourceId}
               to={`/people/${p.resourceId}/performance`}
-              className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-bg-subtle no-underline"
+              className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-[#F7FAFC] no-underline"
             >
               <div
                 className="w-10 h-10 rounded flex items-center justify-center text-sm font-bold shrink-0"

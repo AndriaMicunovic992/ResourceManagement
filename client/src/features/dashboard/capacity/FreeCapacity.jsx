@@ -102,7 +102,7 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
 
   if (tree.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-border shadow-card p-8 text-center text-sm text-text-light">
+      <div className="bg-white rounded-2xl border border-border-light shadow-card p-8 text-center text-sm text-text-light">
         No resources with roles configured
       </div>
     );
@@ -112,8 +112,8 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
   const allResourceIds = useMemo(() => [...new Set(resources.map((r) => r.id))], [resources]);
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-card overflow-auto">
-      <h3 className="text-base font-bold text-text px-5 pt-4 pb-2">Free Capacity (FTE)</h3>
+    <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
+      <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">Free Capacity (FTE)</h3>
       <div className="flex items-center border-b-2 border-border sticky top-0 bg-white z-10">
         <div className="w-[270px] shrink-0 px-3 py-2">
           <span className="text-xs font-semibold text-text-mid">Domain / Role / Seniority</span>

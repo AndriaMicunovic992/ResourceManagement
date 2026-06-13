@@ -9,7 +9,7 @@ export default function ProfileUtilization({ resource }) {
 
   return (
     <div className="mb-4">
-      <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">Monthly Utilization</div>
+      <div className="text-[13px] font-bold text-text mb-2">Monthly Utilization</div>
       <div className="flex gap-1 overflow-x-auto">
         {months.map((m) => {
           const used = rURealised[resource.id]?.[m] || 0;

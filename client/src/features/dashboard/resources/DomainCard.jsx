@@ -36,7 +36,7 @@ export default function DomainCard({ domain, months, includePotential, teamId })
   const label = includePotential ? 'all' : 'realised';
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-card p-4">
+    <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded" style={{ backgroundColor: d.color }} />

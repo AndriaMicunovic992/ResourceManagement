@@ -28,9 +28,9 @@ export default function CompanyTrend({ filters }) {
   }, [filters, bucket]);
 
   return (
-    <div className="bg-white rounded-xl border border-border p-4">
+    <div className="bg-white rounded-2xl border border-border-light p-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs font-bold text-text uppercase tracking-wider">Company trend</div>
+        <div className="text-[13px] font-bold text-text">Company trend</div>
         <div className="flex items-center gap-1">
           {['month', 'quarter'].map((b) => (
             <button

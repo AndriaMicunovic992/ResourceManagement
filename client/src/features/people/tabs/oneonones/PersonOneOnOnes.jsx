@@ -82,21 +82,21 @@ export default function PersonOneOnOnes() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-bold text-text m-0">1:1 Meetings</h2>
+        <h2 className="text-[13px] font-bold text-text m-0">1:1 meetings</h2>
         {!isSelfView && (
           <div className="flex items-center gap-2">
             <button
               onClick={handleStartCockpit}
               disabled={starting}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 border-0 rounded-[11px] font-bold text-[11.5px] px-3.5 py-2 cursor-pointer bg-primary text-white shadow-[0_3px_10px_rgba(76,186,212,0.35)] hover:brightness-105 disabled:opacity-50"
             >
               <PlayIcon size={11} /> {starting ? 'Starting…' : 'Start 1:1'}
             </button>
             <button
               onClick={handleCreate}
-              className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-3 py-1.5 cursor-pointer hover:bg-primary hover:text-white"
+              className="rounded-[11px] font-bold text-[11.5px] px-3.5 py-2 cursor-pointer bg-white text-text-mid border border-border-light hover:bg-primary-bg"
             >
-              + Quick add
+              ＋ Quick add
             </button>
           </div>
         )}
@@ -107,11 +107,11 @@ export default function PersonOneOnOnes() {
       )}
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-border p-8 text-center text-xs text-text-light">
+        <div className="bg-white rounded-2xl border border-border-light p-8 text-center text-xs text-text-light">
           Loading…
         </div>
       ) : oneOnOnes.length === 0 ? (
-        <div className="bg-white rounded-xl border border-border">
+        <div className="bg-white rounded-2xl border border-border-light">
           <EmptyState icon="💬" message="No 1:1 meetings recorded yet." />
         </div>
       ) : (

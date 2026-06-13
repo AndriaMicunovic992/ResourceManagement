@@ -9,7 +9,7 @@ export default function OneOnOneList({ oneOnOnes, onEdit, onDelete, readOnly = f
   }, [oneOnOnes]);
 
   return (
-    <div className="space-y-2">
+    <div className="bg-white rounded-2xl border border-border-light shadow-card p-2">
       {sorted.map((record) => (
         <OneOnOneCard
           key={record.id}

@@ -4,20 +4,20 @@ import SkillsMatrixRow from './SkillsMatrixRow';
 export default function SkillsMatrix({ resources, skills }) {
   if (skills.length === 0) {
     return (
-      <div className="text-center text-text-light text-sm py-10 bg-white rounded-xl border border-border">
+      <div className="text-center text-text-light text-sm py-10 bg-white rounded-2xl border border-border-light">
         No skills defined yet. Add them from Settings.
       </div>
     );
   }
   if (resources.length === 0) {
     return (
-      <div className="text-center text-text-light text-sm py-10 bg-white rounded-xl border border-border">
+      <div className="text-center text-text-light text-sm py-10 bg-white rounded-2xl border border-border-light">
         No people match the current filters.
       </div>
     );
   }
   return (
-    <div className="bg-white rounded-xl border border-border overflow-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+    <div className="bg-white rounded-2xl border border-border-light overflow-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
       <div className="inline-block min-w-full">
         <SkillsMatrixHeader skills={skills} />
         {resources.map((r) => (
