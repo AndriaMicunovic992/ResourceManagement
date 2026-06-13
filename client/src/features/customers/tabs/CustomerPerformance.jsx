@@ -3,6 +3,8 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { api } from '../../../lib/api';
 import { scoreColor, scoreBg } from '../../../lib/statusUtils';
 import { addMonths, currentMonth } from '../../../lib/dateUtils';
+import LineChart from '../../../components/ui/LineChart';
+import { formatBucketLabel } from '../../people/tabs/performance/TrendChart';
 
 const PRESETS = [
   { key: '3m', label: 'Last 3m' },
@@ -20,83 +22,25 @@ function presetWindow(key) {
   return { from: `${start}-01`, to: '' };
 }
 
-function TrendSvg({ points }) {
+function TrendSvg({ points, bucket }) {
   const valid = points.filter((p) => p.overall != null);
   if (valid.length < 2) {
     return <div className="text-xs text-text-light">Not enough data for a trend.</div>;
   }
-  const width = 640;
-  const height = 160;
-  const padLeft = 32;
-  const padRight = 8;
-  const padTop = 8;
-  const padBottom = 24;
-  const plotW = width - padLeft - padRight;
-  const plotH = height - padTop - padBottom;
-  const minY = 1;
-  const maxY = 5;
-  const stepX = valid.length === 1 ? 0 : plotW / (valid.length - 1);
-
-  const toX = (i) => padLeft + i * stepX;
-  const toY = (v) => padTop + plotH - ((v - minY) / (maxY - minY)) * plotH;
-
-  const path = valid
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(p.overall).toFixed(1)}`)
-    .join(' ');
-
-  const yLabels = [1, 2, 3, 4, 5];
-
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[160px]">
-      {yLabels.map((v) => (
-        <g key={v}>
-          <line
-            x1={padLeft}
-            x2={width - padRight}
-            y1={toY(v)}
-            y2={toY(v)}
-            stroke="#e5e7eb"
-            strokeDasharray="2 3"
-          />
-          <text
-            x={padLeft - 6}
-            y={toY(v) + 3}
-            fontSize="9"
-            fill="#9ca3af"
-            textAnchor="end"
-          >
-            {v}
-          </text>
-        </g>
-      ))}
-      <path d={path} fill="none" stroke="#6366f1" strokeWidth="2" />
-      {valid.map((p, i) => (
-        <circle
-          key={p.bucketStart}
-          cx={toX(i)}
-          cy={toY(p.overall)}
-          r="3"
-          fill="#6366f1"
-        >
-          <title>{`${p.bucketStart}: ${p.overall.toFixed(1)} (${p.evaluationCount} eval)`}</title>
-        </circle>
-      ))}
-      {valid.map((p, i) => {
-        if (valid.length > 8 && i % 2 === 1) return null;
-        return (
-          <text
-            key={`lbl-${p.bucketStart}`}
-            x={toX(i)}
-            y={height - 6}
-            fontSize="9"
-            fill="#6b7280"
-            textAnchor="middle"
-          >
-            {p.bucketStart}
-          </text>
-        );
-      })}
-    </svg>
+    <LineChart
+      data={points.map((p) => ({
+        label: formatBucketLabel(p.bucketStart, bucket),
+        value: p.overall == null ? null : p.overall,
+        sub: p.overall == null ? null : `${p.evaluationCount} eval${p.evaluationCount === 1 ? '' : 's'}`,
+      }))}
+      height={160}
+      color="#6366f1"
+      domain={[1, 5]}
+      yTicks={[1, 2, 3, 4, 5]}
+      seriesName="Overall"
+      valueFormat={(v) => v.toFixed(1)}
+    />
   );
 }
 
@@ -139,22 +83,22 @@ export default function CustomerPerformance() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-1 p-1 bg-bg-subtle rounded-lg border border-border">
+        <span className="flex bg-[#EEF1F5] rounded-[11px] p-[3px]">
           {PRESETS.map((opt) => (
             <button
               key={opt.key}
               onClick={() => setPreset(opt.key)}
-              className={`px-3 py-1 rounded-md text-[11px] font-bold cursor-pointer border transition ${
+              className={`text-[10.5px] font-bold px-3 py-1.5 rounded-lg transition-colors ${
                 preset === opt.key
-                  ? 'bg-white text-primary border-border shadow-sm'
-                  : 'bg-transparent text-text-mid border-transparent hover:text-text'
+                  ? 'bg-white text-primary shadow-[0_1px_4px_rgba(34,49,63,0.12)]'
+                  : 'text-text-mid hover:text-text'
               }`}
             >
               {opt.label}
             </button>
           ))}
-        </div>
-        <div className="flex items-center gap-1 p-1 bg-bg-subtle rounded-lg border border-border">
+        </span>
+        <span className="flex bg-[#EEF1F5] rounded-[11px] p-[3px]">
           {[
             { key: 'month', label: 'Monthly' },
             { key: 'quarter', label: 'Quarterly' },
@@ -162,26 +106,26 @@ export default function CustomerPerformance() {
             <button
               key={opt.key}
               onClick={() => setBucket(opt.key)}
-              className={`px-3 py-1 rounded-md text-[11px] font-bold cursor-pointer border transition ${
+              className={`text-[10.5px] font-bold px-3 py-1.5 rounded-lg transition-colors ${
                 bucket === opt.key
-                  ? 'bg-white text-primary border-border shadow-sm'
-                  : 'bg-transparent text-text-mid border-transparent hover:text-text'
+                  ? 'bg-white text-primary shadow-[0_1px_4px_rgba(34,49,63,0.12)]'
+                  : 'text-text-mid hover:text-text'
               }`}
             >
               {opt.label}
             </button>
           ))}
-        </div>
+        </span>
       </div>
 
       {loading ? (
         <div className="text-center text-sm text-text-light py-8">Loading…</div>
       ) : (
         <>
-          <div className="bg-white rounded-xl border border-border shadow-card p-5">
+          <div className="bg-white rounded-2xl border border-border-light shadow-card p-5">
             <div className="flex items-start gap-6 flex-wrap">
               <div>
-                <div className="text-[11px] uppercase tracking-wider text-text-light font-semibold">
+                <div className="text-[13px] font-bold text-text">
                   Overall (FTE-weighted)
                 </div>
                 <div
@@ -197,13 +141,13 @@ export default function CustomerPerformance() {
                 </div>
               </div>
               <div className="flex-1 min-w-[320px]">
-                <TrendSvg points={trend} />
+                <TrendSvg points={trend} bucket={bucket} />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-border shadow-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border text-xs font-semibold text-text-mid uppercase tracking-wider">
+          <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border text-[13px] font-bold text-text">
               Per-person breakdown
             </div>
             {perPerson.length === 0 ? (
@@ -212,8 +156,8 @@ export default function CustomerPerformance() {
               </div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-bg-subtle">
-                  <tr className="text-left text-[11px] text-text-mid uppercase tracking-wider">
+                <thead className="bg-[#F7FAFC]">
+                  <tr className="text-left text-[9.5px] text-text-light uppercase tracking-wider">
                     <th className="px-4 py-2 font-semibold">Person</th>
                     <th className="px-4 py-2 font-semibold text-right">Evaluations</th>
                     <th className="px-4 py-2 font-semibold text-right">Allocation share</th>

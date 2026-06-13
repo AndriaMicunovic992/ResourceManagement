@@ -8,6 +8,7 @@ import { MONTHS } from '../../lib/constants';
 import { currentMonth } from '../../lib/dateUtils';
 import { resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
 import { scoreColor } from '../../lib/statusUtils';
+import { Sparkline } from '../../components/ui/LineChart';
 
 function Stat({ value, label, color, spark }) {
   return (
@@ -52,12 +53,9 @@ export default function PersonPageHeader({ resource, canEdit, onEdit, viewMode }
   const lastEval = evalSeries.length ? Math.round(evalSeries[evalSeries.length - 1] * 10) / 10 : null;
 
   const evalSpark = evalSeries.length >= 2 ? (
-    <svg width="56" height="14" viewBox="0 0 56 14" className="block mx-auto mt-0.5">
-      <path
-        d={evalSeries.map((s, i) => `${i === 0 ? 'M' : 'L'}${1 + (i / (evalSeries.length - 1)) * 54} ${12 - ((s - 1) / 4) * 10}`).join(' ')}
-        fill="none" stroke={scoreColor(lastEval)} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-      />
-    </svg>
+    <div className="w-14 mx-auto mt-0.5">
+      <Sparkline data={evalSeries} color={scoreColor(lastEval)} height={16} />
+    </div>
   ) : null;
 
   const managers = useMemo(() => {

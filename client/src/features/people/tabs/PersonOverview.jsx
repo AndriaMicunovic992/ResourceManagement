@@ -8,27 +8,12 @@ import { useComputed } from '../../../hooks/useComputed';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
 import { api } from '../../../lib/api';
 import { LOG_KIND_COLORS as KIND_COLORS } from '../../../lib/constants';
+import { Sparkline } from '../../../components/ui/LineChart';
 
 function PerformanceSparkline({ points }) {
   const valid = points.filter((p) => p.overall != null);
   if (valid.length < 2) return null;
-  const width = 180;
-  const height = 40;
-  const minY = 1;
-  const maxY = 5;
-  const stepX = width / (valid.length - 1);
-  const path = valid
-    .map((p, i) => {
-      const x = i * stepX;
-      const y = height - ((p.overall - minY) / (maxY - minY)) * height;
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[40px]">
-      <path d={path} fill="none" stroke="#6366f1" strokeWidth="2" />
-    </svg>
-  );
+  return <Sparkline data={valid.map((p) => p.overall)} color="#6366f1" height={40} />;
 }
 
 function truncate(text, max) {
