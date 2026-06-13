@@ -649,7 +649,7 @@ export default function PersonPerformance() {
 
   if (!canView) {
     return (
-      <div className="bg-white rounded-xl border border-border p-10 text-center">
+      <div className="bg-white rounded-2xl border border-border-light p-10 text-center">
         <div className="text-4xl mb-3">🔒</div>
         <div className="text-sm text-text-mid">
           Access restricted — evaluations are visible to admins, managers and the person themselves.
@@ -679,10 +679,10 @@ export default function PersonPerformance() {
           </button>
         </div>
       )}
-      <div className="bg-white rounded-xl border border-border p-4 mb-4">
+      <div className="bg-white rounded-2xl border border-border-light p-4 mb-4">
         <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
+            <div className="text-[13px] font-bold text-text">
               Performance
             </div>
             <div className="flex items-baseline gap-2 mt-0.5">
@@ -700,7 +700,7 @@ export default function PersonPerformance() {
             <select
               value={scope}
               onChange={(e) => setScope(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
               title="Customer / project scope"
             >
               <option value="">All scopes combined</option>
@@ -713,7 +713,7 @@ export default function PersonPerformance() {
             <select
               value={periodPreset}
               onChange={(e) => setPeriodPreset(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
               title="Period window"
             >
               <option value="default">{orgDefaultLabel}</option>
@@ -731,7 +731,7 @@ export default function PersonPerformance() {
               <select
                 value={calendarQuarter}
                 onChange={(e) => setCalendarQuarter(e.target.value)}
-                className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+                className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
               >
                 {quarterOpts.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -744,7 +744,7 @@ export default function PersonPerformance() {
               <select
                 value={calendarHalf}
                 onChange={(e) => setCalendarHalf(e.target.value)}
-                className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+                className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
               >
                 {halfOpts.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -757,7 +757,7 @@ export default function PersonPerformance() {
               <select
                 value={calendarYear}
                 onChange={(e) => setCalendarYear(e.target.value)}
-                className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+                className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
               >
                 {yearOpts.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -769,7 +769,7 @@ export default function PersonPerformance() {
             <select
               value={trendBucket}
               onChange={(e) => setTrendBucket(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="month">Monthly</option>
               <option value="quarter">Quarterly</option>
@@ -783,14 +783,14 @@ export default function PersonPerformance() {
               type="date"
               value={periodFrom}
               onChange={(e) => setPeriodFrom(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+              className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary"
             />
             <label className="text-[10px] font-semibold text-text-mid">To</label>
             <input
               type="date"
               value={periodTo}
               onChange={(e) => setPeriodTo(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+              className="px-2 py-1 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary"
             />
           </div>
         )}
@@ -819,10 +819,10 @@ export default function PersonPerformance() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-4 mb-4">
+      <div className="bg-white rounded-2xl border border-border-light p-4 mb-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold">
+            <div className="text-[13px] font-bold text-text">
               Category breakdown
             </div>
             <div className="text-[11px] text-text-light mt-0.5">
@@ -845,7 +845,7 @@ export default function PersonPerformance() {
               {comparisonByGrouping.map((group) => (
                 <div key={group.grouping || '_'}>
                   {group.grouping && (
-                    <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">
+                    <div className="text-[12px] font-bold text-text mb-1">
                       {group.grouping}
                     </div>
                   )}
@@ -925,7 +925,7 @@ export default function PersonPerformance() {
             {singleBreakdownByGrouping.map((group) => (
               <div key={group.grouping || '_'}>
                 {group.grouping && (
-                  <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-1">
+                  <div className="text-[12px] font-bold text-text mb-1">
                     {group.grouping}
                   </div>
                 )}
@@ -967,7 +967,7 @@ export default function PersonPerformance() {
         {canCreate && (
           <button
             onClick={() => setShowNewModal(true)}
-            className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90"
+            className="text-xs font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105"
           >
             + New evaluation
           </button>
@@ -979,11 +979,11 @@ export default function PersonPerformance() {
       )}
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-border p-8 text-center text-xs text-text-light">
+        <div className="bg-white rounded-2xl border border-border-light p-8 text-center text-xs text-text-light">
           Loading…
         </div>
       ) : evaluations.length === 0 ? (
-        <div className="bg-white rounded-xl border border-border">
+        <div className="bg-white rounded-2xl border border-border-light">
           <EmptyState icon="📊" message="No evaluations yet" />
         </div>
       ) : (
@@ -998,7 +998,7 @@ export default function PersonPerformance() {
                   ) / roundFinalized.length
                 : null;
             return (
-            <div key={group.key} className="bg-white rounded-xl border border-border overflow-hidden">
+            <div key={group.key} className="bg-white rounded-2xl border border-border-light overflow-hidden">
               <div className="px-4 py-2 border-b border-border bg-primary-bg flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-text">

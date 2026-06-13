@@ -20,16 +20,16 @@ export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = fals
   const authorName = author?.name || author?.email || 'Unknown';
 
   return (
-    <div className="bg-white rounded-xl border border-border px-4 py-3 flex items-center justify-between gap-3">
+    <div className="px-3.5 py-2.5 rounded-xl hover:bg-[#F7FAFC] flex items-center justify-between gap-3 transition">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-text">
+        <div className="min-w-0 w-[140px]">
+          <div className="text-[12.5px] font-bold text-text">
             {formatDate(record.meetingDate)}
           </div>
-          <div className="text-[11px] text-text-light truncate">by {authorName}</div>
+          <div className="text-[9.5px] font-mono text-text-light truncate mt-0.5">by {authorName}</div>
         </div>
         {record.overallScore != null && (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-light text-primary shrink-0">
+          <span className="text-[9.5px] font-bold px-2.5 py-1 rounded-full bg-primary-light text-primary shrink-0">
             Pulse {record.overallScore}/5
           </span>
         )}
@@ -41,22 +41,22 @@ export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = fals
         )}
       </div>
       {!readOnly && (
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <Link
             to={`/people/${record.resourceId}/oneonones/${record.id}/cockpit`}
-            className="text-xs font-semibold text-white bg-primary border border-primary rounded px-2 py-1 no-underline hover:opacity-90"
+            className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 no-underline hover:brightness-105"
           >
             Cockpit
           </Link>
           <button
             onClick={onEdit}
-            className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
+            className="text-[11px] font-bold text-text-mid bg-white border border-border-light rounded-lg px-3 py-1.5 cursor-pointer hover:bg-primary-bg"
           >
             Edit
           </button>
           <button
             onClick={onDelete}
-            className="text-xs font-semibold text-danger bg-transparent border border-danger rounded px-2 py-1 cursor-pointer hover:bg-danger hover:text-white"
+            className="text-[11px] font-bold text-danger bg-danger-bg border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-95"
           >
             Delete
           </button>

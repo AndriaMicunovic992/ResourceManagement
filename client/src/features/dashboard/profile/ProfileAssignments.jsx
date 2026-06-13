@@ -37,9 +37,9 @@ export default function ProfileAssignments({ resource }) {
 
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">Assigned To</div>
+      <div className="text-[13px] font-bold text-text mb-2">Assigned To</div>
       {grouped.map((g) => (
-        <div key={g.customer.id} className="border border-border rounded-lg p-3 mb-2"
+        <div key={g.customer.id} className="bg-white border border-border-light rounded-2xl shadow-card p-3.5 mb-2.5"
           style={{ borderColor: g.customer.status === 'potential' ? '#F5A623' : undefined }}>
           <div className="font-bold text-sm text-text mb-2">{g.customer.name}</div>
           {Object.values(g.projects).map((pg) => {

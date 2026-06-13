@@ -82,7 +82,7 @@ export default function PersonActivity() {
 
   if (!isAdmin) {
     return (
-      <div className="bg-white rounded-xl border border-border p-10 text-center">
+      <div className="bg-white rounded-2xl border border-border-light p-10 text-center">
         <div className="text-4xl mb-3">🔒</div>
         <div className="text-sm text-text-mid">
           Access restricted — activity logs are visible to admins only.
@@ -114,13 +114,13 @@ export default function PersonActivity() {
 
   return (
     <div>
-      <div className="bg-white rounded-xl border border-border p-3 mb-4">
+      <div className="bg-white rounded-2xl border border-border-light p-3 mb-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <select
               value={filterKind}
               onChange={(e) => setFilterKind(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2.5 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               {KINDS.map((k) => (
                 <option key={k.value} value={k.value}>
@@ -131,7 +131,7 @@ export default function PersonActivity() {
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2.5 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="">All categories</option>
               {groupedCategories.map((group) => (
@@ -151,7 +151,7 @@ export default function PersonActivity() {
             <select
               value={filterCustomer}
               onChange={(e) => setFilterCustomer(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2.5 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="">All customers</option>
               {customers.map((c) => (
@@ -163,7 +163,7 @@ export default function PersonActivity() {
             <select
               value={filterProject}
               onChange={(e) => setFilterProject(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2.5 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="">All projects</option>
               {projects.map((p) => (
@@ -176,20 +176,20 @@ export default function PersonActivity() {
               type="date"
               value={filterFrom}
               onChange={(e) => setFilterFrom(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2.5 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             />
             <input
               type="date"
               value={filterTo}
               onChange={(e) => setFilterTo(e.target.value)}
-              className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="px-2.5 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             />
           </div>
           <button
             onClick={() => setShowNewModal(true)}
-            className="text-xs font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90"
+            className="border-0 rounded-[11px] font-bold text-[11.5px] px-3.5 py-2 cursor-pointer bg-primary text-white shadow-[0_3px_10px_rgba(76,186,212,0.35)] hover:brightness-105"
           >
-            + New log
+            ＋ New log
           </button>
         </div>
       </div>
@@ -199,11 +199,11 @@ export default function PersonActivity() {
       )}
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-border p-8 text-center text-xs text-text-light">
+        <div className="bg-white rounded-2xl border border-border-light p-8 text-center text-xs text-text-light">
           Loading…
         </div>
       ) : logs.length === 0 ? (
-        <div className="bg-white rounded-xl border border-border">
+        <div className="bg-white rounded-2xl border border-border-light">
           <EmptyState icon="📜" message="No activity matching the current filters" />
         </div>
       ) : (

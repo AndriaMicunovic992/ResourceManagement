@@ -63,7 +63,7 @@ export default function LogCard({
   };
 
   return (
-    <div className={`bg-white rounded-xl border border-border border-l-4 ${sourceBorder} p-4`}>
+    <div className={`bg-white rounded-2xl border border-border-light border-l-4 ${sourceBorder} p-4`}>
       <div className="flex flex-wrap gap-1.5 mb-2">
         <span
           className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${sourceBadge}`}
@@ -128,7 +128,7 @@ export default function LogCard({
             {onEdit && (
               <button
                 onClick={onEdit}
-                className="text-[11px] font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
+                className="text-[11px] font-bold text-text-mid bg-white border border-border-light rounded-lg px-2.5 py-1 cursor-pointer hover:bg-primary-bg"
               >
                 Edit
               </button>
@@ -136,7 +136,7 @@ export default function LogCard({
             {onDelete && (
               <button
                 onClick={onDelete}
-                className="text-[11px] font-semibold text-danger bg-transparent border border-danger rounded px-2 py-1 cursor-pointer hover:bg-danger hover:text-white"
+                className="text-[11px] font-bold text-danger bg-danger-bg border-0 rounded-lg px-2.5 py-1 cursor-pointer hover:brightness-95"
               >
                 Delete
               </button>
@@ -168,12 +168,12 @@ export default function LogCard({
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Reply…"
                 maxLength={2000}
-                className="flex-1 px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+                className="flex-1 px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
               />
               <button
                 type="submit"
                 disabled={posting || !newComment.trim()}
-                className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+                className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-50"
               >
                 {posting ? '…' : 'Reply'}
               </button>

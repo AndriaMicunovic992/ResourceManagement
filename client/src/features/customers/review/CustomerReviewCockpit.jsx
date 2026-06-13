@@ -69,13 +69,13 @@ function EntryComposer({ row, person, customer, reviewId, projects, logCategorie
         maxLength={5000}
         placeholder={row.hint}
         autoFocus
-        className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+        className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
         required
       />
       <select
         value={projectId}
         onChange={(e) => setProjectId(e.target.value)}
-        className="px-2 py-1 border border-border rounded text-[11px] text-text outline-none bg-white max-w-[220px]"
+        className="px-2 py-1 border border-border-light rounded-lg text-[11px] text-text outline-none bg-white max-w-[220px]"
       >
         <option value="">Project: whole customer</option>
         {projects.map((p) => (
@@ -95,7 +95,7 @@ function EntryComposer({ row, person, customer, reviewId, projects, logCategorie
         <button
           type="submit"
           disabled={busy || !content.trim()}
-          className="text-[11px] font-semibold text-white bg-primary border-0 rounded px-3 py-1 cursor-pointer hover:opacity-90 disabled:opacity-40"
+          className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1 cursor-pointer hover:brightness-105 disabled:opacity-40"
         >
           {busy ? 'Saving…' : 'Add entry'}
         </button>
@@ -142,7 +142,7 @@ function PersonReviewCard({
   const byKind = (kind) => entries.filter((l) => l.kind === kind);
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-card p-4">
+    <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div className="flex items-center gap-2.5">
           <Avatar name={person.name} color="#4CBAD4" size={34} />
@@ -194,7 +194,7 @@ function PersonReviewCard({
               {composing !== row.kind && (
                 <button
                   onClick={() => setComposing(row.kind)}
-                  className="text-[11px] font-semibold text-primary bg-transparent border border-primary rounded px-2 py-0.5 cursor-pointer hover:bg-primary hover:text-white"
+                  className="text-[11px] font-bold text-text-mid bg-white border border-border-light rounded-lg px-2.5 py-0.5 cursor-pointer hover:bg-primary-bg"
                 >
                   + Add entry
                 </button>
@@ -359,17 +359,36 @@ export default function CustomerReviewCockpit() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-5 py-5">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div>
-          <h2 className="text-lg font-bold text-text m-0">PM review — {customer.name}</h2>
-          <div className="text-[11px] text-text-mid">
-            {formatDate(review.reviewDate)} · by {review.authorUser?.name || '—'} · entries link to
-            this session, the customer and your chosen dimensions
+      {/* Header — entity profile-card language */}
+      <div
+        className="flex items-center gap-4 border border-border-light rounded-[18px] p-[18px] mb-4 flex-wrap"
+        style={{ background: 'linear-gradient(120deg, #F4FBFD, #fff)' }}
+      >
+        <div
+          className="w-[48px] h-[48px] rounded-2xl flex items-center justify-center text-base font-bold text-white shrink-0 shadow-lg"
+          style={{ background: '#6366f1' }}
+        >
+          {customer.name?.charAt(0)?.toUpperCase() || '?'}
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-extrabold tracking-tight text-text m-0 truncate">
+            PM review — {customer.name}
+          </h2>
+          <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
+            <span className="text-[9.5px] font-mono font-semibold text-primary bg-primary-light rounded-[7px] px-2 py-0.5">
+              {formatDate(review.reviewDate)}
+            </span>
+            <span className="text-[9.5px] font-mono font-semibold text-text-mid bg-[#EEF1F5] rounded-[7px] px-2 py-0.5">
+              by {review.authorUser?.name || '—'}
+            </span>
+            <span className="text-[10px] text-text-light">
+              entries link to this session, the customer and your chosen dimensions
+            </span>
           </div>
         </div>
         <Link
           to={`/customers/${customerId}/people`}
-          className="text-xs font-semibold text-text-mid border border-border rounded-lg px-3 py-1.5 no-underline hover:bg-white"
+          className="ml-auto rounded-[11px] font-bold text-[11.5px] px-3.5 py-2.5 no-underline bg-white text-text-mid border border-border-light hover:bg-primary-bg"
         >
           ← Back to customer
         </Link>
@@ -379,7 +398,7 @@ export default function CustomerReviewCockpit() {
         {/* Main column: per-person recap */}
         <div className="lg:col-span-2 space-y-4">
           {people.length === 0 ? (
-            <div className="bg-white rounded-xl border border-border shadow-card p-8 text-center text-sm text-text-light">
+            <div className="bg-white rounded-2xl border border-border-light shadow-card p-8 text-center text-sm text-text-light">
               No people allocated to this customer this month.
             </div>
           ) : (
@@ -413,15 +432,15 @@ export default function CustomerReviewCockpit() {
 
         {/* Context column */}
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-border shadow-card p-4">
-            <h3 className="text-xs font-bold text-text uppercase tracking-wider m-0 mb-2">
+          <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
+            <h3 className="text-[13px] font-bold text-text m-0 mb-2">
               Customer satisfaction (12 mo avg)
             </h3>
             <SignalChart points={chartPoints} />
           </div>
 
-          <div className="bg-white rounded-xl border border-border shadow-card p-4">
-            <h3 className="text-xs font-bold text-text uppercase tracking-wider m-0 mb-2">
+          <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
+            <h3 className="text-[13px] font-bold text-text m-0 mb-2">
               Recent entries (60 days)
             </h3>
             <div className="space-y-2 max-h-[520px] overflow-y-auto">

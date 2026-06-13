@@ -7,9 +7,9 @@ import { useComputed } from '../../hooks/useComputed';
 import { api } from '../../lib/api';
 import Avatar from '../../components/ui/Avatar';
 import { MONTHS, SENIORITY_SHORT } from '../../lib/constants';
-import { currentMonth, monthRange, formatMonth } from '../../lib/dateUtils';
+import { currentMonth, addMonths, monthRange, formatMonth } from '../../lib/dateUtils';
 import { firstName, resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
-import { utilColor, utilBg } from '../../lib/statusUtils';
+import { utilColor, utilBg, scoreColor, scoreBg } from '../../lib/statusUtils';
 
 /* ---------- svg helpers ---------- */
 
@@ -82,8 +82,8 @@ function Kpi({ label, chip, chipBg, chipColor, children, spark, sparkColor, donu
 
 export default function HomeDashboard() {
   const { user } = useAuth();
-  const { managedPersonIds, selfResourceId } = useVisibility();
-  const { projects, resources, needs, assignments } = useData();
+  const { selfResourceId } = useVisibility();
+  const { customers, projects, resources, needs, assignments } = useData();
   const { rU, rURealised } = useComputed();
   const navigate = useNavigate();
 
@@ -197,14 +197,96 @@ export default function HomeDashboard() {
     finalized: ['Finalized', 'bg-success-bg text-success'],
   };
 
-  /* ----- right rail ----- */
+  /* ----- right rail: people I personally manage (directly or via team) ----- */
   const railPeople = useMemo(() => {
-    const managed = resources.filter((r) => managedPersonIds.has(r.id) && r.id !== selfResourceId);
-    const base = managed.length
-      ? managed
-      : [...resources].sort((a, b) => (rU[b.id]?.[m0] || 0) - (rU[a.id]?.[m0] || 0));
-    return base.slice(0, 5);
-  }, [resources, managedPersonIds, selfResourceId, rU, m0]);
+    if (!selfResourceId) return [];
+    return resources
+      .filter(
+        (r) =>
+          r.id !== selfResourceId &&
+          ((r.managerLinks || []).some((l) => (l.managerId || l.manager?.id) === selfResourceId) ||
+            (r.teams || []).some((t) => t.managerId === selfResourceId))
+      )
+      .slice(0, 6);
+  }, [resources, selfResourceId]);
+
+  /* ----- PM slice: customers I'm personally responsible for ----- */
+  const myCustomers = useMemo(() => {
+    if (!selfResourceId) return [];
+    return customers.filter(
+      (c) =>
+        c.responsiblePersonId === selfResourceId ||
+        projects.some((p) => p.customerId === c.id && p.responsiblePersonId === selfResourceId)
+    );
+  }, [customers, projects, selfResourceId]);
+
+  // Signals + last review per responsible customer (small N — one pair of calls each).
+  const [pmInfo, setPmInfo] = useState({});
+  useEffect(() => {
+    const ids = myCustomers.slice(0, 8).map((c) => c.id);
+    if (ids.length === 0) return;
+    let dead = false;
+    const from = addMonths(currentMonth(), -2);
+    Promise.all(
+      ids.map((id) =>
+        Promise.all([
+          api.getCustomerSignals(id, { from, to: currentMonth() }).catch(() => []),
+          api.listCustomerReviews(id).catch(() => []),
+        ]).then(([signals, reviews]) => [id, { signals, reviews }])
+      )
+    ).then((pairs) => {
+      if (!dead) setPmInfo(Object.fromEntries(pairs));
+    });
+    return () => { dead = true; };
+  }, [myCustomers]);
+
+  const pmRows = useMemo(() => {
+    return myCustomers.slice(0, 8).map((c) => {
+      const projIds = new Set(projects.filter((p) => p.customerId === c.id).map((p) => p.id));
+      const custNeeds = needs.filter((n) => projIds.has(n.projectId));
+      const needIds = new Set(custNeeds.map((n) => n.id));
+      let planned = 0, needed = 0;
+      for (const a of assignments) {
+        if (needIds.has(a.needId)) planned += (a.monthAllocations || {})[m0] || 0;
+      }
+      for (const n of custNeeds) needed += (n.monthAllocations || {})[m0] || 0;
+
+      const info = pmInfo[c.id];
+      let signal = null;
+      if (info?.signals?.length) {
+        // Latest month that has ratings within the 3-month window.
+        const byMonth = new Map();
+        for (const s of info.signals) {
+          if (!byMonth.has(s.month)) byMonth.set(s.month, []);
+          byMonth.get(s.month).push(s.rating);
+        }
+        const latest = [...byMonth.keys()].sort().pop();
+        const ratings = byMonth.get(latest) || [];
+        if (ratings.length) {
+          signal = Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10;
+        }
+      }
+      let reviewDays = null;
+      if (info?.reviews?.length) {
+        const last = info.reviews
+          .map((r) => new Date(r.reviewDate))
+          .sort((a, b) => b - a)[0];
+        reviewDays = Math.max(0, Math.round((Date.now() - last.getTime()) / 86400000));
+      }
+      const due = reminders.some(
+        (i) => (i.type === 'pmUpdate' || i.type === 'clientSignal') && i.customerId === c.id
+      );
+      return {
+        customer: c,
+        projects: projIds.size,
+        planned: Math.round(planned * 10) / 10,
+        gap: Math.round(Math.max(0, needed - planned) * 10) / 10,
+        signal,
+        reviewDays,
+        due,
+      };
+    });
+  }, [myCustomers, projects, needs, assignments, m0, pmInfo, reminders]);
 
   const topReminder = reminders[0];
   const reminderCopy = (item) => {
@@ -226,6 +308,7 @@ export default function HomeDashboard() {
     };
   };
   const callout = reminderCopy(topReminder);
+  const hasRail = railPeople.length > 0 || !!callout || reminders.length > 1;
 
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -267,7 +350,7 @@ export default function HomeDashboard() {
         <span className="text-[11px] font-semibold text-text-mid bg-white border border-border-light rounded-full px-3 py-1.5">{dateChip}</span>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-5 items-start">
+      <div className={`grid grid-cols-1 ${hasRail ? 'xl:grid-cols-[1fr_280px]' : ''} gap-5 items-start`}>
         {/* main column */}
         <div className="min-w-0">
           {/* KPIs */}
@@ -356,6 +439,65 @@ export default function HomeDashboard() {
             </div>
           </div>
 
+          {/* PM slice: customers I'm responsible for */}
+          {pmRows.length > 0 && (
+            <div className="bg-white border border-border-light rounded-2xl shadow-card p-4 mb-5">
+              <div className="flex items-baseline gap-2 mb-1.5">
+                <h3 className="text-[13px] font-bold text-text m-0">Your customers</h3>
+                <span className="text-[10.5px] text-text-light">
+                  responsible for {pmRows.length} ·{' '}
+                  {(() => {
+                    const open = Math.round(pmRows.reduce((s, r) => s + r.gap, 0) * 10) / 10;
+                    return open > 0 ? `${open} FTE open in ${MONTHS[today.getMonth()]}` : `fully staffed in ${MONTHS[today.getMonth()]}`;
+                  })()}
+                </span>
+                <span className="flex-1" />
+                <Link to="/customers" className="text-[10.5px] font-semibold text-primary no-underline hover:underline">All customers →</Link>
+              </div>
+              {pmRows.map(({ customer: c, projects: pCount, planned, gap, signal, reviewDays, due }) => (
+                <Link
+                  key={c.id}
+                  to={`/customers/${c.id}`}
+                  className={`flex items-center gap-3 px-2.5 py-2 rounded-xl no-underline transition ${
+                    due ? 'border border-border-light shadow-[0_8px_22px_rgba(34,49,63,0.10)]' : 'hover:bg-[#F7FAFC]'
+                  }`}
+                >
+                  <span className="w-[28px] h-[28px] rounded-[10px] flex items-center justify-center text-[11px] font-bold text-white shrink-0" style={{ background: '#6366f1' }}>
+                    {c.name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                  <span className="min-w-0 w-[170px] shrink-0">
+                    <span className="block text-xs font-bold text-text truncate">{c.name}</span>
+                    <span className="block text-[9.5px] font-mono text-text-light mt-0.5">
+                      {pCount} project{pCount === 1 ? '' : 's'} · {planned} FTE
+                    </span>
+                  </span>
+                  {gap > 0 ? (
+                    <span className="text-[9.5px] font-bold rounded-full px-2 py-0.5 bg-danger-bg text-danger shrink-0">{gap} open</span>
+                  ) : (
+                    <span className="text-[9.5px] font-bold rounded-full px-2 py-0.5 bg-success-bg text-success shrink-0">staffed</span>
+                  )}
+                  <span className="flex-1" />
+                  {signal != null && (
+                    <span
+                      className="text-[9.5px] font-bold font-mono rounded-md px-1.5 py-0.5 shrink-0"
+                      style={{ background: scoreBg(signal), color: scoreColor(signal) }}
+                      title="Latest client satisfaction signal (avg)"
+                    >
+                      signal {signal}
+                    </span>
+                  )}
+                  {due ? (
+                    <span className="text-[9.5px] font-bold rounded-full px-2.5 py-1 bg-danger-bg text-danger shrink-0">review due</span>
+                  ) : (
+                    <span className="text-[9.5px] font-mono text-text-light shrink-0">
+                      {reviewDays != null ? `review ${reviewDays}d ago` : 'no review yet'}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+
           {/* evaluations in flight */}
           <div className="bg-white border border-border-light rounded-2xl shadow-card p-4">
             <div className="flex items-baseline gap-2 mb-1.5">
@@ -412,11 +554,13 @@ export default function HomeDashboard() {
           </div>
         </div>
 
-        {/* right rail */}
+        {/* right rail — only renders sections relevant to YOUR duties */}
+        {hasRail && (
         <div className="flex flex-col gap-4 min-w-0">
+          {railPeople.length > 0 && (
           <div className="bg-white border border-border-light rounded-2xl shadow-card p-4">
             <div className="flex items-baseline mb-2">
-              <h4 className="text-xs font-bold text-text m-0">{managedPersonIds.size > 0 ? 'Your people' : 'People'}</h4>
+              <h4 className="text-xs font-bold text-text m-0">Your people</h4>
               <span className="flex-1" />
               <Link to="/people" className="text-[10px] font-semibold text-primary no-underline hover:underline">View all</Link>
             </div>
@@ -438,8 +582,8 @@ export default function HomeDashboard() {
                 </Link>
               );
             })}
-            {railPeople.length === 0 && <div className="text-[11px] text-text-light py-2">No people yet.</div>}
           </div>
+          )}
 
           {callout && (
             <Link to={callout.to} className="relative block no-underline rounded-2xl p-4 text-white shadow-card" style={{ background: 'linear-gradient(135deg, #2E7D8F, #4CBAD4)' }}>
@@ -458,6 +602,7 @@ export default function HomeDashboard() {
             </Link>
           )}
         </div>
+        )}
       </div>
     </div>
   );

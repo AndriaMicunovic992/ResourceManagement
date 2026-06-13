@@ -37,8 +37,8 @@ export default function ClientHeatmap({ months, includePotential }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-border shadow-card overflow-auto">
-      <h3 className="text-base font-bold text-text px-5 pt-4 pb-2">Client Staffing</h3>
+    <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
+      <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">Client Staffing</h3>
       <ClientHeatmapHeader months={months} />
       {filtered.map((c, i) => (
         <CustomerHeatmapRow key={c.id} customer={c} index={i} months={months} includePotential={includePotential} />

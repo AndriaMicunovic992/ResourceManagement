@@ -112,7 +112,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
             onChange={(e) => setContent(e.target.value)}
             rows={4}
             maxLength={5000}
-            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+            className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
             required
           />
         </div>
@@ -125,7 +125,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value)}
-              className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               {kindOptions.map((k) => (
                 <option key={k.value} value={k.value}>
@@ -151,7 +151,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
             <select
               value={customerId}
               onChange={handleCustomerChange}
-              className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="">None</option>
               {customers.map((c) => (
@@ -168,7 +168,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
-              className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+              className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
             >
               <option value="">None</option>
               {availableProjects.map((p) => (
@@ -189,7 +189,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
             value={jiraUrl}
             onChange={(e) => setJiraUrl(e.target.value)}
             maxLength={500}
-            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+            className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
           />
         </div>
 
@@ -205,7 +205,7 @@ export default function NewLogModal({ resourceId, onCancel, onCreated }) {
           <button
             type="submit"
             disabled={saving}
-            className="text-xs font-semibold text-white bg-primary border-0 rounded px-4 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+            className="text-xs font-bold text-white bg-primary border-0 rounded-lg px-4 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Create'}
           </button>

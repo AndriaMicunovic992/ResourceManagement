@@ -92,7 +92,7 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
             type="date"
             value={meetingDate}
             onChange={(e) => setMeetingDate(e.target.value)}
-            className="px-2 py-1.5 border border-border rounded text-sm text-text outline-none focus:border-primary bg-white"
+            className="px-2 py-1.5 border border-border-light rounded-lg text-sm text-text outline-none focus:border-primary bg-white"
             required
           />
         </div>
@@ -113,7 +113,7 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
             onChange={(e) => setWentWell(e.target.value)}
             rows={3}
             maxLength={10000}
-            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+            className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
           />
         </div>
         <div>
@@ -125,7 +125,7 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
             onChange={(e) => setWentBad(e.target.value)}
             rows={3}
             maxLength={10000}
-            className="w-full px-2 py-1.5 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white resize-y"
+            className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
           />
         </div>
 
@@ -162,7 +162,7 @@ export default function OneOnOneForm({ initial, onCancel, onSave }) {
           <button
             type="submit"
             disabled={saving}
-            className="text-xs font-semibold text-white bg-primary border-0 rounded px-4 py-1.5 cursor-pointer hover:opacity-90 disabled:opacity-50"
+            className="text-xs font-bold text-white bg-primary border-0 rounded-lg px-4 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-50"
           >
             {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create'}
           </button>

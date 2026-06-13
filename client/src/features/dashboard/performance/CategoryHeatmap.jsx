@@ -32,8 +32,8 @@ export default function CategoryHeatmap({ filters }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-border p-4">
-      <div className="text-xs font-bold text-text mb-3 uppercase tracking-wider">Domain × category heatmap</div>
+    <div className="bg-white rounded-2xl border border-border-light p-4">
+      <div className="text-[13px] font-bold text-text mb-3">Domain × category heatmap</div>
       {loading ? (
         <div className="text-[11px] text-text-light italic py-6 text-center">Loading…</div>
       ) : error ? (
@@ -62,7 +62,7 @@ export default function CategoryHeatmap({ filters }) {
                       if (!c) {
                         return (
                           <td key={d} className="p-1">
-                            <div className="w-14 h-8 rounded bg-bg-subtle text-[10px] text-text-light flex items-center justify-center">—</div>
+                            <div className="w-14 h-8 rounded bg-[#F0F4F8] text-[10px] text-text-light flex items-center justify-center">—</div>
                           </td>
                         );
                       }

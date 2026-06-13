@@ -88,7 +88,7 @@ export default function SelfAllocation({ resource }) {
   return (
     <div>
       <div className="mb-4">
-        <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">
+        <div className="text-[13px] font-bold text-text mb-2">
           Monthly Utilization
         </div>
         <div className="flex gap-1 overflow-x-auto">
@@ -117,13 +117,13 @@ export default function SelfAllocation({ resource }) {
         <div className="text-center text-text-light text-sm py-6">Not assigned yet</div>
       ) : (
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-text-light font-semibold mb-2">
+          <div className="text-[13px] font-bold text-text mb-2">
             Assigned To
           </div>
           {grouped.map((g) => (
             <div
               key={g.customer.id}
-              className="border border-border rounded-lg p-3 mb-2"
+              className="border border-border-light rounded-xl p-3 mb-2"
               style={{
                 borderColor: g.customer.status === 'potential' ? '#F5A623' : undefined,
               }}
