@@ -538,19 +538,19 @@ export default function CustomerReviewCockpit() {
           )}
         </div>
 
-        {/* Context column — card-less and sticky so its box edges don't fight
-            the variable-height left column. */}
-        <div className="lg:sticky lg:top-4 self-start px-1">
+        {/* Context column — one unified, sticky card. A single box (vs. two
+            stacked ones) has no internal gap to misalign with the left. */}
+        <div className="lg:sticky lg:top-4 self-start bg-white rounded-2xl border border-border-light shadow-card p-4">
           <h3 className="text-[13px] font-bold text-text m-0 mb-2">
             Customer satisfaction (12 mo avg)
           </h3>
           <SignalChart points={chartPoints} height={200} />
 
-          <div className="mt-5 pt-5 border-t border-border-light">
+          <div className="mt-4 pt-4 border-t border-border-light">
             <h3 className="text-[13px] font-bold text-text m-0 mb-2">
               Recent entries (60 days)
             </h3>
-            <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 360px)' }}>
+            <div className="space-y-2 overflow-y-auto pr-1 -mr-1" style={{ maxHeight: 'calc(100vh - 380px)' }}>
               {recentEntries.length === 0 && (
                 <div className="text-xs text-text-light">Nothing logged in this window.</div>
               )}
