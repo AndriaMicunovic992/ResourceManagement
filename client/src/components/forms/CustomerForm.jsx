@@ -6,19 +6,21 @@ import StatusPicker from '../ui/StatusPicker';
 import { useData } from '../../contexts/DataContext';
 
 export default function CustomerForm({ initial, onSave, onClose }) {
-  const { resources } = useData();
+  const { members } = useData();
   const [name, setName] = useState(initial?.name || '');
   const [status, setStatus] = useState(initial?.status || 'realised');
-  const [responsiblePersonId, setResponsiblePersonId] = useState(
-    initial?.responsiblePersonId || ''
+  const [responsibleUserId, setResponsibleUserId] = useState(
+    initial?.responsibleUserId || ''
   );
 
-  // Viewers cannot be set as responsible persons — the backend rejects them.
-  const isViewerResource = (r) => r.user?.memberships?.[0]?.role === 'viewer';
-  const eligibleResources = resources.filter(
-    (r) => !isViewerResource(r) || r.id === initial?.responsiblePersonId,
+  // Responsible person can be any org member (not only staffable people).
+  // Viewers can't act on responsibilities, so they're excluded.
+  const eligible = members.filter(
+    (m) => m.role !== 'viewer' || m.user?.id === initial?.responsibleUserId,
   );
-  const sortedResources = [...eligibleResources].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = [...eligible].sort((a, b) =>
+    (a.user?.name || a.user?.email || '').localeCompare(b.user?.name || b.user?.email || ''),
+  );
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -26,7 +28,7 @@ export default function CustomerForm({ initial, onSave, onClose }) {
     onSave({
       name: name.trim(),
       status,
-      responsiblePersonId: responsiblePersonId || null,
+      responsibleUserId: responsibleUserId || null,
     });
   };
 
@@ -42,13 +44,13 @@ export default function CustomerForm({ initial, onSave, onClose }) {
         </Field>
         <Field label="Responsible Person">
           <select
-            value={responsiblePersonId}
-            onChange={(e) => setResponsiblePersonId(e.target.value)}
+            value={responsibleUserId}
+            onChange={(e) => setResponsibleUserId(e.target.value)}
             className="w-full px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary bg-white"
           >
             <option value="">None</option>
-            {sortedResources.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
+            {sorted.map((m) => (
+              <option key={m.user?.id} value={m.user?.id}>{m.user?.name || m.user?.email}</option>
             ))}
           </select>
         </Field>

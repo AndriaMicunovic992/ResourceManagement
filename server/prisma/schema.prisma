@@ -80,6 +80,9 @@ model User {
   authoredClientSignals ClientSignal[] @relation("AuthoredClientSignals")
   reminderDismissals    ReminderDismissal[] @relation("ReminderDismissals")
   authoredCustomerReviews CustomerReview[] @relation("AuthoredCustomerReviews")
+  // A responsible person is any org user (not necessarily a staffable Resource).
+  responsibleCustomers  Customer[] @relation("CustomerResponsibleUser")
+  responsibleProjects   Project[]  @relation("ProjectResponsibleUser")
 }
 
 model OrgMember {
@@ -126,8 +129,8 @@ model Customer {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  responsiblePersonId String?
-  responsiblePerson   Resource? @relation("CustomerResponsible", fields: [responsiblePersonId], references: [id], onDelete: SetNull)
+  responsibleUserId String?
+  responsibleUser   User? @relation("CustomerResponsibleUser", fields: [responsibleUserId], references: [id], onDelete: SetNull)
 
   projects    Project[]
   logs        Log[]
@@ -136,7 +139,7 @@ model Customer {
   reviews     CustomerReview[]
 
   @@index([orgId])
-  @@index([responsiblePersonId])
+  @@index([responsibleUserId])
 }
 
 model Project {
@@ -151,8 +154,8 @@ model Project {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  responsiblePersonId String?
-  responsiblePerson   Resource? @relation("ProjectResponsible", fields: [responsiblePersonId], references: [id], onDelete: SetNull)
+  responsibleUserId String?
+  responsibleUser   User? @relation("ProjectResponsibleUser", fields: [responsibleUserId], references: [id], onDelete: SetNull)
 
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -163,6 +166,7 @@ model Project {
 
   @@index([orgId])
   @@index([customerId])
+  @@index([responsibleUserId])
 }
 
 model Resource {
@@ -185,8 +189,6 @@ model Resource {
   personSkills PersonSkill[]
   oneOnOnes   OneOnOne[]
   logs        Log[]
-  responsibleProjects  Project[]  @relation("ProjectResponsible")
-  responsibleCustomers Customer[] @relation("CustomerResponsible")
   managedTeams Team[] @relation("TeamManager")
   managerLinks       PersonManager[] @relation("PersonSide")
   managedPersonLinks PersonManager[] @relation("ManagerSide")
@@ -366,8 +368,9 @@ model Log {
   id              String   @id @default(cuid())
   orgId           String
   org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  resourceId      String
-  resource        Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  // Null = a general entry about the customer/project, not a specific person.
+  resourceId      String?
+  resource        Resource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   authorUserId    String
   authorUser      User     @relation("AuthoredLogs", fields: [authorUserId], references: [id], onDelete: Restrict)
   content         String

@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { projectService } from '../services/project.service.js';
 import { createProjectSchema, updateProjectSchema } from '../schemas/project.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
-import { assertNoViewerResources } from '../services/visibility.service.js';
+import { assertResponsibleUserAllowed } from '../services/visibility.service.js';
 
 export const projectRoutes: FastifyPluginAsync = async (app) => {
   app.get('/projects', async (req) => {
@@ -14,18 +14,14 @@ export const projectRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/projects', { preHandler: requireRole('admin') }, async (req) => {
     const data = createProjectSchema.parse(req.body);
-    if (data.responsiblePersonId) {
-      await assertNoViewerResources(req.orgId, [data.responsiblePersonId]);
-    }
+    await assertResponsibleUserAllowed(req.orgId, data.responsibleUserId);
     return projectService.create(req.orgId, data);
   });
 
   app.patch('/projects/:id', { preHandler: requireRole('admin') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updateProjectSchema.parse(req.body);
-    if (data.responsiblePersonId) {
-      await assertNoViewerResources(req.orgId, [data.responsiblePersonId]);
-    }
+    await assertResponsibleUserAllowed(req.orgId, data.responsibleUserId);
     return projectService.update(req.orgId, id, data);
   });
 

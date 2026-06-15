@@ -6,12 +6,13 @@ import { useData } from '../../../../contexts/DataContext';
 import { useMemo } from 'react';
 
 export default function ProjectLabel({ project, customer, onEdit, onDelete, onAddNeed, canEdit }) {
-  const { needs, assignments, resources } = useData();
+  const { needs, assignments, members } = useData();
   const ok = useMemo(() => isProjectOk(project, needs, assignments), [project, needs, assignments]);
   const hasNeeds = needs.some((n) => n.projectId === project.id);
   const isPotential = customer.status === 'potential' || project.status === 'potential';
   const borderColor = isPotential ? '#F5A62330' : '#D8E8EF';
-  const responsible = project.responsiblePersonId ? resources.find((r) => r.id === project.responsiblePersonId) : null;
+  const responsibleMember = project.responsibleUserId ? members.find((m) => m.user?.id === project.responsibleUserId) : null;
+  const responsible = responsibleMember ? { name: responsibleMember.user?.name || responsibleMember.user?.email } : null;
 
   return (
     <div className="group flex items-center gap-1.5 h-[34px]" style={{ paddingLeft: 24, opacity: isPotential ? 0.7 : 1 }}>

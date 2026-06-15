@@ -135,11 +135,12 @@ export async function computeVisibility(
     managedPersonIds.delete(selfResourceId);
   }
 
-  // Responsible customers: directly-responsible.
+  // Responsible customers: directly-responsible. Responsibility is keyed on the
+  // login user (any org member can be responsible, not only staffable people).
   const responsibleCustomerIds = new Set<string>();
-  if (selfResourceId) {
+  {
     const custs = await prisma.customer.findMany({
-      where: { orgId, responsiblePersonId: selfResourceId },
+      where: { orgId, responsibleUserId: userId },
       select: { id: true },
     });
     for (const c of custs) responsibleCustomerIds.add(c.id);
@@ -148,9 +149,9 @@ export async function computeVisibility(
   // Responsible projects: any project under a responsible customer, plus
   // projects directly-responsible.
   const responsibleProjectIds = new Set<string>();
-  if (selfResourceId) {
+  {
     const directProjects = await prisma.project.findMany({
-      where: { orgId, responsiblePersonId: selfResourceId },
+      where: { orgId, responsibleUserId: userId },
       select: { id: true, customerId: true },
     });
     for (const p of directProjects) {
@@ -278,5 +279,26 @@ export async function assertNoViewerResources(
     throw new BadRequestError(
       'A viewer cannot be assigned as a manager or responsible person'
     );
+  }
+}
+
+/**
+ * Guard: a responsible person must be a non-viewer org member. Throws if the
+ * given user isn't a member of the org, or is a viewer.
+ */
+export async function assertResponsibleUserAllowed(
+  orgId: string,
+  userId: string | null | undefined
+): Promise<void> {
+  if (!userId) return;
+  const member = await prisma.orgMember.findFirst({
+    where: { orgId, userId },
+    select: { role: true },
+  });
+  if (!member) {
+    throw new BadRequestError('Responsible person must be a member of this organization');
+  }
+  if (member.role === 'viewer') {
+    throw new BadRequestError('A viewer cannot be assigned as a responsible person');
   }
 }

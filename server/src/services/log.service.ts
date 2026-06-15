@@ -4,6 +4,7 @@ import { NotFoundError, ForbiddenError } from '../utils/errors.js';
 import {
   EMPLOYEE_LOG_KINDS,
   type CreateLogInput,
+  type CreateGeneralLogInput,
   type UpdateLogInput,
   type ListLogsQuery,
 } from '../schemas/log.schema.js';
@@ -214,6 +215,65 @@ export async function createLog(
     },
     include: logInclude,
   });
+}
+
+/**
+ * Create a general (whole-customer) entry — no specific person. It rolls into
+ * the evaluation of every person working on that customer/project. Admin or the
+ * customer/project responsible person gates this at the route level.
+ */
+export async function createGeneralCustomerLog(
+  orgId: string,
+  customerId: string,
+  authorUserId: string,
+  data: CreateGeneralLogInput
+) {
+  await ensureCustomerInOrg(orgId, customerId);
+  if (data.projectId) await ensureProjectInOrg(orgId, data.projectId);
+  if (data.customerReviewId) {
+    const review = await prisma.customerReview.findFirst({
+      where: { id: data.customerReviewId, orgId },
+    });
+    if (!review) throw new NotFoundError('Review not found');
+  }
+  const categoryIds = data.categoryIds ?? [];
+  await ensureCategoriesInOrg(orgId, categoryIds);
+
+  return prisma.log.create({
+    data: {
+      orgId,
+      resourceId: null,
+      authorUserId,
+      content: data.content,
+      kind: data.kind,
+      categories: { connect: categoryIds.map((id) => ({ id })) },
+      customerId,
+      projectId: data.projectId ?? null,
+      customerReviewId: data.customerReviewId ?? null,
+    },
+    include: logInclude,
+  });
+}
+
+/**
+ * Delete a general (resourceId-null) customer entry. Only the author or an
+ * admin may remove it.
+ */
+export async function deleteGeneralCustomerLog(
+  orgId: string,
+  customerId: string,
+  logId: string,
+  requestingUserId: string,
+  requestingUserRole: string
+) {
+  const log = await prisma.log.findFirst({
+    where: { id: logId, orgId, customerId, resourceId: null },
+  });
+  if (!log) throw new NotFoundError('Entry not found');
+  if (!isAdminRole(requestingUserRole) && log.authorUserId !== requestingUserId) {
+    throw new ForbiddenError('Only the author can delete this entry');
+  }
+  await prisma.log.delete({ where: { id: logId } });
 }
 
 export async function updateLog(

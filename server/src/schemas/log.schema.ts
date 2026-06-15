@@ -56,10 +56,21 @@ export const listLogsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
 
+// A general (whole-customer) review entry: no specific person. Applies to
+// everyone working on the customer/project during the period.
+export const createGeneralLogSchema = z.object({
+  content: z.string().trim().min(1).max(5000),
+  kind: kindSchema,
+  categoryIds: z.array(z.string()).max(20).optional(),
+  projectId: z.string().optional().nullable(),
+  customerReviewId: z.string().optional().nullable(),
+});
+
 export const createLogCommentSchema = z.object({
   content: z.string().trim().min(1).max(2000),
 });
 
 export type CreateLogInput = z.infer<typeof createLogSchema>;
+export type CreateGeneralLogInput = z.infer<typeof createGeneralLogSchema>;
 export type UpdateLogInput = z.infer<typeof updateLogSchema>;
 export type ListLogsQuery = z.infer<typeof listLogsQuerySchema>;

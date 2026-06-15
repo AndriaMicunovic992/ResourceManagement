@@ -60,30 +60,25 @@ export async function userIsResponsibleFor(
   customerId: string | null | undefined,
   projectId: string | null | undefined
 ): Promise<boolean> {
-  const me = await prisma.resource.findFirst({
-    where: { orgId, userId: requestingUserId },
-    select: { id: true },
-  });
-  if (!me) return false;
   if (projectId) {
     const project = await prisma.project.findFirst({
       where: { id: projectId, orgId },
-      select: { responsiblePersonId: true, customerId: true },
+      select: { responsibleUserId: true, customerId: true },
     });
-    if (project?.responsiblePersonId === me.id) return true;
+    if (project?.responsibleUserId === requestingUserId) return true;
     if (project?.customerId) {
       const customer = await prisma.customer.findFirst({
         where: { id: project.customerId, orgId },
-        select: { responsiblePersonId: true },
+        select: { responsibleUserId: true },
       });
-      if (customer?.responsiblePersonId === me.id) return true;
+      if (customer?.responsibleUserId === requestingUserId) return true;
     }
   } else if (customerId) {
     const customer = await prisma.customer.findFirst({
       where: { id: customerId, orgId },
-      select: { responsiblePersonId: true },
+      select: { responsibleUserId: true },
     });
-    if (customer?.responsiblePersonId === me.id) return true;
+    if (customer?.responsibleUserId === requestingUserId) return true;
   }
   return false;
 }
