@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../../../lib/api';
 import { LOG_KIND_COLORS, LOG_KIND_LABELS } from '../../../../lib/constants';
 import { CategoryChips } from '../../../../components/forms/CategoryMultiPicker';
+import { ReplyToggle } from '../../../../components/ui/MiniThread';
 import {
   BuildingIcon,
   FolderIcon,
@@ -46,6 +47,7 @@ export default function LogCard({
   const [newComment, setNewComment] = useState('');
   const [posting, setPosting] = useState(false);
   const [commentError, setCommentError] = useState('');
+  const [replyOpen, setReplyOpen] = useState(false);
 
   const handleAddComment = async (e) => {
     e.preventDefault();
@@ -64,19 +66,24 @@ export default function LogCard({
 
   return (
     <div className={`bg-white rounded-2xl border border-border-light border-l-4 ${sourceBorder} p-4`}>
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        <span
-          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${sourceBadge}`}
-        >
-          {sourceLabel} input
-        </span>
-        <span
-          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${
-            LOG_KIND_COLORS[log.kind] || LOG_KIND_COLORS.note
-          }`}
-        >
-          {LOG_KIND_LABELS[log.kind] || log.kind}
-        </span>
+      <div className="flex items-start gap-1.5 mb-2">
+        <div className="flex flex-wrap gap-1.5 min-w-0">
+          <span
+            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${sourceBadge}`}
+          >
+            {sourceLabel} input
+          </span>
+          <span
+            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${
+              LOG_KIND_COLORS[log.kind] || LOG_KIND_COLORS.note
+            }`}
+          >
+            {LOG_KIND_LABELS[log.kind] || log.kind}
+          </span>
+        </div>
+        {canComment && (
+          <ReplyToggle open={replyOpen} onClick={() => setReplyOpen((v) => !v)} />
+        )}
       </div>
       <div className="text-sm text-text whitespace-pre-wrap mb-2">{log.content}</div>
       <div className="flex flex-wrap gap-1.5 mb-2">
@@ -145,8 +152,9 @@ export default function LogCard({
         )}
       </div>
 
-      {/* Thread: PM ↔ manager correspondence about this entry. */}
-      {(comments.length > 0 || canComment) && (
+      {/* Thread: PM ↔ manager correspondence about this entry. Composer opens
+          from the reply icon in the header. */}
+      {(comments.length > 0 || replyOpen) && (
         <div className="mt-3 pt-2 border-t border-border-light">
           {comments.map((c) => (
             <div key={c.id} className="flex items-start gap-2 py-1.5">
@@ -160,7 +168,7 @@ export default function LogCard({
               </div>
             </div>
           ))}
-          {canComment && (
+          {canComment && replyOpen && (
             <form onSubmit={handleAddComment} className="flex items-center gap-2 mt-1">
               <input
                 type="text"
@@ -168,6 +176,8 @@ export default function LogCard({
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Reply…"
                 maxLength={2000}
+                autoFocus
+                onBlur={() => { if (!newComment.trim()) setReplyOpen(false); }}
                 className="flex-1 px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
               />
               <button
