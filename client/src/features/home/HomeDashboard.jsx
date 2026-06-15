@@ -10,6 +10,7 @@ import { MONTHS, SENIORITY_SHORT } from '../../lib/constants';
 import { currentMonth, addMonths, monthRange, formatMonth } from '../../lib/dateUtils';
 import { firstName, resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
 import { utilColor, utilBg, scoreColor, scoreBg } from '../../lib/statusUtils';
+import NotificationBell from './NotificationBell';
 
 /* ---------- svg helpers ---------- */
 
@@ -365,6 +366,7 @@ export default function HomeDashboard() {
         </div>
         <div className="flex-1" />
         <span className="text-[11px] font-semibold text-text-mid bg-white border border-border-light rounded-full px-3 py-1.5">{dateChip}</span>
+        <NotificationBell />
       </div>
 
       <div className={`grid grid-cols-1 ${hasRail ? 'xl:grid-cols-[1fr_280px]' : ''} gap-5 items-start`}>

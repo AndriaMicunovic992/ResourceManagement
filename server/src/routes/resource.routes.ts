@@ -9,6 +9,7 @@ import {
 import { NotFoundError } from '../utils/errors.js';
 import { prisma } from '../db/prisma.js';
 import { reminderService } from '../services/reminder.service.js';
+import { notificationService } from '../services/notification.service.js';
 import { z } from 'zod';
 
 const dismissReminderSchema = z.object({
@@ -85,6 +86,12 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
   // from org cadence settings — nothing stored.
   app.get('/me/reminders', async (req) => {
     return reminderService.forUser(req.orgId, req.userId, req.visibility);
+  });
+
+  // Notification feed for the header bell: thread replies + review reminders +
+  // cadence reminders.
+  app.get('/me/notifications', async (req) => {
+    return notificationService.forUser(req.orgId, req.userId, req.visibility);
   });
 
   // Snooze one reminder item (e.g. the person was on leave). Cadence reminders
