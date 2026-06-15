@@ -1,6 +1,7 @@
 import { prisma } from '../db/prisma.js';
 import { NotFoundError, ConflictError, ForbiddenError } from '../utils/errors.js';
 import { inviteService } from './invite.service.js';
+import { ensureSystemRoles } from './role.service.js';
 
 export const orgService = {
   /** Membership row for (user, org), or null. Used to gate org switching. */
@@ -26,6 +27,7 @@ export const orgService = {
     await prisma.orgMember.create({
       data: { userId, orgId: org.id, role: 'owner' },
     });
+    await ensureSystemRoles(org.id);
     return org;
   },
 

@@ -70,6 +70,7 @@ When adding an endpoint that returns or mutates org data: **filter by `req.orgId
 - **Roles** are the 3-level Domain → Role → Seniority system (`ResourceRole`). Constants mirror in `client/src/lib/constants.js` (`DOMAINS`, `SENIORITIES`).
 - **Evaluations** snapshot their categories (`EvaluationCategorySnapshot`) so finalized reviews stay stable even if `PerformanceLogCategory` rows later change. Respect the `draft → submitted → finalized` state machine in `services/evaluation.service.ts`.
 - One Resource per (org, user) — a `Resource` is a person and may optionally link to a login `User` via `userId`.
+- **RBAC (in progress).** `Role` is a per-org named permission matrix (`server/src/lib/permissions.ts` is the source of truth: segments × `{scope: none|own|team|all, create, edit, delete}`). The four system roles are seeded per org (`role.service.ts ensureSystemRoles`). `OrgMember.role` references a role by `key`. Today enforcement still uses the hardcoded `requireRole`/visibility gates; the matrix is being migrated in stages (Settings → Roles currently shows it read-only).
 - **`Log.resourceId` is nullable.** A null `resourceId` (with `customerId` set) is a **general / whole-customer review entry** — it isn't about one person and rolls into the evaluation of *every* person working on that customer/project (see the `resourceId: null` branch in `evaluation.service.ts` and `createGeneralCustomerLog`).
 
 ## Frontend conventions (`client/src/`)
