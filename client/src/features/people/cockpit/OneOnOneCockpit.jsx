@@ -76,6 +76,7 @@ function RatingPicker({ label, value, onChange }) {
             key={n}
             type="button"
             onClick={() => onChange(value === n ? null : n)}
+            title={value === n ? 'Click again to clear' : `Set ${n}/5`}
             className={`w-8 h-8 rounded-lg border text-xs font-bold cursor-pointer ${
               value === n
                 ? 'bg-primary text-white border-primary'
