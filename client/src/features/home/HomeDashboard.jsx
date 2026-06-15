@@ -78,6 +78,41 @@ function Kpi({ label, chip, chipBg, chipColor, children, spark, sparkColor, donu
   );
 }
 
+/* ---------- right-rail list (people / customers share one structure) ---------- */
+
+function RailSection({ title, linkTo, linkLabel, children }) {
+  return (
+    <div>
+      <div className="flex items-baseline mb-1.5 px-1">
+        <h4 className="text-xs font-bold text-text m-0">{title}</h4>
+        <span className="flex-1" />
+        {linkTo && (
+          <Link to={linkTo} className="text-[10px] font-semibold text-primary no-underline hover:underline">{linkLabel}</Link>
+        )}
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function RailRow({ to, avatar, title, meta, chip, hot }) {
+  return (
+    <Link
+      to={to}
+      className={`flex items-center gap-2.5 py-2 px-2 -mx-1 rounded-xl no-underline transition ${
+        hot ? 'bg-white shadow-[0_4px_14px_rgba(34,49,63,0.08)]' : 'hover:bg-white/70'
+      }`}
+    >
+      {avatar}
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-semibold text-text truncate">{title}</span>
+        <span className="block text-[9.5px] font-mono text-text-light truncate">{meta}</span>
+      </span>
+      {chip}
+    </Link>
+  );
+}
+
 /* ---------- main ---------- */
 
 export default function HomeDashboard() {
@@ -309,7 +344,7 @@ export default function HomeDashboard() {
     };
   };
   const callout = reminderCopy(topReminder);
-  const hasRail = railPeople.length > 0 || !!callout || reminders.length > 1;
+  const hasRail = railPeople.length > 0 || pmRows.length > 0 || !!callout || reminders.length > 1;
 
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -440,65 +475,6 @@ export default function HomeDashboard() {
             </div>
           </div>
 
-          {/* PM slice: customers I'm responsible for */}
-          {pmRows.length > 0 && (
-            <div className="bg-white border border-border-light rounded-2xl shadow-card p-4 mb-5">
-              <div className="flex items-baseline gap-2 mb-1.5">
-                <h3 className="text-[13px] font-bold text-text m-0">Your customers</h3>
-                <span className="text-[10.5px] text-text-light">
-                  responsible for {pmRows.length} ·{' '}
-                  {(() => {
-                    const open = Math.round(pmRows.reduce((s, r) => s + r.gap, 0) * 10) / 10;
-                    return open > 0 ? `${open} FTE open in ${MONTHS[today.getMonth()]}` : `fully staffed in ${MONTHS[today.getMonth()]}`;
-                  })()}
-                </span>
-                <span className="flex-1" />
-                <Link to="/customers" className="text-[10.5px] font-semibold text-primary no-underline hover:underline">All customers →</Link>
-              </div>
-              {pmRows.map(({ customer: c, projects: pCount, planned, gap, signal, reviewDays, due }) => (
-                <Link
-                  key={c.id}
-                  to={`/customers/${c.id}`}
-                  className={`flex items-center gap-3 px-2.5 py-2 rounded-xl no-underline transition ${
-                    due ? 'border border-border-light shadow-[0_8px_22px_rgba(34,49,63,0.10)]' : 'hover:bg-[#F7FAFC]'
-                  }`}
-                >
-                  <span className="w-[28px] h-[28px] rounded-[10px] flex items-center justify-center text-[11px] font-bold text-white shrink-0" style={{ background: '#6366f1' }}>
-                    {c.name?.charAt(0)?.toUpperCase() || '?'}
-                  </span>
-                  <span className="min-w-0 w-[170px] shrink-0">
-                    <span className="block text-xs font-bold text-text truncate">{c.name}</span>
-                    <span className="block text-[9.5px] font-mono text-text-light mt-0.5">
-                      {pCount} project{pCount === 1 ? '' : 's'} · {planned} FTE
-                    </span>
-                  </span>
-                  {gap > 0 ? (
-                    <span className="text-[9.5px] font-bold rounded-full px-2 py-0.5 bg-danger-bg text-danger shrink-0">{gap} open</span>
-                  ) : (
-                    <span className="text-[9.5px] font-bold rounded-full px-2 py-0.5 bg-success-bg text-success shrink-0">staffed</span>
-                  )}
-                  <span className="flex-1" />
-                  {signal != null && (
-                    <span
-                      className="text-[9.5px] font-bold font-mono rounded-md px-1.5 py-0.5 shrink-0"
-                      style={{ background: scoreBg(signal), color: scoreColor(signal) }}
-                      title="Latest client satisfaction signal (avg)"
-                    >
-                      signal {signal}
-                    </span>
-                  )}
-                  {due ? (
-                    <span className="text-[9.5px] font-bold rounded-full px-2.5 py-1 bg-danger-bg text-danger shrink-0">review due</span>
-                  ) : (
-                    <span className="text-[9.5px] font-mono text-text-light shrink-0">
-                      {reviewDays != null ? `review ${reviewDays}d ago` : 'no review yet'}
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          )}
-
           {/* evaluations in flight */}
           <div className="bg-white border border-border-light rounded-2xl shadow-card p-4">
             <div className="flex items-baseline gap-2 mb-1.5">
@@ -555,35 +531,60 @@ export default function HomeDashboard() {
           </div>
         </div>
 
-        {/* right rail — only renders sections relevant to YOUR duties */}
+        {/* right rail — your people + your customers, same row structure */}
         {hasRail && (
-        <div className="flex flex-col gap-4 min-w-0">
+        <div className="flex flex-col gap-6 min-w-0">
           {railPeople.length > 0 && (
-          <div className="bg-white border border-border-light rounded-2xl shadow-card p-4">
-            <div className="flex items-baseline mb-2">
-              <h4 className="text-xs font-bold text-text m-0">Your people</h4>
-              <span className="flex-1" />
-              <Link to="/people" className="text-[10px] font-semibold text-primary no-underline hover:underline">View all</Link>
-            </div>
-            {railPeople.map((r) => {
-              const role = r.roles?.[0];
-              const pct = Math.round(((rU[r.id]?.[m0] || 0) / (r.capacity || 1)) * 100);
-              return (
-                <Link key={r.id} to={`/people/${r.id}`} className="flex items-center gap-2.5 py-1.5 no-underline rounded-lg px-1 -mx-1 hover:bg-primary-bg/50">
-                  <Avatar name={r.name} size={28} color={domainColor(resourcePrimaryDomain(r))} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-semibold text-text truncate">{r.name}</span>
-                    <span className="block text-[9.5px] font-mono text-text-light truncate">
-                      {role ? `${role.domain} ${role.role} · ${SENIORITY_SHORT[role.seniority] || role.seniority}` : '—'}
+            <RailSection title="Your people" linkTo="/people" linkLabel="View all">
+              {railPeople.map((r) => {
+                const role = r.roles?.[0];
+                const pct = Math.round(((rU[r.id]?.[m0] || 0) / (r.capacity || 1)) * 100);
+                return (
+                  <RailRow
+                    key={r.id}
+                    to={`/people/${r.id}`}
+                    avatar={<Avatar name={r.name} size={30} color={domainColor(resourcePrimaryDomain(r))} />}
+                    title={r.name}
+                    meta={role ? `${role.domain} ${role.role} · ${SENIORITY_SHORT[role.seniority] || role.seniority}` : '—'}
+                    chip={
+                      <span className="text-[9.5px] font-bold font-mono px-1.5 py-0.5 rounded-md shrink-0" style={{ background: pct > 0 ? utilBg(pct) : '#F0F4F8', color: utilColor(pct) }}>
+                        {pct}%
+                      </span>
+                    }
+                  />
+                );
+              })}
+            </RailSection>
+          )}
+
+          {pmRows.length > 0 && (
+            <RailSection title="Your customers" linkTo="/customers" linkLabel="View all">
+              {pmRows.map(({ customer: c, projects: pCount, planned, gap, signal, due }) => (
+                <RailRow
+                  key={c.id}
+                  to={`/customers/${c.id}`}
+                  hot={due}
+                  avatar={
+                    <span className="w-[30px] h-[30px] rounded-[10px] flex items-center justify-center text-[11px] font-bold text-white shrink-0" style={{ background: '#6366f1' }}>
+                      {c.name?.charAt(0)?.toUpperCase() || '?'}
                     </span>
-                  </span>
-                  <span className="text-[9.5px] font-bold font-mono px-1.5 py-0.5 rounded-md shrink-0" style={{ background: pct > 0 ? utilBg(pct) : '#F0F4F8', color: utilColor(pct) }}>
-                    {pct}%
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
+                  }
+                  title={c.name}
+                  meta={`${pCount} project${pCount === 1 ? '' : 's'} · ${planned} FTE`}
+                  chip={
+                    gap > 0 ? (
+                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md shrink-0 bg-danger-bg text-danger">{gap} open</span>
+                    ) : signal != null ? (
+                      <span className="text-[9.5px] font-bold font-mono px-1.5 py-0.5 rounded-md shrink-0" style={{ background: scoreBg(signal), color: scoreColor(signal) }} title="Latest client satisfaction signal">
+                        {signal}
+                      </span>
+                    ) : (
+                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md shrink-0 bg-success-bg text-success">staffed</span>
+                    )
+                  }
+                />
+              ))}
+            </RailSection>
           )}
 
           {callout && (
