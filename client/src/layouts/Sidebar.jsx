@@ -1,28 +1,10 @@
-import { useEffect, useState } from 'react';
-import { NavLink, useLocation, Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, useLocation, Link, useNavigate } from 'react-router-dom';
 import { useVisibility } from '../contexts/VisibilityContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useOrg } from '../contexts/OrgContext';
 import { api } from '../lib/api';
 import { firstName } from '../lib/resourceUtils';
-
-// Turn the top reminder into a compact nudge (title + one-line sub + link).
-function reminderCopy(item) {
-  if (!item) return null;
-  if (item.type === 'oneOnOne') return {
-    title: `1:1 with ${firstName(item.resourceName)} is due`,
-    sub: item.lastAt ? `Last one ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago` : 'No 1:1 on record yet',
-    to: `/people/${item.resourceId}/oneonones`,
-  };
-  if (item.type === 'pmUpdate') return {
-    title: `PM update due · ${item.customerName}`,
-    sub: item.lastAt ? `Last review ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago` : 'No review yet',
-    to: `/customers/${item.customerId}/review`,
-  };
-  return {
-    title: `Signal missing · ${item.customerName}`,
-    sub: 'No signal logged this month',
-    to: `/customers/${item.customerId}/review`,
-  };
-}
 
 const ICONS = {
   home: <path d="M3 12 12 3l9 9M5 10v10h14V10" />,
@@ -67,29 +49,142 @@ function NavIcon({ name }) {
   );
 }
 
+// Turn the top reminder into a compact nudge (title + one-line sub + link).
+function reminderCopy(item) {
+  if (!item) return null;
+  if (item.type === 'oneOnOne') return {
+    title: `1:1 with ${firstName(item.resourceName)} is due`,
+    sub: item.lastAt ? `Last one ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago` : 'No 1:1 on record yet',
+    to: `/people/${item.resourceId}/oneonones`,
+  };
+  if (item.type === 'pmUpdate') return {
+    title: `PM update due · ${item.customerName}`,
+    sub: item.lastAt ? `Last review ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago` : 'No review yet',
+    to: `/customers/${item.customerId}/review`,
+  };
+  return {
+    title: `Signal missing · ${item.customerName}`,
+    sub: 'No signal logged this month',
+    to: `/customers/${item.customerId}/review`,
+  };
+}
+
+/** Brand mark + wordmark, top of the sidebar (was the top ribbon's logo). */
+function Brand({ collapsed, to }) {
+  return (
+    <Link to={to} className="flex items-center gap-2.5 no-underline mb-4 px-1.5">
+      <span className="w-9 h-9 rounded-xl bg-primary text-white font-extrabold flex items-center justify-center text-base shrink-0 shadow-[0_4px_12px_rgba(76,186,212,0.4)]">d</span>
+      {!collapsed && (
+        <span className="leading-tight">
+          <span className="block text-[15px] font-extrabold text-text">databob</span>
+          <span className="block text-[9.5px] text-text-light font-medium">People Hub</span>
+        </span>
+      )}
+    </Link>
+  );
+}
+
+/** User identity + menu (org switch / settings / logout), bottom of the sidebar. */
+function SidebarProfile({ collapsed }) {
+  const { user, logout } = useAuth();
+  const { currentOrg, orgs, switchOrg, role } = useOrg();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  if (!user) return null;
+  const initials = (user.name || user.email || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+
+  const menu = open && (
+    <div className={`absolute bottom-full mb-2 bg-white rounded-xl shadow-lg border border-border-light py-1 z-50 ${collapsed ? 'left-0 w-[180px]' : 'left-0 right-0'}`}>
+      <div className="px-3 py-1.5 text-[10px] text-text-light truncate border-b border-border-light">{user.email}</div>
+      {orgs.length > 1 && (
+        <>
+          <div className="px-3 pt-1.5 pb-0.5 text-[9px] uppercase tracking-wider text-text-light font-bold">Organization</div>
+          {orgs.map((o) => (
+            <button
+              key={o.id}
+              onClick={() => { if (o.id !== currentOrg?.id) switchOrg(o.id); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-xs cursor-pointer border-0 bg-transparent hover:bg-primary-bg ${o.id === currentOrg?.id ? 'text-primary font-bold' : 'text-text'}`}
+            >
+              {o.name}
+            </button>
+          ))}
+          <div className="border-t border-border-light my-1" />
+        </>
+      )}
+      <button onClick={() => { navigate('/settings'); setOpen(false); }} className="w-full text-left px-3 py-1.5 text-xs text-text hover:bg-primary-bg cursor-pointer border-0 bg-transparent">
+        Settings
+      </button>
+      <button onClick={() => { logout(); navigate('/login'); }} className="w-full text-left px-3 py-1.5 text-xs text-danger hover:bg-danger-bg cursor-pointer border-0 bg-transparent">
+        Logout
+      </button>
+    </div>
+  );
+
+  if (collapsed) {
+    return (
+      <div className="relative mt-1" ref={ref}>
+        <button
+          onClick={() => setOpen((o) => !o)}
+          title={user.name}
+          className="mx-auto w-9 h-9 rounded-full bg-primary text-white text-[11px] font-bold flex items-center justify-center cursor-pointer border-0"
+        >
+          {initials}
+        </button>
+        {menu}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative border-t border-border-light pt-2.5 mt-1" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg cursor-pointer border-0 bg-transparent hover:bg-primary-bg"
+      >
+        <span className="w-8 h-8 rounded-full bg-primary text-white text-[11px] font-bold flex items-center justify-center shrink-0">{initials}</span>
+        <span className="min-w-0 flex-1 text-left">
+          <span className="block text-xs font-bold text-text truncate">{user.name}</span>
+          <span className="block text-[10px] text-text-light truncate">{currentOrg?.name}{role ? ` · ${role}` : ''}</span>
+        </span>
+        <span className="text-text-light font-bold tracking-wider leading-none">⋮</span>
+      </button>
+      {menu}
+    </div>
+  );
+}
+
 /**
- * App navigation sidebar. Collapses to an icon rail on the width-hungry
- * planner. The old header promo-slot idea becomes a live "Due" queue fed by
- * the reminder engine.
+ * App navigation sidebar — now the app's only chrome (the top ribbon is gone):
+ * brand at the top, nav, the live reminder nudge, and the user profile at the
+ * bottom. Collapses to an icon rail on the width-hungry planner.
  */
 export default function Sidebar() {
-  const { isAdmin, role, loading } = useVisibility();
+  const { isAdmin, role, loading, selfResourceId } = useVisibility();
   const location = useLocation();
   const collapsed = location.pathname.startsWith('/planner');
   const [due, setDue] = useState([]);
 
+  const isViewer = role === 'viewer';
+
   useEffect(() => {
-    if (loading || role === 'viewer') return;
+    if (loading || isViewer) return;
     let cancelled = false;
     api.getMyReminders().then((d) => { if (!cancelled) setDue(Array.isArray(d) ? d : []); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [loading, role, location.pathname]);
+  }, [loading, isViewer, location.pathname]);
 
   if (loading) {
     // Hold the slot so content doesn't jump once visibility resolves.
     return <aside className={`shrink-0 bg-white border-r border-border-light ${collapsed ? 'w-[64px]' : 'w-[210px]'}`} />;
   }
-  if (role === 'viewer') return null; // viewers live on their profile
 
   const items = [
     { to: '/home', label: 'Dashboard', icon: 'home' },
@@ -102,6 +197,7 @@ export default function Sidebar() {
   ];
 
   const callout = reminderCopy(due[0]);
+  const brandTo = isViewer ? (selfResourceId ? `/people/${selfResourceId}` : '/people') : '/home';
 
   return (
     <aside
@@ -109,30 +205,35 @@ export default function Sidebar() {
         collapsed ? 'w-[64px] px-2' : 'w-[210px] px-3'
       } py-4`}
     >
-      <nav className="flex flex-col gap-0.5">
-        {items.map((it) => (
-          <NavLink
-            key={it.to}
-            to={it.to}
-            title={it.label}
-            className={({ isActive }) =>
-              `relative flex items-center gap-2.5 rounded-xl text-xs font-semibold no-underline transition-colors ${
-                collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2'
-              } ${
-                isActive
-                  ? 'text-primary bg-primary-light before:absolute before:-left-2 before:top-2 before:bottom-2 before:w-[3px] before:rounded before:bg-primary'
-                  : 'text-text-mid hover:bg-primary-bg/60'
-              }`
-            }
-          >
-            <NavIcon name={it.icon} />
-            {!collapsed && it.label}
-          </NavLink>
-        ))}
-      </nav>
+      <Brand collapsed={collapsed} to={brandTo} />
+
+      {!isViewer && (
+        <nav className="flex flex-col gap-0.5">
+          {items.map((it) => (
+            <NavLink
+              key={it.to}
+              to={it.to}
+              title={it.label}
+              className={({ isActive }) =>
+                `relative flex items-center gap-2.5 rounded-xl text-xs font-semibold no-underline transition-colors ${
+                  collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2'
+                } ${
+                  isActive
+                    ? 'text-primary bg-primary-light before:absolute before:-left-2 before:top-2 before:bottom-2 before:w-[3px] before:rounded before:bg-primary'
+                    : 'text-text-mid hover:bg-primary-bg/60'
+                }`
+              }
+            >
+              <NavIcon name={it.icon} />
+              {!collapsed && it.label}
+            </NavLink>
+          ))}
+        </nav>
+      )}
+
       <div className="flex-1" />
-      {/* Top-reminder nudge (compact version of the dashboard callout) + queue. */}
-      {callout && !collapsed && (
+
+      {!isViewer && callout && !collapsed && (
         <Link
           to={callout.to}
           className="block no-underline rounded-xl p-2.5 text-white shadow-card mb-1.5"
@@ -146,19 +247,21 @@ export default function Sidebar() {
           <p className="text-[9px] opacity-85 mt-0.5 mb-0 leading-snug">{callout.sub}</p>
         </Link>
       )}
-      {due.length > 0 && !collapsed && (
+      {!isViewer && due.length > 0 && !collapsed && (
         <Link
           to="/people"
-          className="block text-center text-[10px] font-bold text-text-mid bg-white border border-border-light rounded-lg py-1.5 no-underline hover:bg-primary-bg mb-1"
+          className="block text-center text-[10px] font-bold text-text-mid bg-white border border-border-light rounded-lg py-1.5 no-underline hover:bg-primary-bg mb-2"
         >
           Open queue · {due.length}
         </Link>
       )}
-      {due.length > 0 && collapsed && (
-        <Link to="/people" title={`${due.length} reminders due`} className="mx-auto mb-1 w-8 h-8 rounded-xl bg-danger-bg text-danger text-[10px] font-bold flex items-center justify-center no-underline">
+      {!isViewer && due.length > 0 && collapsed && (
+        <Link to="/people" title={`${due.length} reminders due`} className="mx-auto mb-2 w-8 h-8 rounded-xl bg-danger-bg text-danger text-[10px] font-bold flex items-center justify-center no-underline">
           {due.length}
         </Link>
       )}
+
+      <SidebarProfile collapsed={collapsed} />
     </aside>
   );
 }
