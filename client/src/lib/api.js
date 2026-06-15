@@ -182,6 +182,11 @@ export const api = {
     apiFetch('/customers/' + customerId + '/reviews', { method: 'POST', body: JSON.stringify(data || {}) }),
   deleteCustomerReview: (customerId, id) =>
     apiFetch('/customers/' + customerId + '/reviews/' + id, { method: 'DELETE' }),
+  // General (whole-customer) review entries — no specific person.
+  createCustomerGeneralLog: (customerId, data) =>
+    apiFetch('/customers/' + customerId + '/general-logs', { method: 'POST', body: JSON.stringify(data) }),
+  deleteCustomerGeneralLog: (customerId, logId) =>
+    apiFetch('/customers/' + customerId + '/general-logs/' + logId, { method: 'DELETE' }),
 
   // Compensation satisfaction (on the evaluation cadence)
   setEvaluationCompensation: (id, compensationSatisfaction) =>

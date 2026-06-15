@@ -4,14 +4,19 @@ import { prisma } from '../db/prisma.js';
 import { customerService } from '../services/customer.service.js';
 import { customerPerformanceService } from '../services/customerPerformance.service.js';
 import { canViewCustomer } from '../services/customerAccess.service.js';
-import { assertNoViewerResources } from '../services/visibility.service.js';
+import { assertResponsibleUserAllowed } from '../services/visibility.service.js';
 import { createCustomerSchema, updateCustomerSchema } from '../schemas/customer.schema.js';
 import {
   customerDetailQuerySchema,
   customerTrendQuerySchema,
 } from '../schemas/customerDetail.schema.js';
-import { listLogsQuerySchema } from '../schemas/log.schema.js';
-import { logInclude } from '../services/log.service.js';
+import { listLogsQuerySchema, createGeneralLogSchema } from '../schemas/log.schema.js';
+import {
+  logInclude,
+  createGeneralCustomerLog,
+  deleteGeneralCustomerLog,
+} from '../services/log.service.js';
+import { userIsResponsibleFor } from '../services/personAccess.service.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { NotFoundError } from '../utils/errors.js';
 
@@ -48,12 +53,12 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(404).send({ error: 'Customer not found' });
     }
     let responsiblePerson: { id: string; name: string } | null = null;
-    if (customer.responsiblePersonId) {
-      const r = await prisma.resource.findFirst({
-        where: { id: customer.responsiblePersonId, orgId: req.orgId },
-        select: { id: true, name: true },
+    if (customer.responsibleUserId) {
+      const u = await prisma.user.findUnique({
+        where: { id: customer.responsibleUserId },
+        select: { id: true, name: true, email: true },
       });
-      responsiblePerson = r ?? null;
+      responsiblePerson = u ? { id: u.id, name: u.name || u.email } : null;
     }
     return { customer, responsiblePerson };
   });
@@ -123,6 +128,28 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
+  // General (whole-customer) review entries — no specific person. Admin or the
+  // customer/project responsible may add/remove them.
+  app.post('/customers/:id/general-logs', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const allowed =
+      req.visibility.isAdmin ||
+      (await userIsResponsibleFor(req.orgId, req.userId, id, null));
+    if (!allowed) return reply.status(403).send({ error: 'Not allowed' });
+    const data = createGeneralLogSchema.parse(req.body);
+    return createGeneralCustomerLog(req.orgId, id, req.userId, data);
+  });
+
+  app.delete('/customers/:id/general-logs/:logId', async (req, reply) => {
+    const { id, logId } = req.params as { id: string; logId: string };
+    const allowed =
+      req.visibility.isAdmin ||
+      (await userIsResponsibleFor(req.orgId, req.userId, id, null));
+    if (!allowed) return reply.status(403).send({ error: 'Not allowed' });
+    await deleteGeneralCustomerLog(req.orgId, id, logId, req.userId, req.role);
+    return reply.status(204).send();
+  });
+
   app.get('/customers/:id/performance/overall', async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!canViewCustomer(req.visibility, id)) {
@@ -179,18 +206,14 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/customers', { preHandler: requireRole('admin') }, async (req) => {
     const data = createCustomerSchema.parse(req.body);
-    if (data.responsiblePersonId) {
-      await assertNoViewerResources(req.orgId, [data.responsiblePersonId]);
-    }
+    await assertResponsibleUserAllowed(req.orgId, data.responsibleUserId);
     return customerService.create(req.orgId, data);
   });
 
   app.patch('/customers/:id', { preHandler: requireRole('admin') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updateCustomerSchema.parse(req.body);
-    if (data.responsiblePersonId) {
-      await assertNoViewerResources(req.orgId, [data.responsiblePersonId]);
-    }
+    await assertResponsibleUserAllowed(req.orgId, data.responsibleUserId);
     return customerService.update(req.orgId, id, data);
   });
 

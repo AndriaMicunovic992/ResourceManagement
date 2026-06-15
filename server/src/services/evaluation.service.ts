@@ -309,13 +309,19 @@ export const evaluationService = {
     //   null (customer-level logs cascade down) or matches the project.
     let logs: unknown[] = [];
     if (evaluation.customerId) {
+      // Include this person's own logs AND general (resourceId null) entries
+      // about the customer/project — those apply to everyone working on it.
       const logsWhere: Prisma.LogWhereInput = {
         orgId,
-        resourceId: evaluation.resourceId,
         customerId: evaluation.customerId,
+        AND: [
+          { OR: [{ resourceId: evaluation.resourceId }, { resourceId: null }] },
+        ],
       };
       if (evaluation.projectId) {
-        logsWhere.OR = [{ projectId: null }, { projectId: evaluation.projectId }];
+        (logsWhere.AND as Prisma.LogWhereInput[]).push({
+          OR: [{ projectId: null }, { projectId: evaluation.projectId }],
+        });
       }
       logs = await prisma.log.findMany({
         where: logsWhere,

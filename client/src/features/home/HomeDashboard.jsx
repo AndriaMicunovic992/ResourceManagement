@@ -207,18 +207,19 @@ export default function HomeDashboard() {
           ((r.managerLinks || []).some((l) => (l.managerId || l.manager?.id) === selfResourceId) ||
             (r.teams || []).some((t) => t.managerId === selfResourceId))
       )
-      .slice(0, 6);
+      .slice(0, 12);
   }, [resources, selfResourceId]);
 
   /* ----- PM slice: customers I'm personally responsible for ----- */
+  const myUserId = user?.id;
   const myCustomers = useMemo(() => {
-    if (!selfResourceId) return [];
+    if (!myUserId) return [];
     return customers.filter(
       (c) =>
-        c.responsiblePersonId === selfResourceId ||
-        projects.some((p) => p.customerId === c.id && p.responsiblePersonId === selfResourceId)
+        c.responsibleUserId === myUserId ||
+        projects.some((p) => p.customerId === c.id && p.responsibleUserId === myUserId)
     );
-  }, [customers, projects, selfResourceId]);
+  }, [customers, projects, myUserId]);
 
   // Signals + last review per responsible customer (small N — one pair of calls each).
   const [pmInfo, setPmInfo] = useState({});

@@ -6,19 +6,25 @@ import StatusPicker from '../ui/StatusPicker';
 import { useData } from '../../contexts/DataContext';
 
 export default function ProjectForm({ initial, onSave, onClose }) {
-  const { customers, resources } = useData();
+  const { customers, members } = useData();
   const [name, setName] = useState(initial?.name || '');
   const [customerId, setCustomerId] = useState(initial?.customerId || customers[0]?.id || '');
   const [status, setStatus] = useState(initial?.status || 'realised');
-  const [responsiblePersonId, setResponsiblePersonId] = useState(initial?.responsiblePersonId || '');
+  const [responsibleUserId, setResponsibleUserId] = useState(initial?.responsibleUserId || '');
 
-  const sortedResources = [...resources].sort((a, b) => a.name.localeCompare(b.name));
+  // Responsible person can be any org member; viewers can't act, so exclude them.
+  const eligible = members.filter(
+    (m) => m.role !== 'viewer' || m.user?.id === initial?.responsibleUserId,
+  );
+  const sorted = [...eligible].sort((a, b) =>
+    (a.user?.name || a.user?.email || '').localeCompare(b.user?.name || b.user?.email || ''),
+  );
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim() || !customerId) return;
     // No start/end here — the project's range is inherited from its needs.
-    onSave({ name: name.trim(), customerId, status, responsiblePersonId: responsiblePersonId || null });
+    onSave({ name: name.trim(), customerId, status, responsibleUserId: responsibleUserId || null });
   };
 
   return (
@@ -35,10 +41,10 @@ export default function ProjectForm({ initial, onSave, onClose }) {
           </select>
         </Field>
         <Field label="Responsible Person">
-          <select value={responsiblePersonId} onChange={(e) => setResponsiblePersonId(e.target.value)}
+          <select value={responsibleUserId} onChange={(e) => setResponsibleUserId(e.target.value)}
             className="w-full px-3 py-2 border border-border rounded-lg text-sm text-text outline-none focus:border-primary bg-white">
             <option value="">None</option>
-            {sortedResources.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            {sorted.map((m) => <option key={m.user?.id} value={m.user?.id}>{m.user?.name || m.user?.email}</option>)}
           </select>
         </Field>
         <Field label="Status">

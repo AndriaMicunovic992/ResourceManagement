@@ -55,7 +55,7 @@ Scope rules (non-admin):
 - **member** sees: self + directly/team-managed people + people/projects/customers they're responsible for (and people assigned to those projects).
 - **viewer** sees: only themselves. Viewers are bounced to their own person page client-side and use dedicated `/me/*` endpoints (e.g. `/me/allocations`) so we don't widen their scope just to render names.
 
-`assertAdmin(scope)` guards admin-only mutations (customer/project/need/assignment writes). `assertNoViewerResources(...)` prevents assigning a viewer as a manager or responsible person.
+`assertAdmin(scope)` guards admin-only mutations (customer/project/need/assignment writes). `assertNoViewerResources(...)` prevents assigning a viewer as a **manager**. The **responsible person** of a customer/project is any org **User** (`Customer.responsibleUserId` / `Project.responsibleUserId`, not a Resource) — so an account manager who isn't a staffable person can own a customer; `assertResponsibleUserAllowed(...)` rejects non-members and viewers. Responsibility-based visibility/reminders match `req.userId` against `responsibleUserId`.
 
 When adding an endpoint that returns or mutates org data: **filter by `req.orgId`**, then apply the appropriate visibility assert or `requireRole`.
 
@@ -66,6 +66,7 @@ When adding an endpoint that returns or mutates org data: **filter by `req.orgId
 - **Roles** are the 3-level Domain → Role → Seniority system (`ResourceRole`). Constants mirror in `client/src/lib/constants.js` (`DOMAINS`, `SENIORITIES`).
 - **Evaluations** snapshot their categories (`EvaluationCategorySnapshot`) so finalized reviews stay stable even if `PerformanceLogCategory` rows later change. Respect the `draft → submitted → finalized` state machine in `services/evaluation.service.ts`.
 - One Resource per (org, user) — a `Resource` is a person and may optionally link to a login `User` via `userId`.
+- **`Log.resourceId` is nullable.** A null `resourceId` (with `customerId` set) is a **general / whole-customer review entry** — it isn't about one person and rolls into the evaluation of *every* person working on that customer/project (see the `resourceId: null` branch in `evaluation.service.ts` and `createGeneralCustomerLog`).
 
 ## Frontend conventions (`client/src/`)
 

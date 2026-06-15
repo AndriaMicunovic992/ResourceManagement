@@ -13,7 +13,7 @@ const AVATAR_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#
 const colorFor = (name) => AVATAR_COLORS[(name || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
 
 export default function CustomersListView() {
-  const { customers, projects, resources, needs, assignments, addCustomer } = useData();
+  const { customers, projects, members, needs, assignments, addCustomer } = useData();
   const { isAdmin } = useVisibility();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -40,11 +40,14 @@ export default function CustomersListView() {
           projectCount: projIds.size,
           planned: Math.round(planned * 10) / 10,
           gap: Math.round(Math.max(0, needed - planned) * 10) / 10,
-          responsible: resources.find((r) => r.id === c.responsiblePersonId) || null,
+          responsible: (() => {
+            const m = c.responsibleUserId ? members.find((mm) => mm.user?.id === c.responsibleUserId) : null;
+            return m ? { name: m.user?.name || m.user?.email } : null;
+          })(),
         };
       })
       .sort((a, b) => a.customer.name.localeCompare(b.customer.name));
-  }, [customers, projects, resources, needs, assignments, search, m0]);
+  }, [customers, projects, members, needs, assignments, search, m0]);
 
   const openTotal = rows.reduce((s, r) => s + r.gap, 0);
 

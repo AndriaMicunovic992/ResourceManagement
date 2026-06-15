@@ -45,14 +45,23 @@ function EntryComposer({ row, person, customer, reviewId, projects, logCategorie
     setBusy(true);
     setError('');
     try {
-      const created = await api.createLog(person.id, {
-        content: content.trim(),
-        kind: row.kind,
-        customerId: customer.id,
-        projectId: projectId || null,
-        categoryIds,
-        customerReviewId: reviewId,
-      });
+      // person === null → a general (whole-customer) entry.
+      const created = person
+        ? await api.createLog(person.id, {
+            content: content.trim(),
+            kind: row.kind,
+            customerId: customer.id,
+            projectId: projectId || null,
+            categoryIds,
+            customerReviewId: reviewId,
+          })
+        : await api.createCustomerGeneralLog(customer.id, {
+            content: content.trim(),
+            kind: row.kind,
+            projectId: projectId || null,
+            categoryIds,
+            customerReviewId: reviewId,
+          });
       onCreated(created);
     } catch (err) {
       setError(err.message || 'Failed to save entry');
@@ -101,6 +110,96 @@ function EntryComposer({ row, person, customer, reviewId, projects, logCategorie
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * General (whole-customer) section: entries unrelated to a specific person.
+ * They roll into the evaluation of everyone working on the customer/project.
+ */
+function GeneralReviewCard({ customer, reviewId, custProjects, logCategories, entries, onEntryCreated, onEntryDeleted }) {
+  const [composing, setComposing] = useState(null);
+  const byKind = (kind) => entries.filter((l) => l.kind === kind);
+
+  const handleDelete = async (logId) => {
+    if (!window.confirm('Delete this general entry?')) return;
+    try {
+      await api.deleteCustomerGeneralLog(customer.id, logId);
+      onEntryDeleted(logId);
+    } catch {
+      /* surfaced rarely; ignore to keep the cockpit responsive */
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
+      <div className="flex items-center gap-2.5 mb-1">
+        <span className="w-[34px] h-[34px] rounded-xl flex items-center justify-center text-white shrink-0" style={{ background: '#6366f1' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4" /></svg>
+        </span>
+        <div>
+          <div className="text-sm font-bold text-text">General · whole customer</div>
+          <div className="text-[10px] text-text-light">
+            Applies to everyone working on {customer.name} this period — rolls into each person's evaluation.
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2.5 mt-3">
+        {REVIEW_ROWS.map((row) => (
+          <div key={row.kind}>
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[10px] uppercase tracking-wider text-text-mid font-bold">{row.label}</div>
+              {composing !== row.kind && (
+                <button
+                  onClick={() => setComposing(row.kind)}
+                  className="text-[11px] font-bold text-text-mid bg-white border border-border-light rounded-lg px-2.5 py-0.5 cursor-pointer hover:bg-primary-bg"
+                >
+                  + Add entry
+                </button>
+              )}
+            </div>
+            {composing === row.kind && (
+              <EntryComposer
+                row={row}
+                person={null}
+                customer={customer}
+                reviewId={reviewId}
+                projects={custProjects}
+                logCategories={logCategories}
+                onCreated={(created) => {
+                  onEntryCreated(created);
+                  setComposing(null);
+                }}
+                onCancel={() => setComposing(null)}
+              />
+            )}
+            <div className="space-y-1.5 mt-1">
+              {byKind(row.kind).map((log) => (
+                <div key={log.id} className="rounded-lg border border-border-light p-2 group">
+                  <div className="flex items-start gap-2">
+                    <div className="text-xs text-text whitespace-pre-wrap flex-1">{log.content}</div>
+                    <button
+                      onClick={() => handleDelete(log.id)}
+                      className="text-[10px] text-text-light opacity-0 group-hover:opacity-100 hover:text-danger shrink-0"
+                      title="Delete entry"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    {(log.categories || []).map((c) => (
+                      <span key={c.id} className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary">{c.name}</span>
+                    ))}
+                    {log.project && <span className="text-[9px] text-text-light">📁 {log.project.name}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -395,8 +494,17 @@ export default function CustomerReviewCockpit() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 items-start">
-        {/* Main column: per-person recap */}
+        {/* Main column: general recap + per-person recap */}
         <div className="lg:col-span-2 space-y-4">
+          <GeneralReviewCard
+            customer={customer}
+            reviewId={reviewId}
+            custProjects={custProjects}
+            logCategories={logCategories}
+            entries={reviewEntries.filter((l) => !l.resourceId)}
+            onEntryCreated={(created) => setReviewEntries((prev) => [created, ...prev])}
+            onEntryDeleted={(logId) => setReviewEntries((prev) => prev.filter((l) => l.id !== logId))}
+          />
           {people.length === 0 ? (
             <div className="bg-white rounded-2xl border border-border-light shadow-card p-8 text-center text-sm text-text-light">
               No people allocated to this customer this month.
@@ -436,7 +544,7 @@ export default function CustomerReviewCockpit() {
             <h3 className="text-[13px] font-bold text-text m-0 mb-2">
               Customer satisfaction (12 mo avg)
             </h3>
-            <SignalChart points={chartPoints} />
+            <SignalChart points={chartPoints} height={200} />
           </div>
 
           <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">

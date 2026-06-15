@@ -8,7 +8,10 @@ export const projectService = {
     if (customerId) where.customerId = customerId;
     return prisma.project.findMany({
       where,
-      include: { needs: { include: { assignments: true } }, responsiblePerson: true },
+      include: {
+        needs: { include: { assignments: true } },
+        responsibleUser: { select: { id: true, name: true, email: true } },
+      },
       orderBy: { createdAt: 'asc' },
     });
   },

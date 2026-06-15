@@ -76,6 +76,13 @@ export function DataProvider({ children }) {
   });
   const needsQ = useQuery({ queryKey: ['needs', orgId], queryFn: api.getNeeds, enabled });
   const assignmentsQ = useQuery({ queryKey: ['assignments', orgId], queryFn: api.getAssignments, enabled });
+  // Org members back the "responsible person" pickers — responsibility can be
+  // any login user, not only staffable resources.
+  const membersQ = useQuery({
+    queryKey: ['members', orgId],
+    queryFn: () => api.getMembers().catch(() => []),
+    enabled,
+  });
   const meResourceQ = useQuery({
     queryKey: ['meResource', orgId],
     queryFn: () => api.getMyResource().catch(() => null),
@@ -90,6 +97,7 @@ export function DataProvider({ children }) {
   const logCategories = logCategoriesQ.data ?? [];
   const needs = needsQ.data ?? [];
   const assignments = assignmentsQ.data ?? [];
+  const members = membersQ.data ?? [];
   const meResource = meResourceQ.data ?? null;
 
   // Gate the app on the collections the planner/dashboards can't render without.
@@ -251,7 +259,7 @@ export function DataProvider({ children }) {
 
   const value = {
     loading, error: loadError,
-    customers, projects, resources, teams, skills, logCategories, needs, assignments, meResource, reload,
+    customers, projects, resources, teams, skills, logCategories, needs, assignments, members, meResource, reload,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
     addResource, updateResource, deleteResource,

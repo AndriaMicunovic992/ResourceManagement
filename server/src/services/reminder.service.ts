@@ -188,18 +188,16 @@ export const reminderService = {
 
     // --- PM duties: per (responsible project → its customer) × person
     // allocated to those projects this month ---
-    const projects = self
-      ? await prisma.project.findMany({
-          where: {
-            orgId,
-            OR: [
-              { responsiblePersonId: self },
-              { customer: { responsiblePersonId: self } },
-            ],
-          },
-          select: { id: true, customerId: true },
-        })
-      : [];
+    const projects = await prisma.project.findMany({
+      where: {
+        orgId,
+        OR: [
+          { responsibleUserId: userId },
+          { customer: { responsibleUserId: userId } },
+        ],
+      },
+      select: { id: true, customerId: true },
+    });
     const responsibleCustomerIds = Array.from(new Set(projects.map((p) => p.customerId)));
     if (projects.length > 0) {
       const month = currentMonthKey();

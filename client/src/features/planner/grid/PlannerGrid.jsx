@@ -8,7 +8,7 @@ import { resourceMatchesNeed } from '../../../lib/resourceUtils';
 import { monthRange, computePeriods, currentMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
-import { useVisibility } from '../../../contexts/VisibilityContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { LW, CW } from '../../../lib/constants';
 
 const BAR_H = 28;
@@ -31,7 +31,8 @@ function sortCustomers(customers, sort) {
 export default function PlannerGrid({ heldResource, timeRange, aggregation, showUnassignedOnly, customerSort, filterIds, resourceFilterIds, myProjectsOnly, onCellClick, onBarClick, onEditCustomer, onDeleteCustomer, onAddProject, onEditProject, onDeleteProject, onAddNeed, onEditNeed, onDeleteNeed, onSuggestNeed, onPaintNeed, onPaintAssign, onUndoable }) {
   const { customers, projects, needs, assignments } = useData();
   const { canEdit } = useOrg();
-  const { selfResourceId } = useVisibility();
+  const { user } = useAuth();
+  const myUserId = user?.id;
 
   const months = useMemo(() => monthRange(timeRange.start, timeRange.end), [timeRange]);
   const periods = useMemo(() => computePeriods(months, aggregation), [months, aggregation]);
@@ -51,15 +52,15 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
   // "My projects": only projects where I'm the responsible person (directly,
   // or via being the customer's responsible).
   const myRows = useMemo(() => {
-    if (!myProjectsOnly || !selfResourceId) return filteredRows;
+    if (!myProjectsOnly || !myUserId) return filteredRows;
     const isMine = (project, customer) =>
-      project?.responsiblePersonId === selfResourceId ||
-      customer?.responsiblePersonId === selfResourceId;
+      project?.responsibleUserId === myUserId ||
+      customer?.responsibleUserId === myUserId;
     const keptProjectIds = new Set();
     const keptCustomerIds = new Set();
     for (const row of filteredRows) {
       // A customer I'm responsible for is mine wholesale (all its projects).
-      if (row.type === 'customer' && row.data.responsiblePersonId === selfResourceId) {
+      if (row.type === 'customer' && row.data.responsibleUserId === myUserId) {
         keptCustomerIds.add(row.data.id);
       }
       if (row.type === 'project' && isMine(row.data, row.customer)) {
@@ -73,7 +74,7 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
       if (row.type === 'need') return keptProjectIds.has(row.project.id);
       return keptProjectIds.has(row.data.id);
     });
-  }, [filteredRows, myProjectsOnly, selfResourceId]);
+  }, [filteredRows, myProjectsOnly, myUserId]);
 
   // Employee filter: only needs the selected people are assigned to.
   const peopleRows = useMemo(() => {
