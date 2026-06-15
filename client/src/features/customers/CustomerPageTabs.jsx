@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useOrg } from '../../contexts/OrgContext';
 
 const TAB_CLASS = ({ isActive }) =>
-  `relative px-3.5 py-2 text-[11.5px] font-bold no-underline rounded-t-[10px] transition-colors ${
+  `relative px-4 py-2.5 text-sm font-bold no-underline rounded-t-[10px] transition-colors ${
     isActive
       ? 'text-primary after:absolute after:left-2.5 after:right-2.5 after:-bottom-px after:h-[2.5px] after:rounded after:bg-primary'
       : 'text-text-mid hover:text-text'
