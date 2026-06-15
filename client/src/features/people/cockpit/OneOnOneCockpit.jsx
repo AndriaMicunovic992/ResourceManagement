@@ -10,7 +10,6 @@ import MiniThread, { ReplyToggle } from '../../../components/ui/MiniThread';
 import SignalChart from '../../../components/ui/SignalChart';
 import { LockIcon } from '../../../components/ui/icons';
 import {
-  LOG_KIND_OPTIONS,
   LOG_KIND_COLORS,
   LOG_KIND_LABELS,
 } from '../../../lib/constants';
@@ -499,91 +498,11 @@ function CareerPanel({ personId, oneOnOneId, entries, setEntries }) {
   );
 }
 
-/** Quick-add an entry attached to this 1:1. */
-function QuickAddEntry({ personId, oneOnOneId, logCategories, onCreated }) {
-  const kinds = LOG_KIND_OPTIONS.filter((k) => k.value !== 'project_checkin');
-  const [kind, setKind] = useState('strength');
-  const [categoryId, setCategoryId] = useState('');
-  const [content, setContent] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const activeCategories = logCategories.filter((c) => c.active !== false);
-
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    if (!content.trim()) return;
-    setBusy(true);
-    setError('');
-    try {
-      const created = await api.createLog(personId, {
-        content: content.trim(),
-        kind,
-        categoryIds: categoryId ? [categoryId] : [],
-        oneOnOneId,
-      });
-      onCreated(created);
-      setContent('');
-    } catch (err) {
-      setError(err.message || 'Failed to add entry');
-    }
-    setBusy(false);
-  };
-
-  return (
-    <form onSubmit={handleAdd} className="space-y-1.5 pt-2 border-t border-border-light">
-      <div className="flex gap-1.5 min-w-0">
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value)}
-          className="shrink-0 max-w-[110px] px-1.5 py-1 border border-border-light rounded-lg text-[11px] text-text outline-none bg-white"
-        >
-          {kinds.map((k) => (
-            <option key={k.value} value={k.value}>
-              {k.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="flex-1 min-w-0 w-full px-1.5 py-1 border border-border-light rounded-lg text-[11px] text-text outline-none bg-white"
-        >
-          <option value="">No category</option>
-          {activeCategories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.grouping ? `${c.grouping} · ${c.name}` : c.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <input
-          type="text"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Log something from this conversation…"
-          maxLength={5000}
-          className="flex-1 px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
-        />
-        <button
-          type="submit"
-          disabled={busy || !content.trim()}
-          className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105 disabled:opacity-40"
-        >
-          Log
-        </button>
-      </div>
-      {error && <div className="text-[10px] text-danger">{error}</div>}
-    </form>
-  );
-}
-
 export default function OneOnOneCockpit() {
   const { personId, oneOnOneId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { resources, projects, customers, needs, assignments, skills, logCategories } = useData();
+  const { resources, projects, customers, needs, assignments, skills } = useData();
   const visibility = useVisibility();
 
   const person = resources.find((r) => r.id === personId);
@@ -806,10 +725,12 @@ export default function OneOnOneCockpit() {
           />
         </div>
 
-        {/* Context column */}
-        <div className="space-y-4">
-          <Panel title={previousMeetingDate ? 'Since the last 1:1' : 'Recent entries'}>
-            <div className="space-y-1.5 max-h-96 overflow-y-auto mb-1">
+        {/* Context column — one unified sticky card (like the customer review). */}
+        <div className="lg:sticky lg:top-4 self-start bg-white rounded-2xl border border-border-light shadow-card p-4">
+          <h3 className="text-[13px] font-bold text-text m-0 mb-2">
+            {previousMeetingDate ? 'Since the last 1:1' : 'Recent entries'}
+          </h3>
+          <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1 -mr-1">
               {recentLogs.length === 0 && (
                 <div className="text-xs text-text-light">No entries in this window.</div>
               )}
@@ -875,19 +796,10 @@ export default function OneOnOneCockpit() {
                 );
               })}
             </div>
-            <QuickAddEntry
-              personId={personId}
-              oneOnOneId={oneOnOneId}
-              logCategories={logCategories}
-              onCreated={(created) => {
-                setRecentLogs((prev) => [created, ...prev]);
-                setAttachedLogs((prev) => [...prev, created]);
-              }}
-            />
-          </Panel>
 
           {signalsByCustomer.length > 0 && (
-            <Panel title="Client signals (PM-perceived)">
+            <div className="mt-4 pt-4 border-t border-border-light">
+              <h3 className="text-[13px] font-bold text-text m-0 mb-2">Client signals (PM-perceived)</h3>
               <div className="space-y-3">
                 {signalsByCustomer.map(([customerName, list]) => {
                   const byMonth = new Map(list.map((s) => [s.month, s.rating]));
@@ -903,10 +815,11 @@ export default function OneOnOneCockpit() {
                   );
                 })}
               </div>
-            </Panel>
+            </div>
           )}
 
-          <Panel title="Planned allocation">
+          <div className="mt-4 pt-4 border-t border-border-light">
+            <h3 className="text-[13px] font-bold text-text m-0 mb-2">Planned allocation</h3>
             {activeProjects.length === 0 ? (
               <div className="text-xs text-text-light">No active assignments.</div>
             ) : (
@@ -945,9 +858,10 @@ export default function OneOnOneCockpit() {
                 </tbody>
               </table>
             )}
-          </Panel>
+          </div>
 
-          <Panel title="Skills">
+          <div className="mt-4 pt-4 border-t border-border-light">
+            <h3 className="text-[13px] font-bold text-text m-0 mb-2">Skills</h3>
             {personSkills.length === 0 ? (
               <div className="text-xs text-text-light">No skills recorded.</div>
             ) : (
@@ -962,7 +876,7 @@ export default function OneOnOneCockpit() {
                 ))}
               </div>
             )}
-          </Panel>
+          </div>
         </div>
       </div>
     </div>

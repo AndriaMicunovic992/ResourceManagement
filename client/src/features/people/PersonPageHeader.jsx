@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Avatar from '../../components/ui/Avatar';
 import RoleBadge from '../../components/badges/RoleBadge';
 import { useComputed } from '../../hooks/useComputed';
@@ -22,7 +21,6 @@ function Stat({ value, label, color, spark }) {
 
 /** Entity-detail profile card: avatar + chips left, live stats middle, actions right. */
 export default function PersonPageHeader({ resource, canEdit, onEdit, viewMode }) {
-  const navigate = useNavigate();
   const { rU } = useComputed();
   const domain = resourcePrimaryDomain(resource);
   const color = domainColor(domain);
@@ -30,7 +28,6 @@ export default function PersonPageHeader({ resource, canEdit, onEdit, viewMode }
   const monthShort = MONTHS[parseInt(m0.slice(5), 10) - 1];
 
   const [evals, setEvals] = useState(null);
-  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     let dead = false;
@@ -71,22 +68,6 @@ export default function PersonPageHeader({ resource, canEdit, onEdit, viewMode }
     return all;
   }, [resource]);
 
-  // Same flow as the 1:1 tab: create a meeting dated today, jump to the cockpit.
-  const handleStartOneOnOne = async () => {
-    setStarting(true);
-    try {
-      const created = await api.createOneOnOne(resource.id, {
-        meetingDate: new Date().toISOString().slice(0, 10),
-      });
-      navigate(`/people/${resource.id}/oneonones/${created.id}/cockpit`);
-    } catch {
-      setStarting(false);
-      navigate(`/people/${resource.id}/oneonones`);
-    }
-  };
-
-  const canRunOneOnOne = viewMode === 'admin' || viewMode === 'manager';
-
   return (
     <div
       className="flex items-center gap-4 border border-border-light rounded-[18px] p-[18px] mb-4 flex-wrap"
@@ -112,25 +93,16 @@ export default function PersonPageHeader({ resource, canEdit, onEdit, viewMode }
         <Stat value={`${utilization}%`} label={`utilized · ${monthShort}`} color={utilization > 100 ? '#E8636F' : undefined} />
         <Stat value={lastEval ?? '—'} label="last eval" color={lastEval != null ? scoreColor(lastEval) : undefined} spark={evalSpark} />
       </div>
-      <div className="flex gap-2 lg:ml-4 items-center">
-        {canRunOneOnOne && (
-          <button
-            onClick={handleStartOneOnOne}
-            disabled={starting}
-            className="border-0 rounded-[11px] font-bold text-[11.5px] px-3.5 py-2.5 cursor-pointer bg-primary text-white shadow-[0_3px_10px_rgba(76,186,212,0.35)] hover:brightness-105 disabled:opacity-60"
-          >
-            ▶ {starting ? 'Starting…' : 'Start 1:1'}
-          </button>
-        )}
-        {canEdit && (
+      {canEdit && (
+        <div className="flex gap-2 lg:ml-4 items-center">
           <button
             onClick={onEdit}
             className="rounded-[11px] font-bold text-[11.5px] px-3.5 py-2.5 cursor-pointer bg-white text-text-mid border border-border-light hover:bg-primary-bg"
           >
             ✎ Edit
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

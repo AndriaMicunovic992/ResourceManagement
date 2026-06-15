@@ -15,7 +15,7 @@ function formatDate(value) {
  * Flat 1:1 row — all detail work happens in the cockpit. No expansion, no
  * inline entry editing here.
  */
-export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = false }) {
+export default function OneOnOneCard({ record, onDelete, readOnly = false }) {
   const author = record.authorUser;
   const authorName = author?.name || author?.email || 'Unknown';
 
@@ -48,12 +48,6 @@ export default function OneOnOneCard({ record, onEdit, onDelete, readOnly = fals
           >
             Cockpit
           </Link>
-          <button
-            onClick={onEdit}
-            className="text-[11px] font-bold text-text-mid bg-white border border-border-light rounded-lg px-3 py-1.5 cursor-pointer hover:bg-primary-bg"
-          >
-            Edit
-          </button>
           <button
             onClick={onDelete}
             className="text-[11px] font-bold text-danger bg-danger-bg border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-95"
