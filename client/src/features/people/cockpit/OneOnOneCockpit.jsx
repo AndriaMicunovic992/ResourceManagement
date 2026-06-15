@@ -6,7 +6,7 @@ import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 import Avatar from '../../../components/ui/Avatar';
 import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
-import MiniThread from '../../../components/ui/MiniThread';
+import MiniThread, { ReplyToggle } from '../../../components/ui/MiniThread';
 import SignalChart from '../../../components/ui/SignalChart';
 import { LockIcon } from '../../../components/ui/icons';
 import {
@@ -701,6 +701,13 @@ export default function OneOnOneCockpit() {
 
   // "Since last 1:1" entries grouped per customer, each group collapsible.
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const [openReplies, setOpenReplies] = useState(() => new Set());
+  const toggleReply = (id) =>
+    setOpenReplies((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   const recentGroups = useMemo(() => {
     const map = new Map();
     for (const log of recentLogs) {
@@ -826,22 +833,25 @@ export default function OneOnOneCockpit() {
                     {!collapsed &&
                       list.map((log) => (
                         <div key={log.id} className="rounded-lg border border-border-light p-2 mb-1.5">
-                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                            <span
-                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase ${
-                                LOG_KIND_COLORS[log.kind] || LOG_KIND_COLORS.note
-                              }`}
-                            >
-                              {LOG_KIND_LABELS[log.kind] || log.kind}
-                            </span>
-                            {(log.categories || []).map((c) => (
+                          <div className="flex items-start gap-1.5 mb-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                               <span
-                                key={c.id}
-                                className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary"
+                                className={`text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase ${
+                                  LOG_KIND_COLORS[log.kind] || LOG_KIND_COLORS.note
+                                }`}
                               >
-                                {c.name}
+                                {LOG_KIND_LABELS[log.kind] || log.kind}
                               </span>
-                            ))}
+                              {(log.categories || []).map((c) => (
+                                <span
+                                  key={c.id}
+                                  className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary-light text-primary"
+                                >
+                                  {c.name}
+                                </span>
+                              ))}
+                            </div>
+                            <ReplyToggle open={openReplies.has(log.id)} onClick={() => toggleReply(log.id)} />
                           </div>
                           <div className="text-xs text-text whitespace-pre-wrap">{log.content}</div>
                           <div className="text-[10px] text-text-light mt-0.5">
@@ -850,6 +860,8 @@ export default function OneOnOneCockpit() {
                           <MiniThread
                             personId={personId}
                             log={log}
+                            open={openReplies.has(log.id)}
+                            onToggle={() => toggleReply(log.id)}
                             onUpdated={(updated) =>
                               setRecentLogs((prev) =>
                                 prev.map((l) => (l.id === updated.id ? updated : l))

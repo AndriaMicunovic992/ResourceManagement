@@ -3,10 +3,15 @@ import { api } from '../../lib/api';
 import { ReplyIcon } from './icons';
 
 /** Compact reply thread on an entry (used in the 1:1 and PM review cockpits).
- * The composer is collapsed behind a reply icon until you click it. */
-export default function MiniThread({ personId, log, onUpdated }) {
+ * The composer is collapsed behind a reply icon. The trigger can live here
+ * (uncontrolled) or be hoisted into the entry header (controlled via `open` /
+ * `onToggle`), in which case this only renders comments + the composer. */
+export default function MiniThread({ personId, log, onUpdated, open: openProp, onToggle }) {
   const [text, setText] = useState('');
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openState;
+  const setOpen = (v) => (controlled ? onToggle?.(v) : setOpenState(v));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const comments = log.comments || [];
@@ -29,14 +34,14 @@ export default function MiniThread({ personId, log, onUpdated }) {
   const hasContent = comments.length > 0 || open;
 
   return (
-    <div className={hasContent ? 'mt-1.5 pt-1.5 border-t border-border-light' : 'mt-1'}>
+    <div className={hasContent ? 'mt-1.5 pt-1.5 border-t border-border-light' : ''}>
       {comments.map((c) => (
         <div key={c.id} className="text-[11px] text-text py-0.5">
           <span className="font-semibold text-text-mid">{c.authorUser?.name || '—'}:</span>{' '}
           {c.content}
         </div>
       ))}
-      {open ? (
+      {open && (
         <form onSubmit={send} className="flex items-center gap-1 mt-1">
           <input
             type="text"
@@ -57,7 +62,8 @@ export default function MiniThread({ personId, log, onUpdated }) {
             <ReplyIcon size={12} />
           </button>
         </form>
-      ) : (
+      )}
+      {!open && !controlled && (
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -70,5 +76,22 @@ export default function MiniThread({ personId, log, onUpdated }) {
       )}
       {err && <div className="text-[10px] text-danger mt-0.5">{err}</div>}
     </div>
+  );
+}
+
+/** Reply toggle to drop into an entry header so the icon sits up top-right. */
+export function ReplyToggle({ open, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Reply"
+      title="Reply"
+      className={`ml-auto inline-flex items-center justify-center w-6 h-6 rounded-md bg-transparent border-0 cursor-pointer p-0 shrink-0 hover:bg-primary-bg ${
+        open ? 'text-primary' : 'text-text-light hover:text-primary'
+      }`}
+    >
+      <ReplyIcon size={13} />
+    </button>
   );
 }
