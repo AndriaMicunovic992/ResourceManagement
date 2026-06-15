@@ -4,7 +4,7 @@ import { api } from '../../../lib/api';
 import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 import Avatar from '../../../components/ui/Avatar';
-import MiniThread from '../../../components/ui/MiniThread';
+import MiniThread, { ReplyToggle } from '../../../components/ui/MiniThread';
 import SignalChart from '../../../components/ui/SignalChart';
 import CategoryMultiPicker from '../../../components/forms/CategoryMultiPicker';
 import { fteToHours, LOG_KIND_COLORS, LOG_KIND_LABELS } from '../../../lib/constants';
@@ -222,6 +222,7 @@ function PersonReviewCard({
   logCategories,
   monthSignal,
   onSignal,
+  onSignalCleared,
   entries,
   onEntryCreated,
   onEntryUpdated,
@@ -235,12 +236,18 @@ function PersonReviewCard({
     setSignalBusy(true);
     setError('');
     try {
-      const saved = await api.upsertCustomerSignal(customer.id, {
-        resourceId: person.id,
-        month,
-        rating,
-      });
-      onSignal(saved);
+      if (monthSignal?.rating === rating && monthSignal?.id) {
+        // Clicking the selected rating again clears this month's signal.
+        await api.deleteCustomerSignal(customer.id, monthSignal.id);
+        onSignalCleared(person.id, month);
+      } else {
+        const saved = await api.upsertCustomerSignal(customer.id, {
+          resourceId: person.id,
+          month,
+          rating,
+        });
+        onSignal(saved);
+      }
     } catch (err) {
       setError(err.message || 'Failed to save rating');
     }
@@ -278,6 +285,7 @@ function PersonReviewCard({
                 key={n}
                 disabled={signalBusy}
                 onClick={() => handleRate(n)}
+                title={monthSignal?.rating === n ? 'Click again to clear' : `Set ${n}/5`}
                 className={`w-7 h-7 rounded-lg border text-xs font-bold cursor-pointer ${
                   monthSignal?.rating === n
                     ? 'bg-primary text-white border-primary'
@@ -361,6 +369,13 @@ export default function CustomerReviewCockpit() {
   const [reviewEntries, setReviewEntries] = useState([]);
   const [recentEntries, setRecentEntries] = useState([]);
   const [collapsedPeople, setCollapsedPeople] = useState(() => new Set());
+  const [openReplies, setOpenReplies] = useState(() => new Set());
+  const toggleReply = (id) =>
+    setOpenReplies((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -532,6 +547,11 @@ export default function CustomerReviewCockpit() {
                     return [...rest, saved];
                   })
                 }
+                onSignalCleared={(resourceId, m) =>
+                  setSignals((prev) =>
+                    prev.filter((s) => !(s.resourceId === resourceId && s.month === m))
+                  )
+                }
                 entries={reviewEntries.filter((l) => l.resourceId === person.id)}
                 onEntryCreated={(created) => setReviewEntries((prev) => [created, ...prev])}
                 onEntryUpdated={(updated) =>
@@ -581,7 +601,7 @@ export default function CustomerReviewCockpit() {
                     {!collapsed &&
                       personLogs.map((log) => (
                         <div key={log.id} className="rounded-lg border border-border-light p-2 mb-1.5">
-                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                          <div className="flex items-center gap-1.5 mb-0.5">
                             <span
                               className={`text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase ${
                                 LOG_KIND_COLORS[log.kind] || LOG_KIND_COLORS.note
@@ -592,11 +612,14 @@ export default function CustomerReviewCockpit() {
                             <span className="text-[10px] text-text-light">
                               {formatDate(log.createdAt)}
                             </span>
+                            <ReplyToggle open={openReplies.has(log.id)} onClick={() => toggleReply(log.id)} />
                           </div>
                           <div className="text-xs text-text whitespace-pre-wrap">{log.content}</div>
                           <MiniThread
                             personId={log.resourceId}
                             log={log}
+                            open={openReplies.has(log.id)}
+                            onToggle={() => toggleReply(log.id)}
                             onUpdated={(updated) =>
                               setRecentEntries((prev) =>
                                 prev.map((l) => (l.id === updated.id ? updated : l))
