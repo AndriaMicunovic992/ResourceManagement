@@ -9,6 +9,10 @@ A multi-tenant resource-planning + people-management app for databob.ch. Monorep
 
 Two source-of-truth specs describe intended behavior: `UI-SPEC.md` (design tokens, data model, component behavior) and `CLAUDE-CODE-INSTRUCTIONS.md` (architecture, backend design, deployment). The original product brief is `databob-resource-manager-brief.md`. Consult these when a change touches design or domain rules.
 
+## Delivery workflow
+
+Per the maintainer's standing instruction: **finish each request by opening a PR and merging it to `main`.** Commit and push to the working branch, open a PR, **wait for CI to pass** (server typecheck + tests, client build), then merge (standard merge commit so the working branch stays in sync). Never merge red CI — fix and re-push instead. Call out anything that hits production hard (e.g. a new Prisma migration) in the merge summary so it's visible, not silent.
+
 ## Commands
 
 ```bash
