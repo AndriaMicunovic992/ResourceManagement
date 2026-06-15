@@ -2,6 +2,27 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { useVisibility } from '../contexts/VisibilityContext';
 import { api } from '../lib/api';
+import { firstName } from '../lib/resourceUtils';
+
+// Turn the top reminder into a compact nudge (title + one-line sub + link).
+function reminderCopy(item) {
+  if (!item) return null;
+  if (item.type === 'oneOnOne') return {
+    title: `1:1 with ${firstName(item.resourceName)} is due`,
+    sub: item.lastAt ? `Last one ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago` : 'No 1:1 on record yet',
+    to: `/people/${item.resourceId}/oneonones`,
+  };
+  if (item.type === 'pmUpdate') return {
+    title: `PM update due · ${item.customerName}`,
+    sub: item.lastAt ? `Last review ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago` : 'No review yet',
+    to: `/customers/${item.customerId}/review`,
+  };
+  return {
+    title: `Signal missing · ${item.customerName}`,
+    sub: 'No signal logged this month',
+    to: `/customers/${item.customerId}/review`,
+  };
+}
 
 const ICONS = {
   home: <path d="M3 12 12 3l9 9M5 10v10h14V10" />,
@@ -80,7 +101,7 @@ export default function Sidebar() {
     { to: '/settings', label: 'Settings', icon: 'settings' },
   ];
 
-  const counts = due.reduce((m, i) => { m[i.type] = (m[i.type] || 0) + 1; return m; }, {});
+  const callout = reminderCopy(due[0]);
 
   return (
     <aside
@@ -110,28 +131,28 @@ export default function Sidebar() {
         ))}
       </nav>
       <div className="flex-1" />
-      {due.length > 0 && !collapsed && (
-        <div className="rounded-2xl border border-border-light bg-gradient-to-b from-[#F4FBFD] to-white p-3 mb-1">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-text mb-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-danger" />
-            Due now
+      {/* Top-reminder nudge (compact version of the dashboard callout) + queue. */}
+      {callout && !collapsed && (
+        <Link
+          to={callout.to}
+          className="block no-underline rounded-xl p-2.5 text-white shadow-card mb-1.5"
+          style={{ background: 'linear-gradient(135deg, #2E7D8F, #4CBAD4)' }}
+        >
+          <div className="flex items-center gap-1 mb-1 opacity-90">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M10.3 21a1.9 1.9 0 0 0 3.4 0" /></svg>
+            <span className="text-[8.5px] font-bold uppercase tracking-wider">Due now</span>
           </div>
-          {counts.oneOnOne > 0 && (
-            <div className="text-[10.5px] text-text-mid py-0.5"><b className="text-text">{counts.oneOnOne}×</b> 1:1 overdue</div>
-          )}
-          {counts.pmUpdate > 0 && (
-            <div className="text-[10.5px] text-text-mid py-0.5"><b className="text-text">{counts.pmUpdate}×</b> PM update due</div>
-          )}
-          {counts.clientSignal > 0 && (
-            <div className="text-[10.5px] text-text-mid py-0.5"><b className="text-text">{counts.clientSignal}×</b> signal missing</div>
-          )}
-          <Link
-            to="/people"
-            className="block text-center mt-2 bg-primary text-white rounded-lg text-[10.5px] font-bold py-1.5 no-underline hover:opacity-90"
-          >
-            Open queue
-          </Link>
-        </div>
+          <b className="block text-[11px] leading-snug">{callout.title}</b>
+          <p className="text-[9px] opacity-85 mt-0.5 mb-0 leading-snug">{callout.sub}</p>
+        </Link>
+      )}
+      {due.length > 0 && !collapsed && (
+        <Link
+          to="/people"
+          className="block text-center text-[10px] font-bold text-text-mid bg-white border border-border-light rounded-lg py-1.5 no-underline hover:bg-primary-bg mb-1"
+        >
+          Open queue · {due.length}
+        </Link>
       )}
       {due.length > 0 && collapsed && (
         <Link to="/people" title={`${due.length} reminders due`} className="mx-auto mb-1 w-8 h-8 rounded-xl bg-danger-bg text-danger text-[10px] font-bold flex items-center justify-center no-underline">

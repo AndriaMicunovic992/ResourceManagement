@@ -324,27 +324,8 @@ export default function HomeDashboard() {
     });
   }, [myCustomers, projects, needs, assignments, m0, pmInfo, reminders]);
 
-  const topReminder = reminders[0];
-  const reminderCopy = (item) => {
-    if (!item) return null;
-    if (item.type === 'oneOnOne') return {
-      title: `1:1 with ${firstName(item.resourceName)} is due`,
-      sub: item.lastAt ? `Last one ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago — worth a slot this week.` : 'No 1:1 on record yet — worth a slot this week.',
-      to: `/people/${item.resourceId}/oneonones`,
-    };
-    if (item.type === 'pmUpdate') return {
-      title: `PM update due for ${item.customerName}`,
-      sub: item.lastAt ? `Last review ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago.` : 'No review on record yet.',
-      to: `/customers/${item.customerId}/review`,
-    };
-    return {
-      title: `Client signal missing for ${item.customerName}`,
-      sub: 'No satisfaction signal logged this month.',
-      to: `/customers/${item.customerId}/review`,
-    };
-  };
-  const callout = reminderCopy(topReminder);
-  const hasRail = railPeople.length > 0 || pmRows.length > 0 || !!callout || reminders.length > 1;
+  // The top-reminder nudge moved into the left sidebar (Sidebar.jsx).
+  const hasRail = railPeople.length > 0 || pmRows.length > 0;
 
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -585,23 +566,6 @@ export default function HomeDashboard() {
                 />
               ))}
             </RailSection>
-          )}
-
-          {callout && (
-            <Link to={callout.to} className="relative block no-underline rounded-2xl p-4 text-white shadow-card" style={{ background: 'linear-gradient(135deg, #2E7D8F, #4CBAD4)' }}>
-              <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center mb-2.5">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M10.3 21a1.9 1.9 0 0 0 3.4 0" /></svg>
-              </div>
-              <b className="block text-[12.5px] leading-snug">{callout.title}</b>
-              <p className="text-[10.5px] opacity-85 mt-1 mb-0 leading-snug">{callout.sub}</p>
-              <span className="absolute right-3.5 bottom-3 text-base opacity-90">→</span>
-            </Link>
-          )}
-
-          {reminders.length > 1 && (
-            <Link to="/people" className="text-center text-[10.5px] font-semibold text-text-mid no-underline bg-white border border-border-light rounded-xl py-2 hover:bg-primary-bg/50">
-              {reminders.length - 1} more reminder{reminders.length === 2 ? '' : 's'} in the queue
-            </Link>
           )}
         </div>
         )}
