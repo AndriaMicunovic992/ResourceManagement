@@ -113,6 +113,20 @@ function EntryComposer({ row, person, customer, reviewId, projects, logCategorie
   );
 }
 
+/** Compact "+" that sits next to a dimension label to open its composer. */
+function AddDot({ onClick, label }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={`Add to ${label}`}
+      title={`Add to ${label}`}
+      className="w-[18px] h-[18px] rounded-full bg-primary-light text-primary text-[13px] leading-none font-bold flex items-center justify-center cursor-pointer hover:bg-primary hover:text-white transition shrink-0"
+    >
+      +
+    </button>
+  );
+}
+
 /**
  * General (whole-customer) section: entries unrelated to a specific person.
  * They roll into the evaluation of everyone working on the customer/project.
@@ -148,15 +162,10 @@ function GeneralReviewCard({ customer, reviewId, custProjects, logCategories, en
       <div className="space-y-2.5 mt-3">
         {REVIEW_ROWS.map((row) => (
           <div key={row.kind}>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5 mb-1">
               <div className="text-[10px] uppercase tracking-wider text-text-mid font-bold">{row.label}</div>
               {composing !== row.kind && (
-                <button
-                  onClick={() => setComposing(row.kind)}
-                  className="text-[11px] font-bold text-text-mid bg-white border border-border-light rounded-lg px-2.5 py-0.5 cursor-pointer hover:bg-primary-bg"
-                >
-                  + Add entry
-                </button>
+                <AddDot onClick={() => setComposing(row.kind)} label={row.label} />
               )}
             </div>
             {composing === row.kind && (
@@ -286,17 +295,12 @@ function PersonReviewCard({
       <div className="space-y-2.5">
         {REVIEW_ROWS.map((row) => (
           <div key={row.kind}>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5 mb-1">
               <div className="text-[10px] uppercase tracking-wider text-text-mid font-bold">
                 {row.label}
               </div>
               {composing !== row.kind && (
-                <button
-                  onClick={() => setComposing(row.kind)}
-                  className="text-[11px] font-bold text-text-mid bg-white border border-border-light rounded-lg px-2.5 py-0.5 cursor-pointer hover:bg-primary-bg"
-                >
-                  + Add entry
-                </button>
+                <AddDot onClick={() => setComposing(row.kind)} label={row.label} />
               )}
             </div>
             {composing === row.kind && (
