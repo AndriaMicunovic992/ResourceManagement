@@ -8,6 +8,7 @@ import { DEFAULT_SKILLS } from '../../lib/defaultSkills';
 import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
 import PageHeader from '../../components/ui/PageHeader';
+import RolesSection from './RolesSection';
 
 const ROLES = ['viewer', 'member', 'admin'];
 
@@ -513,6 +514,7 @@ export default function SettingsView() {
         ]
       : []),
     { id: 'members', label: 'Members' },
+    ...(isAdmin ? [{ id: 'roles', label: 'Roles & permissions' }] : []),
   ];
 
   return (
@@ -1296,6 +1298,13 @@ export default function SettingsView() {
           </form>
         )}
       </div>
+
+      {isAdmin && (
+        <div id="roles" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-4">Roles &amp; permissions</h3>
+          <RolesSection />
+        </div>
+      )}
         </div>
       </div>
     </div>

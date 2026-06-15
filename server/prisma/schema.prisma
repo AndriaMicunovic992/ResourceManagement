@@ -30,6 +30,7 @@ model Organization {
   updatedAt       DateTime @updatedAt
 
   members     OrgMember[]
+  roles       Role[]
   customers   Customer[]
   projects    Project[]
   resources   Resource[]
@@ -96,6 +97,28 @@ model OrgMember {
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([userId, orgId])
+}
+
+// A role is a named permission matrix, scoped to one org. The four system roles
+// (owner/admin/member/viewer) are seeded per org and can be tuned; admins can
+// also add custom roles. `OrgMember.role` references this by `key`.
+// `permissions` is { [segment]: { scope: none|own|team|all, create, edit, delete } }.
+// `level` is the legacy 1-4 rank, kept as a fallback gate while enforcement
+// migrates from role-level checks to the matrix.
+model Role {
+  id          String   @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  key         String
+  name        String
+  level       Int
+  isSystem    Boolean  @default(false)
+  permissions Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([orgId, key])
+  @@index([orgId])
 }
 
 // Pending org access for an email that may not have an account yet. Created by

@@ -68,6 +68,7 @@ export const api = {
   updateOrg: (data) => apiFetch('/org', { method: 'PATCH', body: JSON.stringify(data) }),
 
   // Org Members
+  getRoles: () => apiFetch('/roles'),
   getMembers: () => apiFetch('/org/members'),
   addMember: (email, role) => apiFetch('/org/members', { method: 'POST', body: JSON.stringify({ email, role }) }),
   updateMemberRole: (id, role) => apiFetch('/org/members/' + id, { method: 'PATCH', body: JSON.stringify({ role }) }),
