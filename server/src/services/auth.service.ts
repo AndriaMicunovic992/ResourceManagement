@@ -2,7 +2,7 @@ import { prisma } from '../db/prisma.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { UnauthorizedError, ConflictError } from '../utils/errors.js';
 import type { SignupInput, LoginInput } from '../schemas/auth.schema.js';
-import { ensureSystemRoles } from './role.service.js';
+import { seedDefaultRoles } from './role.service.js';
 
 export const authService = {
   async signup(input: SignupInput) {
@@ -28,7 +28,7 @@ export const authService = {
       return { user, org };
     });
 
-    await ensureSystemRoles(org.id);
+    await seedDefaultRoles(org.id);
     return { user: { id: user.id, email: user.email, name: user.name }, org };
   },
 

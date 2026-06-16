@@ -1,14 +1,21 @@
 import { prisma } from '../db/prisma.js';
 import { Prisma } from '@prisma/client';
-import { SYSTEM_ROLES, SEGMENTS, SCOPES, normalizeMatrix, systemRoleDef } from '../lib/permissions.js';
+import {
+  SYSTEM_ROLES,
+  SEGMENTS,
+  SCOPES,
+  normalizeMatrix,
+  systemRoleDef,
+  type SystemRoleDef,
+} from '../lib/permissions.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/errors.js';
 
-/**
- * Idempotently ensure the four system roles exist for an org. Existing rows are
- * left untouched (so admin tweaks to a system role's matrix survive).
- */
-export async function ensureSystemRoles(orgId: string): Promise<void> {
-  for (const def of SYSTEM_ROLES) {
+// owner & admin are required and locked: they always exist and always have
+// full access (editing/deleting them risks an org locking itself out).
+const LOCKED_KEYS = new Set(['owner', 'admin']);
+
+async function upsertRoles(orgId: string, defs: SystemRoleDef[]): Promise<void> {
+  for (const def of defs) {
     await prisma.role.upsert({
       where: { orgId_key: { orgId, key: def.key } },
       update: {},
@@ -24,18 +31,27 @@ export async function ensureSystemRoles(orgId: string): Promise<void> {
   }
 }
 
-// owner & admin matrices are locked at full access — editing them risks an
-// admin locking themselves (or everyone) out of org administration.
-const LOCKED_KEYS = new Set(['owner', 'admin']);
+/**
+ * Ensure the always-required roles (owner, admin) exist. Runs on every read.
+ * member/viewer are seeded only at org creation so they can be deleted.
+ */
+export async function ensureBaseRoles(orgId: string): Promise<void> {
+  await upsertRoles(orgId, SYSTEM_ROLES.filter((r) => LOCKED_KEYS.has(r.key)));
+}
+
+/** Seed the full default set (owner/admin/member/viewer) for a new org. */
+export async function seedDefaultRoles(orgId: string): Promise<void> {
+  await upsertRoles(orgId, SYSTEM_ROLES);
+}
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'role';
 }
 
 export const roleService = {
-  /** All roles for an org (system roles seeded on demand), highest level first. */
+  /** All roles for an org (owner/admin ensured on demand), highest level first. */
   async list(orgId: string) {
-    await ensureSystemRoles(orgId);
+    await ensureBaseRoles(orgId);
     const roles = await prisma.role.findMany({
       where: { orgId },
       orderBy: [{ level: 'desc' }, { name: 'asc' }],
@@ -90,7 +106,7 @@ export const roleService = {
     }
 
     const data: Prisma.RoleUpdateInput = {};
-    if (input.name !== undefined && !role.isSystem) {
+    if (input.name !== undefined) {
       const name = input.name.trim();
       if (!name) throw new BadRequestError('Role name is required');
       data.name = name;
@@ -109,7 +125,7 @@ export const roleService = {
   async remove(orgId: string, id: string) {
     const role = await prisma.role.findFirst({ where: { id, orgId } });
     if (!role) throw new NotFoundError('Role not found');
-    if (role.isSystem) throw new ForbiddenError('System roles can’t be deleted');
+    if (LOCKED_KEYS.has(role.key)) throw new ForbiddenError('The owner and admin roles can’t be deleted');
     const inUse = await prisma.orgMember.count({ where: { orgId, role: role.key } });
     if (inUse > 0) {
       throw new BadRequestError(
