@@ -5,6 +5,7 @@ import {
   saveConnectionSchema,
   createWorkItemSchema,
   updateWorkItemSchema,
+  mapEntitySchema,
 } from '../schemas/integration.schema.js';
 
 // All integration settings are admin-only. The connection endpoint never
@@ -19,8 +20,33 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.saveConnection(req.orgId, data);
   });
 
+  // Validate the stored credentials against Jira.
+  app.post('/integration/jira/test', { preHandler: requireRole('admin') }, async (req) => {
+    return integrationService.testConnection(req.orgId);
+  });
+
+  // Pull projects / epics / accounts from Jira into the local cache.
+  app.post('/integration/jira/refresh', { preHandler: requireRole('admin') }, async (req) => {
+    return integrationService.refreshFromJira(req.orgId);
+  });
+
+  // Pulled Jira accounts (the People-mapping "Account" dropdown).
+  app.get('/integration/jira/accounts', { preHandler: requireRole('admin') }, async (req) => {
+    return integrationService.listAccounts(req.orgId);
+  });
+
   app.get('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {
     return integrationService.listWorkItems(req.orgId);
+  });
+
+  // Map one of our customers/projects to a Jira work item (our-entity side).
+  app.put('/integration/jira/mapping', { preHandler: requireRole('admin') }, async (req) => {
+    const data = mapEntitySchema.parse(req.body);
+    return integrationService.mapEntityToWorkItem(
+      req.orgId,
+      { customerId: data.customerId ?? null, projectId: data.projectId ?? null },
+      data.workItemId
+    );
   });
 
   app.post('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {

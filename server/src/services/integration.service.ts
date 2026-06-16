@@ -1,6 +1,41 @@
 import { prisma } from '../db/prisma.js';
 import { NotFoundError, ConflictError, BadRequestError } from '../utils/errors.js';
 import { encryptSecret, decryptSecret } from '../utils/crypto.js';
+import { jiraClient } from './jiraClient.js';
+import type { JiraProject, JiraEpic, JiraAccountRow } from './jiraClient.js';
+
+interface Pulled { projects: JiraProject[]; epics: JiraEpic[]; accounts: JiraAccountRow[] }
+
+// Upsert pulled Jira reference data, preserving existing customer/project
+// mappings (matched by externalKey). Pure DB logic — covered by tests with a
+// mock Jira so the fetch itself is the only unverified piece.
+export async function applyPulled(orgId: string, pulled: Pulled) {
+  for (const p of pulled.projects) {
+    await prisma.jiraWorkItem.upsert({
+      where: { orgId_externalKey: { orgId, externalKey: p.key } },
+      create: { orgId, kind: 'project', externalKey: p.key, name: p.name },
+      update: { kind: 'project', name: p.name },
+    });
+  }
+  const items = await prisma.jiraWorkItem.findMany({ where: { orgId }, select: { id: true, externalKey: true } });
+  const idByKey = new Map(items.map((i) => [i.externalKey, i.id]));
+  for (const e of pulled.epics) {
+    const parentId = e.projectKey ? idByKey.get(e.projectKey) ?? null : null;
+    await prisma.jiraWorkItem.upsert({
+      where: { orgId_externalKey: { orgId, externalKey: e.key } },
+      create: { orgId, kind: 'epic', externalKey: e.key, name: e.name, parentId },
+      update: { kind: 'epic', name: e.name, parentId },
+    });
+  }
+  for (const a of pulled.accounts) {
+    await prisma.jiraAccount.upsert({
+      where: { orgId_accountId: { orgId, accountId: a.accountId } },
+      create: { orgId, accountId: a.accountId, displayName: a.displayName, email: a.email, active: a.active },
+      update: { displayName: a.displayName, email: a.email, active: a.active },
+    });
+  }
+  return { projects: pulled.projects.length, epics: pulled.epics.length, accounts: pulled.accounts.length };
+}
 
 /**
  * External-integration settings (Jira / Tempo) per org:
@@ -98,6 +133,73 @@ export const integrationService = {
       jiraApiToken: decryptSecret(c.jiraApiToken),
       tempoApiToken: decryptSecret(c.tempoApiToken),
     };
+  },
+
+  /** Validate the stored credentials against Jira. */
+  async testConnection(orgId: string) {
+    const conn = await this.getSecrets(orgId);
+    if (!conn?.baseUrl || !conn.jiraApiToken) {
+      throw new BadRequestError('Set the Jira base URL and API token first');
+    }
+    const me = await jiraClient.testConnection(conn);
+    return { ok: true, user: me };
+  },
+
+  /** Pull projects, epics and accounts from Jira into the local cache. */
+  async refreshFromJira(orgId: string) {
+    const conn = await this.getSecrets(orgId);
+    if (!conn?.baseUrl || !conn.jiraApiToken) {
+      throw new BadRequestError('Set the Jira base URL and API token first');
+    }
+    const [projects, epics, accounts] = await Promise.all([
+      jiraClient.fetchProjects(conn),
+      jiraClient.fetchEpics(conn),
+      jiraClient.fetchAccounts(conn),
+    ]);
+    return applyPulled(orgId, { projects, epics, accounts });
+  },
+
+  async listAccounts(orgId: string) {
+    return prisma.jiraAccount.findMany({
+      where: { orgId },
+      orderBy: { displayName: 'asc' },
+      select: { id: true, accountId: true, displayName: true, email: true, active: true },
+    });
+  },
+
+  /**
+   * Map one of OUR entities (a customer or project) to a Jira work item, from
+   * the our-entity side. Enforces one Jira item per entity and one entity per
+   * item. Pass workItemId = null to clear the mapping.
+   */
+  async mapEntityToWorkItem(
+    orgId: string,
+    target: { customerId?: string | null; projectId?: string | null },
+    workItemId: string | null
+  ) {
+    const isCustomer = !!target.customerId;
+    const entityId = target.customerId || target.projectId;
+    if (!entityId) throw new BadRequestError('A customer or project is required');
+    if (isCustomer) {
+      const c = await prisma.customer.findFirst({ where: { id: entityId, orgId }, select: { id: true } });
+      if (!c) throw new NotFoundError('Customer not found');
+    } else {
+      const p = await prisma.project.findFirst({ where: { id: entityId, orgId }, select: { id: true } });
+      if (!p) throw new NotFoundError('Project not found');
+    }
+    const field = isCustomer ? 'customerId' : 'projectId';
+    // Clear whatever item currently points at this entity.
+    await prisma.jiraWorkItem.updateMany({ where: { orgId, [field]: entityId }, data: { [field]: null } });
+    if (workItemId) {
+      const item = await prisma.jiraWorkItem.findFirst({ where: { id: workItemId, orgId }, select: { id: true } });
+      if (!item) throw new NotFoundError('Work item not found');
+      // A work item maps to one of ours — set the chosen side, clear the other.
+      await prisma.jiraWorkItem.update({
+        where: { id: workItemId },
+        data: { customerId: target.customerId ?? null, projectId: target.projectId ?? null },
+      });
+    }
+    return this.listWorkItems(orgId);
   },
 
   async saveConnection(orgId: string, data: ConnectionInput) {

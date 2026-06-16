@@ -29,3 +29,14 @@ export const updateWorkItemSchema = z.object({
   customerId: z.string().nullable().optional(),
   projectId: z.string().nullable().optional(),
 });
+
+// Map one of our entities (customer XOR project) to a Jira work item.
+export const mapEntitySchema = z
+  .object({
+    customerId: z.string().nullable().optional(),
+    projectId: z.string().nullable().optional(),
+    workItemId: z.string().nullable(),
+  })
+  .refine((d) => !!d.customerId !== !!d.projectId, {
+    message: 'Provide exactly one of customerId / projectId',
+  });
