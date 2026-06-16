@@ -228,6 +228,8 @@ function PersonReviewCard({
   entries,
   onEntryCreated,
   onEntryUpdated,
+  active,
+  onFocus,
 }) {
   const [composing, setComposing] = useState(null);
   const [signalBusy, setSignalBusy] = useState(false);
@@ -259,7 +261,16 @@ function PersonReviewCard({
   const byKind = (kind) => entries.filter((l) => l.kind === kind);
 
   return (
-    <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
+    <div className="relative">
+      {!active && (
+        <button
+          type="button"
+          onClick={() => onFocus(person.id)}
+          title={`Focus ${person.name} and filter recent entries to them`}
+          className="absolute inset-0 z-10 rounded-2xl bg-transparent border-0 cursor-pointer"
+        />
+      )}
+      <div className={`bg-white rounded-2xl border shadow-card p-4 transition ${active ? 'border-primary ring-1 ring-primary/30' : 'border-border-light opacity-60 hover:opacity-90'}`}>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div className="flex items-center gap-2.5">
           <Avatar name={person.name} color="#4CBAD4" size={34} />
@@ -270,6 +281,14 @@ function PersonReviewCard({
             >
               {person.name}
             </Link>
+            {active && (
+              <button
+                onClick={() => onFocus(null)}
+                className="ml-2 text-[10px] font-semibold text-primary bg-primary-light rounded-full px-2 py-0.5 cursor-pointer hover:brightness-95 align-middle"
+              >
+                focused ✕
+              </button>
+            )}
             <div className="text-[10px] text-text-light">
               Planned this month: {fte > 0 ? `${fte.toFixed(1)} FTE (≈${fteToHours(fte)}h)` : '—'}
               {' · '}actual: {actualHours != null ? <span className="font-semibold text-text-mid">{actualHours}h</span> : '—'}
@@ -349,6 +368,7 @@ function PersonReviewCard({
           </div>
         ))}
       </div>
+      </div>
     </div>
   );
 }
@@ -370,6 +390,9 @@ export default function CustomerReviewCockpit() {
   const [signals, setSignals] = useState([]);
   const [reviewEntries, setReviewEntries] = useState([]);
   const [recentEntries, setRecentEntries] = useState([]);
+  // The general recap is filled first; clicking a person focuses them and
+  // filters the right-hand recent-entries list down to that employee.
+  const [focusedPersonId, setFocusedPersonId] = useState(null);
   const [collapsedPeople, setCollapsedPeople] = useState(() => new Set());
   const [openReplies, setOpenReplies] = useState(() => new Set());
   const toggleReply = (id) =>
@@ -386,6 +409,9 @@ export default function CustomerReviewCockpit() {
   }, [visLoading, canReview, navigate, customerId]);
 
   const months = useMemo(() => monthRange(addMonths(currentMonth(), -11), currentMonth()), []);
+  // The planned-vs-actual chart runs into the future so the plan ahead is
+  // visible; the satisfaction chart and signals stay on the trailing 12 months.
+  const chartMonths = useMemo(() => monthRange(addMonths(currentMonth(), -8), addMonths(currentMonth(), 3)), []);
   const entriesFrom = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 60);
@@ -449,11 +475,11 @@ export default function CustomerReviewCockpit() {
   const [custActuals, setCustActuals] = useState({});
   useEffect(() => {
     if (!customerId) return;
-    api.getMonthlyActualsByCustomer(months[0], months[months.length - 1]).then(setCustActuals).catch(() => setCustActuals({}));
-  }, [customerId, months]);
+    api.getMonthlyActualsByCustomer(chartMonths[0], chartMonths[chartMonths.length - 1]).then(setCustActuals).catch(() => setCustActuals({}));
+  }, [customerId, chartMonths]);
   const plannedActualData = useMemo(() => {
     const needIds = new Set(needs.filter((n) => custProjects.some((p) => p.id === n.projectId)).map((n) => n.id));
-    return months.map((m) => {
+    return chartMonths.map((m) => {
       let fte = 0;
       for (const a of assignments) {
         if (!needIds.has(a.needId)) continue;
@@ -461,7 +487,7 @@ export default function CustomerReviewCockpit() {
       }
       return { month: m, planned: fte * MONTHLY_HOURS_PER_FTE, actual: custActuals[customerId]?.[m] || 0 };
     });
-  }, [months, needs, custProjects, assignments, custActuals, customerId]);
+  }, [chartMonths, needs, custProjects, assignments, custActuals, customerId]);
 
   // Customer satisfaction chart: monthly average across all rated people.
   const chartPoints = useMemo(() => {
@@ -557,7 +583,11 @@ export default function CustomerReviewCockpit() {
               No people allocated to this customer this month.
             </div>
           ) : (
-            people.map(({ person, fte }) => (
+            <>
+            <div className="text-[11px] text-text-light px-1 -mb-1">
+              Fill the general recap first — then click a person to focus their review and filter recent entries →
+            </div>
+            {people.map(({ person, fte }) => (
               <PersonReviewCard
                 key={person.id}
                 person={person}
@@ -586,8 +616,11 @@ export default function CustomerReviewCockpit() {
                 onEntryUpdated={(updated) =>
                   setReviewEntries((prev) => prev.map((l) => (l.id === updated.id ? updated : l)))
                 }
+                active={focusedPersonId === person.id}
+                onFocus={setFocusedPersonId}
               />
-            ))
+            ))}
+            </>
           )}
         </div>
 
@@ -605,14 +638,27 @@ export default function CustomerReviewCockpit() {
           </div>
 
           <div className="mt-4 pt-4 border-t border-border-light">
-            <h3 className="text-[13px] font-bold text-text m-0 mb-2">
-              Recent entries (60 days)
-            </h3>
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <h3 className="text-[13px] font-bold text-text m-0">
+                Recent entries (60 days)
+              </h3>
+              {focusedPersonId && (
+                <button
+                  onClick={() => setFocusedPersonId(null)}
+                  className="text-[10px] font-semibold text-primary bg-primary-light rounded-full px-2 py-0.5 cursor-pointer hover:brightness-95 shrink-0"
+                  title="Filtered to the focused person — click to show all"
+                >
+                  {people.find((p) => p.person.id === focusedPersonId)?.person.name || 'Focused'} ✕
+                </button>
+              )}
+            </div>
             <div className="space-y-2 overflow-y-auto pr-1 -mr-1" style={{ maxHeight: 'calc(100vh - 380px)' }}>
               {recentEntries.length === 0 && (
                 <div className="text-xs text-text-light">Nothing logged in this window.</div>
               )}
-              {people.map(({ person }) => {
+              {people
+                .filter(({ person }) => !focusedPersonId || person.id === focusedPersonId)
+                .map(({ person }) => {
                 const personLogs = recentEntries.filter((l) => l.resourceId === person.id);
                 if (personLogs.length === 0) return null;
                 const collapsed = collapsedPeople.has(person.id);

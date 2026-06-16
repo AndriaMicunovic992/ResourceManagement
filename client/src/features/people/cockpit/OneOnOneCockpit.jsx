@@ -200,7 +200,7 @@ function MeetingPanel({ personId, record, onSaved }) {
 }
 
 /** One box per active project — saved as project_checkin entries on this 1:1. */
-function ProjectCheckins({ personId, oneOnOneId, activeProjects, checkins, onChanged }) {
+function ProjectCheckins({ personId, oneOnOneId, activeProjects, checkins, onChanged, focusedProjectId, onFocusProject }) {
   const [drafts, setDrafts] = useState({});
   const [busy, setBusy] = useState({});
   const [errors, setErrors] = useState({});
@@ -242,45 +242,71 @@ function ProjectCheckins({ personId, oneOnOneId, activeProjects, checkins, onCha
   }
 
   return (
-    <Panel title="Project check-ins">
+    <Panel
+      title="Project check-ins"
+      action={<span className="text-[10px] text-text-light">Click a project to focus &amp; filter the context →</span>}
+    >
       <div className="space-y-3">
         {activeProjects.map(({ project, customer, fte }) => {
           const existing = existingFor(project.id);
           const value = drafts[project.id] ?? existing?.content ?? '';
           const dirty = (drafts[project.id] ?? null) !== null && drafts[project.id] !== (existing?.content ?? '');
+          const active = focusedProjectId === project.id;
           return (
-            <div key={project.id} className="rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="text-xs font-semibold text-text">
-                  {project.name}
-                  <span className="text-text-light font-normal">
-                    {' '}· {customer?.name || '—'} {fte ? `· ${fte.toFixed(1)} FTE` : ''}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {existing && !dirty && (
-                    <span className="text-[10px] text-success font-semibold">Filled ✓</span>
-                  )}
-                  <button
-                    onClick={() => handleSave({ ...project })}
-                    disabled={busy[project.id] || !value.trim() || (!dirty && !!existing)}
-                    className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-2.5 py-1 cursor-pointer hover:brightness-105 disabled:opacity-40"
-                  >
-                    {busy[project.id] ? '…' : existing ? 'Update' : 'Save'}
-                  </button>
-                </div>
-              </div>
-              <textarea
-                value={value}
-                onChange={(e) => setDrafts((d) => ({ ...d, [project.id]: e.target.value }))}
-                rows={2}
-                maxLength={5000}
-                placeholder="How is it going on this project?"
-                className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
-              />
-              {errors[project.id] && (
-                <div className="text-[10px] text-danger mt-1">{errors[project.id]}</div>
+            <div key={project.id} className="relative">
+              {!active && (
+                <button
+                  type="button"
+                  onClick={() => onFocusProject(project.id)}
+                  title={`Focus ${project.name} and filter the context on the right`}
+                  className="absolute inset-0 z-10 rounded-lg cursor-pointer bg-transparent border-0"
+                />
               )}
+              <div
+                className={`rounded-lg border p-3 transition ${
+                  active ? 'border-primary bg-primary-bg/30 shadow-sm' : 'border-border opacity-60 hover:opacity-90'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-xs font-semibold text-text">
+                    {project.name}
+                    <span className="text-text-light font-normal">
+                      {' '}· {customer?.name || '—'} {fte ? `· ${fte.toFixed(1)} FTE` : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {active && (
+                      <button
+                        onClick={() => onFocusProject(null)}
+                        className="text-[10px] font-semibold text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary"
+                      >
+                        ✕ unfocus
+                      </button>
+                    )}
+                    {existing && !dirty && (
+                      <span className="text-[10px] text-success font-semibold">Filled ✓</span>
+                    )}
+                    <button
+                      onClick={() => handleSave({ ...project })}
+                      disabled={busy[project.id] || !value.trim() || (!dirty && !!existing)}
+                      className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-2.5 py-1 cursor-pointer hover:brightness-105 disabled:opacity-40"
+                    >
+                      {busy[project.id] ? '…' : existing ? 'Update' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  value={value}
+                  onChange={(e) => setDrafts((d) => ({ ...d, [project.id]: e.target.value }))}
+                  rows={2}
+                  maxLength={5000}
+                  placeholder="How is it going on this project?"
+                  className="w-full px-2 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white resize-y"
+                />
+                {errors[project.id] && (
+                  <div className="text-[10px] text-danger mt-1">{errors[project.id]}</div>
+                )}
+              </div>
             </div>
           );
         })}
@@ -520,16 +546,21 @@ export default function OneOnOneCockpit() {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Which project the user is "focused" on. The general 1:1 is filled first;
+  // clicking a project check-in focuses it and filters the right-hand context
+  // (recent entries + client signals) down to that project's customer.
+  const [focusedProjectId, setFocusedProjectId] = useState(null);
 
-  // Planned (from allocations) vs actual (Tempo) hours per month for this person.
+  // Planned (from allocations) vs actual (Tempo) hours per month for this
+  // person. The window runs into the future so the plan ahead is visible — the
+  // chart replaces the old per-project planned-allocation table.
   const { rURealised } = useComputed();
-  const chartMonths = useMemo(() => monthRange(addMonths(currentMonth(), -11), currentMonth()), []);
+  const chartMonths = useMemo(() => monthRange(addMonths(currentMonth(), -8), addMonths(currentMonth(), 3)), []);
   const [actualsRange, setActualsRange] = useState({});
   useEffect(() => {
     if (!personId) return;
     api.getMonthlyActuals(chartMonths[0], chartMonths[chartMonths.length - 1]).then(setActualsRange).catch(() => setActualsRange({}));
   }, [personId, chartMonths]);
-  const actualThisMonth = actualsRange[personId]?.[currentMonthKey()] ?? null;
   const plannedActualData = useMemo(
     () => chartMonths.map((mo) => ({
       month: mo,
@@ -634,6 +665,14 @@ export default function OneOnOneCockpit() {
 
   const checkins = attachedLogs.filter((l) => l.kind === 'project_checkin');
 
+  // The focused project resolves to a customer; that's what we filter the
+  // right-hand context by. Clearing the focus shows everything again.
+  const focusedProject = useMemo(
+    () => activeProjects.find((ap) => ap.project.id === focusedProjectId) || null,
+    [activeProjects, focusedProjectId]
+  );
+  const focusedCustomerName = focusedProject?.customer?.name || null;
+
   const personSkills = useMemo(() => {
     const list = person?.personSkills || [];
     return list
@@ -670,6 +709,17 @@ export default function OneOnOneCockpit() {
     for (const list of map.values()) list.sort((a, b) => (a.month < b.month ? -1 : 1));
     return Array.from(map.entries());
   }, [signals]);
+
+  // When a project is focused, the right-hand context narrows to that
+  // project's customer (this person, inside that customer).
+  const visibleRecentGroups = useMemo(
+    () => (focusedCustomerName ? recentGroups.filter(([name]) => name === focusedCustomerName) : recentGroups),
+    [recentGroups, focusedCustomerName]
+  );
+  const visibleSignals = useMemo(
+    () => (focusedCustomerName ? signalsByCustomer.filter(([name]) => name === focusedCustomerName) : signalsByCustomer),
+    [signalsByCustomer, focusedCustomerName]
+  );
 
   if (loading || visibility.loading) {
     return (
@@ -732,6 +782,8 @@ export default function OneOnOneCockpit() {
             activeProjects={activeProjects}
             checkins={checkins}
             onChanged={setAttachedLogs}
+            focusedProjectId={focusedProjectId}
+            onFocusProject={setFocusedProjectId}
           />
           <FollowUpsPanel
             personId={personId}
@@ -749,14 +801,28 @@ export default function OneOnOneCockpit() {
 
         {/* Context column — one unified sticky card (like the customer review). */}
         <div className="lg:sticky lg:top-4 self-start bg-white rounded-2xl border border-border-light shadow-card p-4">
-          <h3 className="text-[13px] font-bold text-text m-0 mb-2">
-            {previousMeetingDate ? 'Since the last 1:1' : 'Recent entries'}
-          </h3>
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <h3 className="text-[13px] font-bold text-text m-0">
+              {previousMeetingDate ? 'Since the last 1:1' : 'Recent entries'}
+            </h3>
+            {focusedCustomerName && (
+              <button
+                onClick={() => setFocusedProjectId(null)}
+                className="text-[10px] font-semibold text-primary bg-primary-light rounded-full px-2 py-0.5 cursor-pointer hover:brightness-95 shrink-0"
+                title="Filtered to the focused project's customer — click to show all"
+              >
+                {focusedCustomerName} ✕
+              </button>
+            )}
+          </div>
           <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1 -mr-1">
               {recentLogs.length === 0 && (
                 <div className="text-xs text-text-light">No entries in this window.</div>
               )}
-              {recentGroups.map(([groupName, list]) => {
+              {recentLogs.length > 0 && visibleRecentGroups.length === 0 && (
+                <div className="text-xs text-text-light">No entries for {focusedCustomerName} in this window.</div>
+              )}
+              {visibleRecentGroups.map(([groupName, list]) => {
                 const collapsed = collapsedGroups.has(groupName);
                 return (
                   <div key={groupName}>
@@ -819,11 +885,11 @@ export default function OneOnOneCockpit() {
               })}
             </div>
 
-          {signalsByCustomer.length > 0 && (
+          {visibleSignals.length > 0 && (
             <div className="mt-4 pt-4 border-t border-border-light">
               <h3 className="text-[13px] font-bold text-text m-0 mb-2">Client signals (PM-perceived)</h3>
               <div className="space-y-3">
-                {signalsByCustomer.map(([customerName, list]) => {
+                {visibleSignals.map(([customerName, list]) => {
                   const byMonth = new Map(list.map((s) => [s.month, s.rating]));
                   const points = lastMonthKeys(12).map((m) => ({
                     label: m.slice(5),
@@ -839,51 +905,6 @@ export default function OneOnOneCockpit() {
               </div>
             </div>
           )}
-
-          <div className="mt-4 pt-4 border-t border-border-light">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[13px] font-bold text-text m-0">Planned allocation</h3>
-              <span className="text-[11px] text-text-mid">Actual this month: <b className="text-text">{actualThisMonth != null ? `${actualThisMonth}h` : '—'}</b></span>
-            </div>
-            {activeProjects.length === 0 ? (
-              <div className="text-xs text-text-light">No active assignments.</div>
-            ) : (
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-[10px] text-text-mid uppercase tracking-wider">
-                    <th className="text-left font-semibold pb-1">Project</th>
-                    <th className="text-right font-semibold pb-1">This mo</th>
-                    <th className="text-right font-semibold pb-1">Next mo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeProjects.map(({ project, customer, fte, fteNext }) => (
-                    <tr key={project.id} className="border-t border-border-light">
-                      <td className="py-1 text-text truncate max-w-[160px]">
-                        {project.name}
-                        <span className="text-text-light"> · {customer?.name || '—'}</span>
-                      </td>
-                      <td className="py-1 font-mono text-right text-text-mid">
-                        {fte > 0 ? fte.toFixed(1) : '—'}
-                      </td>
-                      <td className="py-1 font-mono text-right text-text-mid">
-                        {fteNext > 0 ? fteNext.toFixed(1) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="border-t border-border">
-                    <td className="py-1 font-bold text-text">Total</td>
-                    <td className="py-1 font-mono text-right font-bold text-text">
-                      {activeProjects.reduce((s, p) => s + p.fte, 0).toFixed(1)}
-                    </td>
-                    <td className="py-1 font-mono text-right font-bold text-text">
-                      {activeProjects.reduce((s, p) => s + p.fteNext, 0).toFixed(1)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
-          </div>
 
           <div className="mt-4 pt-4 border-t border-border-light">
             <h3 className="text-[13px] font-bold text-text m-0 mb-2">Planned vs actual hours</h3>
