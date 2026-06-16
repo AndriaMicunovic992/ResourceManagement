@@ -52,27 +52,31 @@ export default function IntegrationsSection() {
     api.getMembers().then(setMembers).catch(() => setMembers([]));
   }, [loadConn, loadRefs]);
 
-  const saveConn = (extra = {}) => run(async () => {
+  // Persist the form (incl. any newly-typed tokens) without a status message.
+  // Test/Refresh act on the *saved* connection, so they save first — otherwise
+  // typing creds and hitting Test would act on stale stored values.
+  const persist = async () => {
     await api.saveJiraConnection({
       baseUrl: form.baseUrl || null, jiraEmail: form.jiraEmail || null, enabled: form.enabled,
       ...(jiraToken.trim() ? { jiraApiToken: jiraToken.trim() } : {}),
       ...(tempoToken.trim() ? { tempoApiToken: tempoToken.trim() } : {}),
-      ...extra,
     });
     setJiraToken(''); setTempoToken('');
     await loadConn();
-    setStatus('Connection saved.');
-  })();
+  };
+
+  const saveConn = () => run(async () => { await persist(); setStatus('Connection saved.'); })();
 
   const testConn = () => run(async () => {
     setBusy('test'); setStatus('');
-    try { const r = await api.testJiraConnection(); setStatus(`Connected to Jira as ${r.user?.displayName || 'user'}.`); }
+    try { await persist(); const r = await api.testJiraConnection(); setStatus(`Connected to Jira as ${r.user?.displayName || 'user'}.`); }
     finally { setBusy(''); }
   })();
 
   const refresh = () => run(async () => {
     setBusy('refresh'); setStatus('');
     try {
+      await persist();
       const c = await api.refreshJira();
       setStatus(`Pulled ${c.projects} projects, ${c.epics} epics, ${c.accounts} accounts from Jira.`);
       await loadRefs();
