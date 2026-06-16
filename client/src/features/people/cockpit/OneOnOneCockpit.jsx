@@ -517,6 +517,14 @@ export default function OneOnOneCockpit() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Actual hours (Tempo) for this person this month, shown beside the plan.
+  const [actualThisMonth, setActualThisMonth] = useState(null);
+  useEffect(() => {
+    if (!personId) return;
+    const m = currentMonthKey();
+    api.getMonthlyActuals(m, m).then((r) => setActualThisMonth(r[personId]?.[m] ?? null)).catch(() => setActualThisMonth(null));
+  }, [personId]);
+
   // The cockpit is a manager/admin tool — subjects use their profile tabs.
   const isSelf = !visibility.loading && visibility.selfResourceId === personId && !visibility.isAdmin;
 
@@ -819,7 +827,10 @@ export default function OneOnOneCockpit() {
           )}
 
           <div className="mt-4 pt-4 border-t border-border-light">
-            <h3 className="text-[13px] font-bold text-text m-0 mb-2">Planned allocation</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[13px] font-bold text-text m-0">Planned allocation</h3>
+              <span className="text-[11px] text-text-mid">Actual this month: <b className="text-text">{actualThisMonth != null ? `${actualThisMonth}h` : '—'}</b></span>
+            </div>
             {activeProjects.length === 0 ? (
               <div className="text-xs text-text-light">No active assignments.</div>
             ) : (
