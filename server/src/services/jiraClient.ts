@@ -16,7 +16,7 @@ export interface JiraProject { key: string; name: string }
 export interface JiraEpic { key: string; name: string; projectKey: string | null }
 export interface JiraAccountRow { accountId: string; displayName: string; email: string | null; active: boolean }
 
-class JiraError extends Error {
+export class JiraError extends Error {
   constructor(message: string, readonly status?: number) {
     super(message);
     this.name = 'JiraError';
@@ -24,13 +24,15 @@ class JiraError extends Error {
 }
 
 function authHeader(conn: JiraConn): string {
-  if (!conn.jiraApiToken) throw new JiraError('Missing Jira API token');
-  if (conn.jiraEmail) {
-    const basic = Buffer.from(`${conn.jiraEmail}:${conn.jiraApiToken}`).toString('base64');
+  const token = (conn.jiraApiToken || '').trim();
+  const email = (conn.jiraEmail || '').trim();
+  if (!token) throw new JiraError('Missing Jira API token');
+  if (email) {
+    const basic = Buffer.from(`${email}:${token}`).toString('base64');
     return `Basic ${basic}`;
   }
   // No email → treat the token as a bearer (Jira Data Center PAT).
-  return `Bearer ${conn.jiraApiToken}`;
+  return `Bearer ${token}`;
 }
 
 function baseUrl(conn: JiraConn): string {

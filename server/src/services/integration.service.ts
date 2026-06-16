@@ -1,8 +1,32 @@
 import { prisma } from '../db/prisma.js';
 import { NotFoundError, ConflictError, BadRequestError } from '../utils/errors.js';
 import { encryptSecret, decryptSecret } from '../utils/crypto.js';
-import { jiraClient } from './jiraClient.js';
+import { jiraClient, JiraError } from './jiraClient.js';
 import type { JiraProject, JiraEpic, JiraAccountRow } from './jiraClient.js';
+
+type ConnSecrets = { baseUrl: string | null; jiraEmail: string | null; jiraApiToken: string | null } | null;
+
+// Validate we have enough to call Jira, with a Cloud-specific nudge: an API
+// token alone (no email) can't authenticate to *.atlassian.net.
+function assertJiraReady(conn: ConnSecrets) {
+  if (!conn?.baseUrl || !conn.jiraApiToken) {
+    throw new BadRequestError('Set the Jira base URL and API token first, then Save.');
+  }
+  if (/atlassian\.net/i.test(conn.baseUrl) && !conn.jiraEmail) {
+    throw new BadRequestError('Jira Cloud needs the account email that owns the API token.');
+  }
+}
+
+// Surface Jira failures (401, unreachable, …) as a clear message instead of a
+// generic 500.
+async function callJira<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof JiraError) throw new BadRequestError(e.message);
+    throw e;
+  }
+}
 
 interface Pulled { projects: JiraProject[]; epics: JiraEpic[]; accounts: JiraAccountRow[] }
 
@@ -138,24 +162,22 @@ export const integrationService = {
   /** Validate the stored credentials against Jira. */
   async testConnection(orgId: string) {
     const conn = await this.getSecrets(orgId);
-    if (!conn?.baseUrl || !conn.jiraApiToken) {
-      throw new BadRequestError('Set the Jira base URL and API token first');
-    }
-    const me = await jiraClient.testConnection(conn);
+    assertJiraReady(conn);
+    const me = await callJira(() => jiraClient.testConnection(conn!));
     return { ok: true, user: me };
   },
 
   /** Pull projects, epics and accounts from Jira into the local cache. */
   async refreshFromJira(orgId: string) {
     const conn = await this.getSecrets(orgId);
-    if (!conn?.baseUrl || !conn.jiraApiToken) {
-      throw new BadRequestError('Set the Jira base URL and API token first');
-    }
-    const [projects, epics, accounts] = await Promise.all([
-      jiraClient.fetchProjects(conn),
-      jiraClient.fetchEpics(conn),
-      jiraClient.fetchAccounts(conn),
-    ]);
+    assertJiraReady(conn);
+    const [projects, epics, accounts] = await callJira(() =>
+      Promise.all([
+        jiraClient.fetchProjects(conn!),
+        jiraClient.fetchEpics(conn!),
+        jiraClient.fetchAccounts(conn!),
+      ])
+    );
     return applyPulled(orgId, { projects, epics, accounts });
   },
 
