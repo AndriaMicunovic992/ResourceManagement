@@ -120,7 +120,11 @@ export const api = {
   // plaintext — only whether each is set.
   getJiraConnection: () => apiFetch('/integration/jira'),
   saveJiraConnection: (data) => apiFetch('/integration/jira', { method: 'PUT', body: JSON.stringify(data) }),
+  testJiraConnection: () => apiFetch('/integration/jira/test', { method: 'POST', body: '{}' }),
+  refreshJira: () => apiFetch('/integration/jira/refresh', { method: 'POST', body: '{}' }),
+  getJiraAccounts: () => apiFetch('/integration/jira/accounts'),
   getJiraWorkItems: () => apiFetch('/integration/jira/work-items'),
+  setJiraMapping: (data) => apiFetch('/integration/jira/mapping', { method: 'PUT', body: JSON.stringify(data) }),
   createJiraWorkItem: (data) => apiFetch('/integration/jira/work-items', { method: 'POST', body: JSON.stringify(data) }),
   updateJiraWorkItem: (id, data) => apiFetch('/integration/jira/work-items/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteJiraWorkItem: (id) => apiFetch('/integration/jira/work-items/' + id, { method: 'DELETE' }),

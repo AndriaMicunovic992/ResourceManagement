@@ -36,6 +36,7 @@ model Organization {
   seniorities Seniority[]
   jiraConnection JiraConnection?
   jiraWorkItems  JiraWorkItem[]
+  jiraAccounts   JiraAccount[]
   customers   Customer[]
   projects    Project[]
   resources   Resource[]
@@ -765,4 +766,22 @@ model JiraWorkItem {
   @@index([parentId])
   @@index([customerId])
   @@index([projectId])
+}
+
+// Cache of Jira user accounts pulled from the connected Jira (the "Account"
+// dropdown in People mapping). Resource.externalWorkId stores the chosen
+// accountId. Refreshed on demand; email may be null (Jira can hide it).
+model JiraAccount {
+  id          String   @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  accountId   String   // Jira accountId
+  displayName String
+  email       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([orgId, accountId])
+  @@index([orgId])
 }
