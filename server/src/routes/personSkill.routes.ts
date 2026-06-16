@@ -5,6 +5,7 @@ import {
   updatePersonSkillSchema,
 } from '../schemas/personSkill.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 
 export const personSkillRoutes: FastifyPluginAsync = async (app) => {
   app.get('/person-skills', async (req) => {
@@ -13,18 +14,18 @@ export const personSkillRoutes: FastifyPluginAsync = async (app) => {
     return list.filter((ps) => req.visibility.visiblePersonIds.has(ps.resourceId));
   });
 
-  app.post('/person-skills', { preHandler: requireRole('admin') }, async (req) => {
+  app.post('/person-skills', { preHandler: requirePermission('skills', 'create') }, async (req) => {
     const data = upsertPersonSkillSchema.parse(req.body);
     return personSkillService.upsert(req.orgId, data);
   });
 
-  app.patch('/person-skills/:id', { preHandler: requireRole('admin') }, async (req) => {
+  app.patch('/person-skills/:id', { preHandler: requirePermission('skills', 'edit') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updatePersonSkillSchema.parse(req.body);
     return personSkillService.update(req.orgId, id, data);
   });
 
-  app.delete('/person-skills/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
+  app.delete('/person-skills/:id', { preHandler: requirePermission('skills', 'delete') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await personSkillService.delete(req.orgId, id);
     return reply.status(204).send();

@@ -5,7 +5,9 @@ const ROLE_LEVEL: Record<Role, number> = { viewer: 1, member: 2, admin: 3, owner
 
 export function requireRole(minRole: Role) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
-    const userLevel = ROLE_LEVEL[req.role as Role] ?? 0;
+    // Prefer the role's resolved level (handles custom roles); fall back to the
+    // legacy key map if visibility hasn't populated it.
+    const userLevel = req.roleLevel ?? ROLE_LEVEL[req.role as Role] ?? 0;
     const requiredLevel = ROLE_LEVEL[minRole];
     if (userLevel < requiredLevel) {
       return reply.status(403).send({ error: 'Insufficient permissions' });

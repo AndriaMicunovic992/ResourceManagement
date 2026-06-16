@@ -55,10 +55,13 @@ export function isAdmin(role: string): boolean {
 export async function computeVisibility(
   orgId: string,
   userId: string,
-  roleString: string
+  level: number
 ): Promise<VisibilityScope> {
-  const role = normalizeRole(roleString);
-  const admin = isAdmin(role);
+  // Visibility tier follows the role's level so custom roles behave like their
+  // base level (owner & admin → all, member → team, viewer → own). Per-segment
+  // read scoping comes in the next stage.
+  const role: Role = level >= 3 ? 'admin' : level <= 1 ? 'viewer' : 'member';
+  const admin = role === 'admin';
 
   // Resolve self resource (may be null if the user has no linked Resource).
   const self = await prisma.resource.findFirst({

@@ -6,6 +6,7 @@ import {
   scopeFor,
   normalizeMatrix,
   emptyMatrix,
+  tierForLevel,
 } from '../src/lib/permissions.js';
 
 const byKey = Object.fromEntries(SYSTEM_ROLES.map((r) => [r.key, r]));
@@ -54,6 +55,14 @@ describe('matrix helpers', () => {
     const m = emptyMatrix();
     m.customers = { scope: 'none', create: true, edit: true, delete: true };
     expect(canDo(m, 'customers', 'create')).toBe(false);
+  });
+
+  it('tierForLevel maps custom levels onto visibility tiers', () => {
+    expect(tierForLevel(4)).toBe('admin'); // owner
+    expect(tierForLevel(3)).toBe('admin');
+    expect(tierForLevel(2)).toBe('member');
+    expect(tierForLevel(1)).toBe('viewer');
+    expect(tierForLevel(0)).toBe('viewer');
   });
 
   it('normalizeMatrix fills missing segments and clamps bad input', () => {

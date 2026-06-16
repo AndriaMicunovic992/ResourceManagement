@@ -137,3 +137,16 @@ export function canDo(matrix: PermissionMatrix, seg: SegmentKey, action: Action)
   if (!e || e.scope === 'none') return false;
   return !!e[action];
 }
+
+// Legacy 1-4 role rank, used as the visibility/gate fallback while enforcement
+// migrates onto the matrix.
+export const LEGACY_ROLE_LEVEL: Record<string, number> = { owner: 4, admin: 3, member: 2, viewer: 1 };
+
+export type Tier = 'admin' | 'member' | 'viewer';
+
+/** Coarse visibility tier a role's level maps to (owner & admin both see all). */
+export function tierForLevel(level: number): Tier {
+  if (level >= 3) return 'admin';
+  if (level <= 1) return 'viewer';
+  return 'member';
+}

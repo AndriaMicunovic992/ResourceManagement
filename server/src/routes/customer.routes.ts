@@ -18,6 +18,7 @@ import {
 } from '../services/log.service.js';
 import { userIsResponsibleFor } from '../services/personAccess.service.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 import { NotFoundError } from '../utils/errors.js';
 
 function parseBoundaryDate(value: string, endOfDay: boolean): Date {
@@ -204,20 +205,20 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
-  app.post('/customers', { preHandler: requireRole('admin') }, async (req) => {
+  app.post('/customers', { preHandler: requirePermission('customers', 'create') }, async (req) => {
     const data = createCustomerSchema.parse(req.body);
     await assertResponsibleUserAllowed(req.orgId, data.responsibleUserId);
     return customerService.create(req.orgId, data);
   });
 
-  app.patch('/customers/:id', { preHandler: requireRole('admin') }, async (req) => {
+  app.patch('/customers/:id', { preHandler: requirePermission('customers', 'edit') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updateCustomerSchema.parse(req.body);
     await assertResponsibleUserAllowed(req.orgId, data.responsibleUserId);
     return customerService.update(req.orgId, id, data);
   });
 
-  app.delete('/customers/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
+  app.delete('/customers/:id', { preHandler: requirePermission('customers', 'delete') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await customerService.delete(req.orgId, id);
     return reply.status(204).send();

@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { needService } from '../services/need.service.js';
 import { createNeedSchema, updateNeedSchema } from '../schemas/need.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 
 export const needRoutes: FastifyPluginAsync = async (app) => {
   app.get('/needs', async (req) => {
@@ -11,18 +12,18 @@ export const needRoutes: FastifyPluginAsync = async (app) => {
     return list.filter((n) => req.visibility.visibleProjectIds.has(n.projectId));
   });
 
-  app.post('/needs', { preHandler: requireRole('admin') }, async (req) => {
+  app.post('/needs', { preHandler: requirePermission('planner', 'create') }, async (req) => {
     const data = createNeedSchema.parse(req.body);
     return needService.create(req.orgId, data);
   });
 
-  app.patch('/needs/:id', { preHandler: requireRole('admin') }, async (req) => {
+  app.patch('/needs/:id', { preHandler: requirePermission('planner', 'edit') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updateNeedSchema.parse(req.body);
     return needService.update(req.orgId, id, data);
   });
 
-  app.delete('/needs/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
+  app.delete('/needs/:id', { preHandler: requirePermission('planner', 'delete') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await needService.delete(req.orgId, id);
     return reply.status(204).send();

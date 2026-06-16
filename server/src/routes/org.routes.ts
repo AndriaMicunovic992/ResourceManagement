@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { orgService } from '../services/org.service.js';
 import { inviteService } from '../services/invite.service.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 import { ForbiddenError } from '../utils/errors.js';
 import { config } from '../config.js';
 import {
@@ -34,7 +35,7 @@ export const orgRoutes: FastifyPluginAsync = async (app) => {
     return { token };
   });
 
-  app.patch('/org', { preHandler: requireRole('admin') }, async (req) => {
+  app.patch('/org', { preHandler: requirePermission('settings', 'edit') }, async (req) => {
     const data = updateOrgSchema.parse(req.body);
     return orgService.updateOrg(req.orgId, data);
   });
@@ -50,18 +51,18 @@ export const orgRoutes: FastifyPluginAsync = async (app) => {
     return orgService.listMembers(req.orgId);
   });
 
-  app.post('/org/members', { preHandler: requireRole('admin') }, async (req) => {
+  app.post('/org/members', { preHandler: requirePermission('members', 'create') }, async (req) => {
     const { email, role } = addMemberSchema.parse(req.body);
     return orgService.addMember(req.orgId, email, role || 'member', req.userId);
   });
 
-  app.patch('/org/members/:id', { preHandler: requireRole('admin') }, async (req) => {
+  app.patch('/org/members/:id', { preHandler: requirePermission('members', 'edit') }, async (req) => {
     const { id } = req.params as { id: string };
     const { role } = updateMemberRoleSchema.parse(req.body);
     return orgService.updateMemberRole(req.orgId, id, role, req.userId);
   });
 
-  app.delete('/org/members/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
+  app.delete('/org/members/:id', { preHandler: requirePermission('members', 'delete') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await orgService.removeMember(req.orgId, id, req.userId);
     return reply.status(204).send();
@@ -73,12 +74,12 @@ export const orgRoutes: FastifyPluginAsync = async (app) => {
     return inviteService.list(req.orgId);
   });
 
-  app.post('/org/invites', { preHandler: requireRole('admin') }, async (req) => {
+  app.post('/org/invites', { preHandler: requirePermission('members', 'create') }, async (req) => {
     const { email, role } = inviteSchema.parse(req.body);
     return inviteService.create(req.orgId, email, role || 'member', req.userId);
   });
 
-  app.delete('/org/invites/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
+  app.delete('/org/invites/:id', { preHandler: requirePermission('members', 'delete') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await inviteService.revoke(req.orgId, id);
     return reply.status(204).send();

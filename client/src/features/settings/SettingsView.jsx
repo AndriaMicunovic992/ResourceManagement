@@ -10,7 +10,6 @@ import Avatar from '../../components/ui/Avatar';
 import PageHeader from '../../components/ui/PageHeader';
 import RolesSection from './RolesSection';
 
-const ROLES = ['viewer', 'member', 'admin'];
 
 export default function SettingsView() {
   const { currentOrg, role, updateOrg } = useOrg();
@@ -209,6 +208,15 @@ export default function SettingsView() {
       setMembers(data);
     } catch { /* ignore */ }
   }, []);
+
+  // Assignable roles (system + custom, excluding owner) for the member dropdowns.
+  const [roleOptions, setRoleOptions] = useState([]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.getRoles()
+      .then((d) => setRoleOptions((d.roles || []).filter((r) => r.key !== 'owner').map((r) => ({ key: r.key, name: r.name }))))
+      .catch(() => {});
+  }, [isAdmin]);
 
   const loadInvites = useCallback(async () => {
     try {
@@ -1216,8 +1224,8 @@ export default function SettingsView() {
                   onChange={(e) => handleRoleChange(m.id, e.target.value)}
                   className="text-[10px] px-2 py-1 border border-border rounded-lg bg-white text-text-mid"
                 >
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                  {roleOptions.map((r) => (
+                    <option key={r.key} value={r.key}>{r.name}</option>
                   ))}
                 </select>
               ) : (
@@ -1287,8 +1295,8 @@ export default function SettingsView() {
                 value={newRole} onChange={(e) => setNewRole(e.target.value)}
                 className="px-2 py-1.5 border border-border rounded-lg text-xs text-text bg-white"
               >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                {roleOptions.map((r) => (
+                  <option key={r.key} value={r.key}>{r.name}</option>
                 ))}
               </select>
             </div>
