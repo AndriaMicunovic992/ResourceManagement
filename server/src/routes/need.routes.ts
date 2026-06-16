@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { canView } from '../lib/permissions.js';
 import { needService } from '../services/need.service.js';
 import { createNeedSchema, updateNeedSchema } from '../schemas/need.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
@@ -6,6 +7,7 @@ import { requirePermission } from '../middleware/requirePermission.js';
 
 export const needRoutes: FastifyPluginAsync = async (app) => {
   app.get('/needs', async (req) => {
+    if (!canView(req.permissions, 'planner')) return [];
     const { projectId } = req.query as { projectId?: string };
     const list = await needService.list(req.orgId, projectId);
     if (req.visibility.isAdmin) return list;

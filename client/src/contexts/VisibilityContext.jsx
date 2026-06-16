@@ -45,6 +45,8 @@ export function VisibilityProvider({ children }) {
         canViewCustomer: () => false,
         canViewProject: () => false,
         viewModeForPerson: () => 'denied',
+        permissions: null,
+        canViewArea: () => true,
         reload,
       };
     }
@@ -88,6 +90,14 @@ export function VisibilityProvider({ children }) {
       canViewCustomer,
       canViewProject,
       viewModeForPerson,
+      // Per-area read permission from the role matrix. Defaults to allow when the
+      // matrix is absent (older sessions) so nothing hides unexpectedly.
+      permissions: scope.permissions ?? null,
+      canViewArea: (segment) => {
+        const p = scope.permissions;
+        if (!p || !p[segment]) return true;
+        return !!p[segment].view;
+      },
       reload,
     };
   }, [scope, loading, reload]);

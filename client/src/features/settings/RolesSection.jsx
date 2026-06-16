@@ -105,8 +105,8 @@ export default function RolesSection() {
   return (
     <div>
       <p className="text-[11px] text-text-light mb-3">
-        What each role can do, by area. <b>Scope</b> controls what they can see (and the reach of their
-        edits); the toggles govern create / edit / delete. Owner &amp; admin always have full access.
+        What each role can do, by area. <b>View</b> grants read access, <b>Scope</b> sets how much, and
+        create / edit / delete are writes (each needs View). Owner &amp; admin always have full access.
       </p>
 
       {/* role switcher + create */}
@@ -191,6 +191,7 @@ export default function RolesSection() {
           <thead>
             <tr className="bg-[#F7FAFC] text-[9.5px] uppercase tracking-wider text-text-light">
               <th className="text-left font-bold px-3 py-2">Area</th>
+              <th className="text-center font-bold px-2 py-2">View</th>
               <th className="text-left font-bold px-3 py-2">Scope</th>
               <th className="text-center font-bold px-2 py-2">Create</th>
               <th className="text-center font-bold px-2 py-2">Edit</th>
@@ -199,17 +200,26 @@ export default function RolesSection() {
           </thead>
           <tbody>
             {segments.map((seg) => {
-              const p = draft.permissions[seg.key] || { scope: 'none' };
-              const disabled = !editable || p.scope === 'none';
+              const p = draft.permissions[seg.key] || { scope: 'own', view: false };
+              const writesOff = !editable || !p.view;
               return (
                 <tr key={seg.key} className="border-t border-border-light">
                   <td className="px-3 py-1.5 font-semibold text-text">{seg.label}</td>
+                  <td className="px-2 py-1.5 text-center">
+                    <input
+                      type="checkbox"
+                      checked={!!p.view}
+                      disabled={!editable}
+                      onChange={(e) => setSeg(seg.key, { view: e.target.checked })}
+                      className="w-4 h-4 accent-primary cursor-pointer disabled:opacity-40"
+                    />
+                  </td>
                   <td className="px-3 py-1.5">
                     <select
                       value={p.scope}
-                      disabled={!editable}
+                      disabled={!editable || !p.view}
                       onChange={(e) => setSeg(seg.key, { scope: e.target.value })}
-                      className="text-[11px] font-semibold border border-border-light rounded-md px-1.5 py-1 outline-none focus:border-primary bg-white disabled:bg-transparent disabled:border-transparent"
+                      className="text-[11px] font-semibold border border-border-light rounded-md px-1.5 py-1 outline-none focus:border-primary bg-white disabled:opacity-40 disabled:bg-transparent disabled:border-transparent"
                     >
                       {scopes.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                     </select>
@@ -218,8 +228,8 @@ export default function RolesSection() {
                     <td key={act} className="px-2 py-1.5 text-center">
                       <input
                         type="checkbox"
-                        checked={!!p[act] && p.scope !== 'none'}
-                        disabled={disabled}
+                        checked={!!p[act] && !!p.view}
+                        disabled={writesOff}
                         onChange={(e) => setSeg(seg.key, { [act]: e.target.checked })}
                         className="w-4 h-4 accent-primary cursor-pointer disabled:opacity-40"
                       />
@@ -232,7 +242,8 @@ export default function RolesSection() {
         </table>
       </div>
       <p className="text-[10px] text-text-light mt-2">
-        Note: per-area <b>scope</b> on reads is rolling out; create / edit / delete are enforced now.
+        <b>View</b> lets the role see an area (read-only unless you also tick create / edit / delete);
+        <b> Scope</b> sets how much they see. Owner &amp; admin always have full access.
       </p>
     </div>
   );

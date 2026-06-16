@@ -167,7 +167,7 @@ function SidebarProfile({ collapsed }) {
  * bottom. Collapses to an icon rail on the width-hungry planner.
  */
 export default function Sidebar() {
-  const { isAdmin, role, loading, selfResourceId } = useVisibility();
+  const { isAdmin, role, loading, selfResourceId, canViewArea } = useVisibility();
   const location = useLocation();
   const collapsed = location.pathname.startsWith('/planner');
   const [due, setDue] = useState([]);
@@ -188,8 +188,8 @@ export default function Sidebar() {
 
   const items = [
     { to: '/home', label: 'Dashboard', icon: 'home' },
-    { to: '/people', label: 'People', icon: 'people' },
-    { to: '/customers', label: 'Customers', icon: 'customers' },
+    ...(canViewArea('people') ? [{ to: '/people', label: 'People', icon: 'people' }] : []),
+    ...(canViewArea('customers') ? [{ to: '/customers', label: 'Customers', icon: 'customers' }] : []),
     ...(isAdmin ? [{ to: '/planner', label: 'Planner', icon: 'planner' }] : []),
     { to: '/dashboard', label: 'Insights', icon: 'insights' },
     { to: '/journal', label: 'My journal', icon: 'journal' },

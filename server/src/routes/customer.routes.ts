@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { Prisma } from '@prisma/client';
+import { canView } from '../lib/permissions.js';
 import { prisma } from '../db/prisma.js';
 import { customerService } from '../services/customer.service.js';
 import { customerPerformanceService } from '../services/customerPerformance.service.js';
@@ -31,6 +32,7 @@ function parseBoundaryDate(value: string, endOfDay: boolean): Date {
 
 export const customerRoutes: FastifyPluginAsync = async (app) => {
   app.get('/customers', async (req) => {
+    if (!canView(req.permissions, 'customers')) return [];
     const list = await customerService.list(req.orgId);
     if (req.visibility.isAdmin) return list;
     return list.filter((c) => req.visibility.visibleCustomerIds.has(c.id));

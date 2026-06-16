@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { canView } from '../lib/permissions.js';
 import { projectService } from '../services/project.service.js';
 import { createProjectSchema, updateProjectSchema } from '../schemas/project.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
@@ -7,6 +8,7 @@ import { assertResponsibleUserAllowed } from '../services/visibility.service.js'
 
 export const projectRoutes: FastifyPluginAsync = async (app) => {
   app.get('/projects', async (req) => {
+    if (!canView(req.permissions, 'customers')) return [];
     const { customerId } = req.query as { customerId?: string };
     const list = await projectService.list(req.orgId, customerId);
     if (req.visibility.isAdmin) return list;

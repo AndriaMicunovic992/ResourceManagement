@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { canView } from '../lib/permissions.js';
 import { resourceService } from '../services/resource.service.js';
 import { createResourceSchema, updateResourceSchema } from '../schemas/resource.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
@@ -21,6 +22,7 @@ const dismissReminderSchema = z.object({
 
 export const resourceRoutes: FastifyPluginAsync = async (app) => {
   app.get('/resources', async (req) => {
+    if (!canView(req.permissions, 'people')) return [];
     const list = await resourceService.list(req.orgId);
     if (req.visibility.isAdmin) return list;
     return list.filter((r) => req.visibility.visiblePersonIds.has(r.id));
@@ -108,6 +110,7 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
     return {
       role: v.role,
       isAdmin: v.isAdmin,
+      permissions: req.permissions,
       selfResourceId: v.selfResourceId,
       managedPersonIds: [...v.managedPersonIds],
       responsibleCustomerIds: [...v.responsibleCustomerIds],

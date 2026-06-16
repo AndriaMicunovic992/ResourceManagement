@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { canView } from '../lib/permissions.js';
 import { prisma } from '../db/prisma.js';
 import { assignmentService } from '../services/assignment.service.js';
 import { upsertAssignmentSchema, updateAssignmentSchema } from '../schemas/assignment.schema.js';
@@ -7,6 +8,7 @@ import { requirePermission } from '../middleware/requirePermission.js';
 
 export const assignmentRoutes: FastifyPluginAsync = async (app) => {
   app.get('/assignments', async (req) => {
+    if (!canView(req.permissions, 'planner')) return [];
     const list = await assignmentService.list(req.orgId);
     if (req.visibility.isAdmin) return list;
 
