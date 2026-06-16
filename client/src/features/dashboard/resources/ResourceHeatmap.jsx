@@ -62,7 +62,7 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
       {visibleResources.map((r) => (
         <ResourceHeatmapRow key={r.id} resource={r} months={months}
           onClick={() => onResourceClick(r)} includePotential={includePotential}
-          actualHours={actualByResource[r.id]} />
+          actualHours={actualByResource[r.id]} actualByMonth={actualsMap[r.id]} />
       ))}
       {/* Totals row */}
       <div className="flex items-center border-t-2 border-border bg-primary-bg/30 sticky bottom-0">
