@@ -64,6 +64,18 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.actualsByResource(req.orgId, from, to, visibleIds);
   });
 
+  // Actual hours per customer per month — scoped to visible customers. Feeds the
+  // client-staffing heatmap and the PM-review chart.
+  app.get('/integration/tempo/actuals/monthly-by-customer', async (req) => {
+    const q = req.query as { from?: string; to?: string };
+    const cur = new Date().toISOString().slice(0, 7);
+    const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
+    const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
+    const v = req.visibility;
+    const visibleIds = v.isAdmin ? null : [...v.visibleCustomerIds];
+    return integrationService.actualsByCustomer(req.orgId, from, to, visibleIds);
+  });
+
   app.get('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {
     return integrationService.listWorkItems(req.orgId);
   });

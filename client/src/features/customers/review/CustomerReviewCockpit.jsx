@@ -7,7 +7,8 @@ import Avatar from '../../../components/ui/Avatar';
 import MiniThread, { ReplyToggle } from '../../../components/ui/MiniThread';
 import SignalChart from '../../../components/ui/SignalChart';
 import CategoryMultiPicker from '../../../components/forms/CategoryMultiPicker';
-import { fteToHours, LOG_KIND_COLORS, LOG_KIND_LABELS } from '../../../lib/constants';
+import PlannedVsActualChart from '../../../components/ui/PlannedVsActualChart';
+import { fteToHours, MONTHLY_HOURS_PER_FTE, LOG_KIND_COLORS, LOG_KIND_LABELS } from '../../../lib/constants';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
 
 // The PM's structured recap fields. Each is an entry type, pre-linked to this
@@ -444,6 +445,24 @@ export default function CustomerReviewCockpit() {
       .sort((a, b) => b.fte - a.fte);
   }, [assignments, needs, custProjects, resources]);
 
+  // Planned (allocations on this customer's needs) vs actual (Tempo) hours/month.
+  const [custActuals, setCustActuals] = useState({});
+  useEffect(() => {
+    if (!customerId) return;
+    api.getMonthlyActualsByCustomer(months[0], months[months.length - 1]).then(setCustActuals).catch(() => setCustActuals({}));
+  }, [customerId, months]);
+  const plannedActualData = useMemo(() => {
+    const needIds = new Set(needs.filter((n) => custProjects.some((p) => p.id === n.projectId)).map((n) => n.id));
+    return months.map((m) => {
+      let fte = 0;
+      for (const a of assignments) {
+        if (!needIds.has(a.needId)) continue;
+        fte += (a.monthAllocations || {})[m] || 0;
+      }
+      return { month: m, planned: fte * MONTHLY_HOURS_PER_FTE, actual: custActuals[customerId]?.[m] || 0 };
+    });
+  }, [months, needs, custProjects, assignments, custActuals, customerId]);
+
   // Customer satisfaction chart: monthly average across all rated people.
   const chartPoints = useMemo(() => {
     return months.map((m) => {
@@ -579,6 +598,11 @@ export default function CustomerReviewCockpit() {
             Customer satisfaction (12 mo avg)
           </h3>
           <SignalChart points={chartPoints} height={200} />
+
+          <div className="mt-4 pt-4 border-t border-border-light">
+            <h3 className="text-[13px] font-bold text-text m-0 mb-2">Planned vs actual hours</h3>
+            <PlannedVsActualChart data={plannedActualData} />
+          </div>
 
           <div className="mt-4 pt-4 border-t border-border-light">
             <h3 className="text-[13px] font-bold text-text m-0 mb-2">
