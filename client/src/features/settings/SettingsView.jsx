@@ -296,7 +296,7 @@ export default function SettingsView() {
     if (!teamName.trim()) return;
     setTeamError('');
     try {
-      await addTeam({ name: teamName.trim(), managerId: teamManagerId || null });
+      await addTeam({ name: teamName.trim(), managerUserId: teamManagerId || null });
       setTeamName('');
       setTeamManagerId('');
     } catch (err) {
@@ -307,7 +307,7 @@ export default function SettingsView() {
   const handleStartEditTeam = (team) => {
     setEditingTeamId(team.id);
     setEditingTeamName(team.name);
-    setEditingTeamManagerId(team.managerId || team.manager?.id || '');
+    setEditingTeamManagerId(team.managerUserId || team.managerUser?.id || '');
     setTeamError('');
   };
 
@@ -322,7 +322,7 @@ export default function SettingsView() {
     try {
       await updateTeam(editingTeamId, {
         name: editingTeamName.trim(),
-        managerId: editingTeamManagerId || null,
+        managerUserId: editingTeamManagerId || null,
       });
       handleCancelEditTeam();
     } catch (err) {
@@ -774,7 +774,7 @@ export default function SettingsView() {
             {teams.map((t) => {
               const count = resources.filter((r) => (r.teams || []).some((rt) => rt.id === t.id)).length;
               const isEditing = editingTeamId === t.id;
-              const managerName = t.manager?.name || resources.find((r) => r.id === t.managerId)?.name;
+              const managerName = t.managerUser?.name || members.find((m) => m.user.id === t.managerUserId)?.user.name;
               return (
                 <div key={t.id} className="py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
                   {isEditing ? (
@@ -796,8 +796,8 @@ export default function SettingsView() {
                         className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
                       >
                         <option value="">No manager</option>
-                        {resources.map((r) => (
-                          <option key={r.id} value={r.id}>{r.name}</option>
+                        {members.filter((m) => m.role !== 'viewer').map((m) => (
+                          <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
                         ))}
                       </select>
                       <button
@@ -859,8 +859,8 @@ export default function SettingsView() {
                 className="px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
               >
                 <option value="">No manager</option>
-                {resources.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
+                {members.filter((m) => m.role !== 'viewer').map((m) => (
+                  <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
                 ))}
               </select>
             </div>

@@ -56,8 +56,9 @@ export default function PersonPageHeader({ resource, canEdit, onEdit, viewMode }
   ) : null;
 
   const managers = useMemo(() => {
-    const direct = (resource.managerLinks || []).map((l) => l.manager).filter(Boolean);
-    const inherited = (resource.teams || []).map((t) => t.manager).filter((m) => m && m.id !== resource.id);
+    // Managers are login users now. Exclude the person's own linked user.
+    const direct = (resource.managerLinks || []).map((l) => l.managerUser).filter(Boolean);
+    const inherited = (resource.teams || []).map((t) => t.managerUser).filter((m) => m && m.id !== resource.userId);
     const all = [];
     const seen = new Set();
     for (const m of [...direct, ...inherited]) {

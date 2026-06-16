@@ -118,24 +118,27 @@ export async function computeVisibility(
   }
 
   // Member: self + managed + responsible-customer-scoped projects/people.
+  // Managers are keyed on the login user (a member), so this no longer needs a
+  // self Resource — an account manager who isn't a staffable person still sees
+  // the people and teams they manage.
   const managedPersonIds = new Set<string>();
-  if (selfResourceId) {
+  {
     // Direct manager links.
     const direct = await prisma.personManager.findMany({
-      where: { orgId, managerId: selfResourceId },
+      where: { orgId, managerUserId: userId },
       select: { personId: true },
     });
     for (const d of direct) managedPersonIds.add(d.personId);
 
-    // Team-inherited: any team where self is the manager -> all team members.
+    // Team-inherited: any team where I'm the manager -> all team members.
     const managedTeams = await prisma.team.findMany({
-      where: { orgId, managerId: selfResourceId },
+      where: { orgId, managerUserId: userId },
       include: { resources: { select: { id: true } } },
     });
     for (const t of managedTeams) {
       for (const r of t.resources) managedPersonIds.add(r.id);
     }
-    managedPersonIds.delete(selfResourceId);
+    if (selfResourceId) managedPersonIds.delete(selfResourceId);
   }
 
   // Responsible customers: directly-responsible. Responsibility is keyed on the
@@ -245,47 +248,6 @@ export function assertAdmin(scope: VisibilityScope): void {
 }
 
 /**
- * Validate that none of the supplied Resource ids belong to a user whose
- * org membership is 'viewer'. Viewers cannot be assigned as managers or as
- * customer/project responsibles. Throws a 400-shaped error on the first
- * offender. Returns quietly if all are fine (including resources with no
- * linked user).
- */
-export async function assertNoViewerResources(
-  orgId: string,
-  resourceIds: (string | null | undefined)[]
-): Promise<void> {
-  const ids = [...new Set(resourceIds.filter((id): id is string => !!id))];
-  if (ids.length === 0) return;
-
-  const resources = await prisma.resource.findMany({
-    where: { orgId, id: { in: ids } },
-    select: { id: true, userId: true },
-  });
-  const userIds = resources
-    .map((r) => r.userId)
-    .filter((u): u is string => !!u);
-  if (userIds.length === 0) return;
-
-  const memberships = await prisma.orgMember.findMany({
-    where: { orgId, userId: { in: userIds } },
-    select: { userId: true, role: true },
-  });
-  const viewerUserIds = new Set(
-    memberships.filter((m) => m.role === 'viewer').map((m) => m.userId)
-  );
-  if (viewerUserIds.size === 0) return;
-  const badIds = resources
-    .filter((r) => r.userId && viewerUserIds.has(r.userId))
-    .map((r) => r.id);
-  if (badIds.length > 0) {
-    throw new BadRequestError(
-      'A viewer cannot be assigned as a manager or responsible person'
-    );
-  }
-}
-
-/**
  * Guard: a responsible person must be a non-viewer org member. Throws if the
  * given user isn't a member of the org, or is a viewer.
  */
@@ -303,5 +265,32 @@ export async function assertResponsibleUserAllowed(
   }
   if (member.role === 'viewer') {
     throw new BadRequestError('A viewer cannot be assigned as a responsible person');
+  }
+}
+
+/**
+ * Guard: every manager (of a person or team) must be a non-viewer org member.
+ * Managers are login users now, not Resources. Throws on the first offender.
+ */
+export async function assertManagerUsersAllowed(
+  orgId: string,
+  userIds: (string | null | undefined)[]
+): Promise<void> {
+  const ids = [...new Set(userIds.filter((id): id is string => !!id))];
+  if (ids.length === 0) return;
+
+  const memberships = await prisma.orgMember.findMany({
+    where: { orgId, userId: { in: ids } },
+    select: { userId: true, role: true },
+  });
+  const byUser = new Map(memberships.map((m) => [m.userId, m.role]));
+  for (const id of ids) {
+    const role = byUser.get(id);
+    if (!role) {
+      throw new BadRequestError('A manager must be a member of this organization');
+    }
+    if (role === 'viewer') {
+      throw new BadRequestError('A viewer cannot be assigned as a manager');
+    }
   }
 }

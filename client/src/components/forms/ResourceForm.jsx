@@ -18,9 +18,9 @@ export default function ResourceForm({ initial, onSave, onClose }) {
   const [teamIds, setTeamIds] = useState(
     Array.isArray(initial?.teams) ? initial.teams.map((t) => t.id) : []
   );
-  const [directManagerIds, setDirectManagerIds] = useState(
+  const [directManagerUserIds, setDirectManagerUserIds] = useState(
     Array.isArray(initial?.managerLinks)
-      ? initial.managerLinks.map((l) => l.managerId || l.manager?.id).filter(Boolean)
+      ? initial.managerLinks.map((l) => l.managerUserId || l.managerUser?.id).filter(Boolean)
       : []
   );
   const [userId, setUserId] = useState(initial?.userId || '');
@@ -43,25 +43,26 @@ export default function ResourceForm({ initial, onSave, onClose }) {
     return set;
   }, [resources, initial?.id]);
 
+  // Managers are login users now (the person's own linked user can't manage
+  // themselves). Inherited manager ids are user ids drawn from selected teams.
   const inheritedManagerIds = useMemo(() => {
     const ids = new Set();
     const selectedTeams = teams.filter((t) => teamIds.includes(t.id));
     for (const t of selectedTeams) {
-      if (t.managerId && t.managerId !== initial?.id) ids.add(t.managerId);
-      else if (t.manager?.id && t.manager.id !== initial?.id) ids.add(t.manager.id);
+      const mid = t.managerUserId || t.managerUser?.id;
+      if (mid && mid !== initial?.userId) ids.add(mid);
     }
     return ids;
-  }, [teams, teamIds, initial?.id]);
+  }, [teams, teamIds, initial?.userId]);
 
-  // Viewers cannot be assigned as direct managers — the backend rejects them.
+  // Managers are picked from org members. Viewers can't manage (backend
+  // rejects them), and a person can't be their own manager.
   const managerCandidates = useMemo(
     () =>
-      resources.filter(
-        (r) =>
-          r.id !== initial?.id &&
-          r.user?.memberships?.[0]?.role !== 'viewer',
+      members.filter(
+        (m) => m.role !== 'viewer' && m.user?.id !== initial?.userId,
       ),
-    [resources, initial?.id]
+    [members, initial?.userId]
   );
 
   const toggleTeam = (id) => {
@@ -69,7 +70,7 @@ export default function ResourceForm({ initial, onSave, onClose }) {
   };
 
   const toggleManager = (id) => {
-    setDirectManagerIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setDirectManagerUserIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const handleSubmit = (e) => {
@@ -79,7 +80,7 @@ export default function ResourceForm({ initial, onSave, onClose }) {
       name: name.trim(),
       capacity: parseFloat(capacity),
       teamIds,
-      directManagerIds,
+      directManagerUserIds,
       roles,
     };
     if (isAdmin) payload.userId = userId || null;
@@ -146,24 +147,24 @@ export default function ResourceForm({ initial, onSave, onClose }) {
         {isAdmin && (
           <Field label="Direct managers">
             {managerCandidates.length === 0 ? (
-              <div className="text-xs text-text-light italic">No other people available.</div>
+              <div className="text-xs text-text-light italic">No eligible members available.</div>
             ) : (
               <div className="max-h-40 overflow-y-auto border border-border rounded-lg p-2 bg-white">
                 <div className="flex flex-wrap gap-1.5">
-                  {managerCandidates.map((r) => {
-                    const active = directManagerIds.includes(r.id);
+                  {managerCandidates.map((m) => {
+                    const active = directManagerUserIds.includes(m.user.id);
                     return (
                       <button
                         type="button"
-                        key={r.id}
-                        onClick={() => toggleManager(r.id)}
+                        key={m.user.id}
+                        onClick={() => toggleManager(m.user.id)}
                         className={`text-xs font-semibold px-2 py-1 rounded-full border cursor-pointer ${
                           active
                             ? 'bg-primary text-white border-primary'
                             : 'bg-white text-text border-border hover:border-primary'
                         }`}
                       >
-                        {r.name}
+                        {m.user.name}
                       </button>
                     );
                   })}
@@ -174,7 +175,7 @@ export default function ResourceForm({ initial, onSave, onClose }) {
               <div className="text-[10px] text-text-light mt-1">
                 Inherited from selected teams:{' '}
                 {Array.from(inheritedManagerIds)
-                  .map((id) => resources.find((r) => r.id === id)?.name)
+                  .map((id) => members.find((m) => m.user.id === id)?.user.name)
                   .filter(Boolean)
                   .join(', ')}
               </div>

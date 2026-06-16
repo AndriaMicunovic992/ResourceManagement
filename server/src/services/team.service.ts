@@ -4,11 +4,11 @@ import { NotFoundError } from '../utils/errors.js';
 import type { CreateTeamInput, UpdateTeamInput } from '../schemas/team.schema.js';
 
 const teamInclude = {
-  manager: { select: { id: true, name: true } },
+  managerUser: { select: { id: true, name: true } },
 } as const;
 
-async function ensureManagerInOrg(orgId: string, managerId: string): Promise<void> {
-  const m = await prisma.resource.findFirst({ where: { id: managerId, orgId } });
+async function ensureManagerInOrg(orgId: string, managerUserId: string): Promise<void> {
+  const m = await prisma.orgMember.findFirst({ where: { orgId, userId: managerUserId } });
   if (!m) throw new NotFoundError('Manager not found');
 }
 
@@ -28,13 +28,13 @@ export const teamService = {
   },
 
   async create(orgId: string, data: CreateTeamInput) {
-    const { managerId, ...rest } = data;
-    if (managerId) await ensureManagerInOrg(orgId, managerId);
+    const { managerUserId, ...rest } = data;
+    if (managerUserId) await ensureManagerInOrg(orgId, managerUserId);
     return prisma.team.create({
       data: {
         ...rest,
         orgId,
-        managerId: managerId ?? null,
+        managerUserId: managerUserId ?? null,
       },
       include: teamInclude,
     });
@@ -42,11 +42,11 @@ export const teamService = {
 
   async update(orgId: string, id: string, data: UpdateTeamInput) {
     await this.getById(orgId, id);
-    const { managerId, ...rest } = data;
-    if (managerId) await ensureManagerInOrg(orgId, managerId);
+    const { managerUserId, ...rest } = data;
+    if (managerUserId) await ensureManagerInOrg(orgId, managerUserId);
     const patch: Prisma.TeamUpdateInput = { ...rest };
-    if (managerId !== undefined) {
-      patch.manager = managerId ? { connect: { id: managerId } } : { disconnect: true };
+    if (managerUserId !== undefined) {
+      patch.managerUser = managerUserId ? { connect: { id: managerUserId } } : { disconnect: true };
     }
     return prisma.team.update({ where: { id }, data: patch, include: teamInclude });
   },

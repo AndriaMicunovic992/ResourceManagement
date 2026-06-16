@@ -22,7 +22,7 @@ function makeResourceInclude(orgId: string) {
     },
     managerLinks: {
       include: {
-        manager: { select: { id: true, name: true } },
+        managerUser: { select: { id: true, name: true } },
       },
     },
   } as const;
@@ -41,20 +41,28 @@ async function ensureTeamsInOrg(orgId: string, teamIds: string[]): Promise<void>
   if (count !== teamIds.length) throw new NotFoundError('One or more teams not found');
 }
 
-async function ensureResourcesInOrg(orgId: string, ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
-  const count = await prisma.resource.count({ where: { orgId, id: { in: ids } } });
-  if (count !== ids.length) throw new NotFoundError('One or more managers not found');
+async function ensureMembersInOrg(orgId: string, userIds: string[]): Promise<void> {
+  if (userIds.length === 0) return;
+  const count = await prisma.orgMember.count({ where: { orgId, userId: { in: userIds } } });
+  if (count !== userIds.length) {
+    throw new NotFoundError('One or more managers are not members of this organisation');
+  }
 }
 
-async function setDirectManagers(orgId: string, personId: string, managerIds: string[]): Promise<void> {
-  await ensureResourcesInOrg(orgId, managerIds);
+async function setDirectManagers(orgId: string, personId: string, managerUserIds: string[]): Promise<void> {
+  const unique = [...new Set(managerUserIds)];
+  await ensureMembersInOrg(orgId, unique);
   await prisma.personManager.deleteMany({ where: { personId } });
-  if (managerIds.length === 0) return;
+  if (unique.length === 0) return;
+  // A person can't manage themselves (via their own login user).
+  const self = await prisma.resource.findUnique({
+    where: { id: personId },
+    select: { userId: true },
+  });
+  const filtered = unique.filter((uid) => uid !== self?.userId);
+  if (filtered.length === 0) return;
   await prisma.personManager.createMany({
-    data: managerIds
-      .filter((id) => id !== personId)
-      .map((managerId) => ({ personId, managerId, orgId })),
+    data: filtered.map((managerUserId) => ({ personId, managerUserId, orgId })),
     skipDuplicates: true,
   });
 }
@@ -85,7 +93,7 @@ export const resourceService = {
   },
 
   async create(orgId: string, data: CreateResourceInput) {
-    const { roles, userId, teamIds, directManagerIds, ...rest } = data;
+    const { roles, userId, teamIds, directManagerUserIds, ...rest } = data;
     if (userId) await ensureUserInOrg(orgId, userId);
     if (teamIds && teamIds.length > 0) await ensureTeamsInOrg(orgId, teamIds);
     try {
@@ -99,8 +107,8 @@ export const resourceService = {
         },
         include: makeResourceInclude(orgId),
       });
-      if (directManagerIds && directManagerIds.length > 0) {
-        await setDirectManagers(orgId, created.id, directManagerIds);
+      if (directManagerUserIds && directManagerUserIds.length > 0) {
+        await setDirectManagers(orgId, created.id, directManagerUserIds);
       }
       return this.getById(orgId, created.id);
     } catch (err) {
@@ -113,7 +121,7 @@ export const resourceService = {
 
   async update(orgId: string, id: string, data: UpdateResourceInput) {
     await this.getById(orgId, id);
-    const { roles, userId, teamIds, directManagerIds, ...rest } = data;
+    const { roles, userId, teamIds, directManagerUserIds, ...rest } = data;
 
     if (userId) await ensureUserInOrg(orgId, userId);
     if (teamIds) await ensureTeamsInOrg(orgId, teamIds);
@@ -145,8 +153,8 @@ export const resourceService = {
       throw err;
     }
 
-    if (directManagerIds !== undefined) {
-      await setDirectManagers(orgId, id, directManagerIds);
+    if (directManagerUserIds !== undefined) {
+      await setDirectManagers(orgId, id, directManagerUserIds);
     }
 
     return this.getById(orgId, id);
