@@ -119,7 +119,7 @@ function RailRow({ to, avatar, title, meta, chip, hot }) {
 
 export default function HomeDashboard() {
   const { user } = useAuth();
-  const { managedPersonIds } = useVisibility();
+  const { managedPersonIds, isAdmin, selfResourceId } = useVisibility();
   const { customers, projects, resources, needs, assignments } = useData();
   const { rU, rURealised } = useComputed();
   const navigate = useNavigate();
@@ -282,10 +282,17 @@ export default function HomeDashboard() {
      Managers are login users now; managedPersonIds is the server-computed set
      of people this user manages (direct links + teams they manage, self
      excluded). */
-  const railPeople = useMemo(
-    () => resources.filter((r) => managedPersonIds.has(r.id)).slice(0, 12),
-    [resources, managedPersonIds]
-  );
+  const railPeople = useMemo(() => {
+    const managed = resources.filter((r) => managedPersonIds.has(r.id));
+    if (managed.length > 0) return managed.slice(0, 12);
+    // Owners/admins who don't directly manage anyone still want their team at a
+    // glance — fall back to the org's people (minus themselves) so the
+    // dashboard isn't blank for them.
+    if (isAdmin) {
+      return resources.filter((r) => r.id !== selfResourceId).slice(0, 12);
+    }
+    return [];
+  }, [resources, managedPersonIds, isAdmin, selfResourceId]);
 
   /* ----- PM slice: customers I'm personally responsible for ----- */
   const myUserId = user?.id;

@@ -4,9 +4,8 @@ import ResourceUtilCell from './ResourceUtilCell';
 import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import { utilColor } from '../../../lib/statusUtils';
 import { useComputed } from '../../../hooks/useComputed';
-import { MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
 
-export default function ResourceHeatmapRow({ resource, months, onClick, includePotential, actualHours, actualByMonth }) {
+export default function ResourceHeatmapRow({ resource, months, onClick, includePotential }) {
   const { rURealised, rU } = useComputed();
   const color = domainColor(resourcePrimaryDomain(resource));
 
@@ -39,14 +38,12 @@ export default function ResourceHeatmapRow({ resource, months, onClick, includeP
         <Avatar name={resource.name} color={color} size={28} className="text-[10px]" />
         <div className="flex-1 min-w-0">
           <div className="text-xs font-semibold text-text truncate">{resource.name}</div>
-          <div className="text-[10px] font-mono" style={{ color: avgColor }}>{avgPct}% avg <span className="text-text-light">· {actualHours != null ? `${Math.round(actualHours)}h actual` : '— actual'}</span></div>
+          <div className="text-[10px] font-mono" style={{ color: avgColor }}>{avgPct}% avg</div>
         </div>
       </div>
-      {months.map((m) => {
-        const actHrs = actualByMonth?.[m] || 0;
-        const actualPct = (actHrs / MONTHLY_HOURS_PER_FTE / (resource.capacity || 1)) * 100;
-        return <ResourceUtilCell key={m} {...monthData[m]} showPotential={includePotential} actualPct={actualPct} />;
-      })}
+      {months.map((m) => (
+        <ResourceUtilCell key={m} {...monthData[m]} showPotential={includePotential} />
+      ))}
     </div>
   );
 }
