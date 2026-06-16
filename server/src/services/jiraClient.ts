@@ -84,21 +84,49 @@ export async function fetchProjects(conn: JiraConn): Promise<JiraProject[]> {
   return out;
 }
 
-export async function fetchEpics(conn: JiraConn): Promise<JiraEpic[]> {
+type IssueRow = { key: string; fields?: { summary?: string; project?: { key?: string } } };
+const EPIC_JQL = 'issuetype = Epic order by created ASC';
+const toEpic = (i: IssueRow): JiraEpic => ({ key: i.key, name: i.fields?.summary || i.key, projectKey: i.fields?.project?.key ?? null });
+
+// Jira Cloud's enhanced search: token-paginated, no startAt/total. Replaces the
+// classic /rest/api/3/search, which Atlassian retired (it now returns 410).
+async function fetchEpicsJql(conn: JiraConn): Promise<JiraEpic[]> {
+  const out: JiraEpic[] = [];
+  let nextPageToken: string | undefined;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const q: Record<string, string | number> = { jql: EPIC_JQL, fields: 'summary,project', maxResults: 100 };
+    if (nextPageToken) q.nextPageToken = nextPageToken;
+    const data = await jiraGet<{ issues?: IssueRow[]; nextPageToken?: string; isLast?: boolean }>(conn, '/rest/api/3/search/jql', q);
+    for (const i of data.issues || []) out.push(toEpic(i));
+    if (data.isLast || !data.nextPageToken || !(data.issues || []).length) break;
+    nextPageToken = data.nextPageToken;
+  }
+  return out;
+}
+
+// Classic startAt/total search — Jira Data Center, which has no /search/jql.
+async function fetchEpicsLegacy(conn: JiraConn): Promise<JiraEpic[]> {
   const out: JiraEpic[] = [];
   let startAt = 0;
   for (let page = 0; page < MAX_PAGES; page++) {
-    const data = await jiraGet<{
-      issues: { key: string; fields: { summary: string; project?: { key: string } } }[];
-      total: number;
-    }>(conn, '/rest/api/3/search', { jql: 'issuetype = Epic order by created asc', fields: 'summary,project', startAt, maxResults: 50 });
-    for (const i of data.issues || []) {
-      out.push({ key: i.key, name: i.fields?.summary || i.key, projectKey: i.fields?.project?.key ?? null });
-    }
+    const data = await jiraGet<{ issues?: IssueRow[]; total?: number }>(
+      conn, '/rest/api/3/search', { jql: EPIC_JQL, fields: 'summary,project', startAt, maxResults: 50 }
+    );
+    for (const i of data.issues || []) out.push(toEpic(i));
     startAt += (data.issues || []).length;
     if (!data.issues || data.issues.length === 0 || startAt >= (data.total ?? 0)) break;
   }
   return out;
+}
+
+export async function fetchEpics(conn: JiraConn): Promise<JiraEpic[]> {
+  try {
+    return await fetchEpicsJql(conn);
+  } catch (e) {
+    // Data Center doesn't have /search/jql (404) — fall back to classic search.
+    if (e instanceof JiraError && e.status === 404) return fetchEpicsLegacy(conn);
+    throw e;
+  }
 }
 
 export async function fetchAccounts(conn: JiraConn): Promise<JiraAccountRow[]> {
