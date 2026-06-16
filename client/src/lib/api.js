@@ -116,6 +116,15 @@ export const api = {
   moveSeniority: (id, direction) => apiFetch('/taxonomy/seniorities/' + id + '/move', { method: 'POST', body: JSON.stringify({ direction }) }),
   deleteSeniority: (id) => apiFetch('/taxonomy/seniorities/' + id, { method: 'DELETE' }),
 
+  // Integrations (Jira / Tempo). The connection GET never returns token
+  // plaintext — only whether each is set.
+  getJiraConnection: () => apiFetch('/integration/jira'),
+  saveJiraConnection: (data) => apiFetch('/integration/jira', { method: 'PUT', body: JSON.stringify(data) }),
+  getJiraWorkItems: () => apiFetch('/integration/jira/work-items'),
+  createJiraWorkItem: (data) => apiFetch('/integration/jira/work-items', { method: 'POST', body: JSON.stringify(data) }),
+  updateJiraWorkItem: (id, data) => apiFetch('/integration/jira/work-items/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteJiraWorkItem: (id) => apiFetch('/integration/jira/work-items/' + id, { method: 'DELETE' }),
+
   // Me
   getMyResource: () => apiFetch('/me/resource'),
   getMyAllocations: () => apiFetch('/me/allocations'),

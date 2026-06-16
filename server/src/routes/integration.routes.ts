@@ -1,0 +1,41 @@
+import { FastifyPluginAsync } from 'fastify';
+import { integrationService } from '../services/integration.service.js';
+import { requireRole } from '../middleware/requireRole.js';
+import {
+  saveConnectionSchema,
+  createWorkItemSchema,
+  updateWorkItemSchema,
+} from '../schemas/integration.schema.js';
+
+// All integration settings are admin-only. The connection endpoint never
+// returns token plaintext — only whether each token is set.
+export const integrationRoutes: FastifyPluginAsync = async (app) => {
+  app.get('/integration/jira', { preHandler: requireRole('admin') }, async (req) => {
+    return integrationService.getConnection(req.orgId);
+  });
+
+  app.put('/integration/jira', { preHandler: requireRole('admin') }, async (req) => {
+    const data = saveConnectionSchema.parse(req.body);
+    return integrationService.saveConnection(req.orgId, data);
+  });
+
+  app.get('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {
+    return integrationService.listWorkItems(req.orgId);
+  });
+
+  app.post('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {
+    const data = createWorkItemSchema.parse(req.body);
+    return integrationService.createWorkItem(req.orgId, data);
+  });
+
+  app.patch('/integration/jira/work-items/:id', { preHandler: requireRole('admin') }, async (req) => {
+    const { id } = req.params as { id: string };
+    const data = updateWorkItemSchema.parse(req.body);
+    return integrationService.updateWorkItem(req.orgId, id, data);
+  });
+
+  app.delete('/integration/jira/work-items/:id', { preHandler: requireRole('admin') }, async (req) => {
+    const { id } = req.params as { id: string };
+    return integrationService.deleteWorkItem(req.orgId, id);
+  });
+};

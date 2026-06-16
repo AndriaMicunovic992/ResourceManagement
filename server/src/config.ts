@@ -21,6 +21,10 @@ export const config = {
   // break-glass admin access; set ALLOW_LOCAL_AUTH=false to disable in prod.
   localAuthEnabled: process.env.ALLOW_LOCAL_AUTH !== 'false',
   jwtSecret: process.env.JWT_SECRET,
+  // Key for encrypting secrets at rest (Jira/Tempo tokens). Falls back to the
+  // JWT secret so no extra config is required; set ENCRYPTION_KEY to rotate
+  // independently. Changing it makes already-stored secrets unreadable.
+  encryptionKey: process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || 'insecure-dev-encryption-key',
   // Lifetime of a normal session token, and of a short-lived "view as" token.
   tokenTtl: process.env.TOKEN_TTL || '7d',
   impersonationTtl: '1h',

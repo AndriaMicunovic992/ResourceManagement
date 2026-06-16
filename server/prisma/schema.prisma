@@ -34,6 +34,8 @@ model Organization {
   domains     Domain[]
   jobRoles    JobRole[]
   seniorities Seniority[]
+  jiraConnection JiraConnection?
+  jiraWorkItems  JiraWorkItem[]
   customers   Customer[]
   projects    Project[]
   resources   Resource[]
@@ -166,6 +168,7 @@ model Customer {
   evaluations Evaluation[]
   clientSignals ClientSignal[]
   reviews     CustomerReview[]
+  jiraWorkItems JiraWorkItem[]
 
   @@index([orgId])
   @@index([responsibleUserId])
@@ -192,6 +195,7 @@ model Project {
   needs       Need[]
   logs        Log[]
   evaluations Evaluation[]
+  jiraWorkItems JiraWorkItem[]
 
   @@index([orgId])
   @@index([customerId])
@@ -202,6 +206,9 @@ model Resource {
   id        String   @id @default(cuid())
   name      String
   capacity  Float    @default(1.0)
+  // Identifier of this person in the external "actual hours" system (e.g. a
+  // Jira accountId). Null until mapped in Settings → Integrations.
+  externalWorkId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -710,4 +717,52 @@ model CustomerReview {
 
   @@index([orgId])
   @@index([customerId])
+}
+
+// --- External integrations (Jira / Tempo "actual hours") ------------------
+
+// Per-org connection to the actual-hours source (Jira Cloud + Tempo). The two
+// API tokens are stored ENCRYPTED at rest (AES-256-GCM via utils/crypto) and
+// never returned to the client in plaintext — the API exposes only whether
+// each is set. baseUrl/email are non-secret.
+model JiraConnection {
+  id            String   @id @default(cuid())
+  orgId         String   @unique
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  baseUrl       String?  // e.g. https://acme.atlassian.net
+  jiraEmail     String?  // account email for API-token basic auth
+  jiraApiToken  String?  // encrypted at rest
+  tempoApiToken String?  // encrypted at rest
+  enabled       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// A node in the external (Jira) work hierarchy, mapped to one of our entities.
+// Jira granularity isn't 1:1 with ours — a Jira project may be our Customer,
+// while its epics map to individual Projects — so items form a tree (parentId)
+// and each can map to a Customer OR a Project.
+model JiraWorkItem {
+  id          String   @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  kind        String   @default("project") // project | epic | issue | other
+  externalKey String   // Jira key/id, e.g. ACME or ACME-1234
+  name        String
+  parentId    String?
+  parent      JiraWorkItem?  @relation("JiraWorkItemTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    JiraWorkItem[] @relation("JiraWorkItemTree")
+  // Maps to at most one of our entities (enforced in the service).
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([orgId, externalKey])
+  @@index([orgId])
+  @@index([parentId])
+  @@index([customerId])
+  @@index([projectId])
 }

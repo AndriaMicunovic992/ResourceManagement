@@ -10,6 +10,7 @@ import Avatar from '../../components/ui/Avatar';
 import PageHeader from '../../components/ui/PageHeader';
 import RolesSection from './RolesSection';
 import TaxonomySection from './TaxonomySection';
+import IntegrationsSection from './IntegrationsSection';
 
 
 export default function SettingsView() {
@@ -526,6 +527,7 @@ export default function SettingsView() {
       : []),
     { id: 'members', label: 'Members' },
     ...(isAdmin ? [{ id: 'roles', label: 'Roles & permissions' }] : []),
+    ...(isAdmin ? [{ id: 'integrations', label: 'Integrations' }] : []),
   ];
 
   // Scroll-spy: highlight the section currently near the top of the viewport.
@@ -1337,6 +1339,8 @@ export default function SettingsView() {
           <RolesSection onRolesChanged={loadRoleOptions} />
         </div>
       )}
+
+      {isAdmin && <IntegrationsSection />}
         </div>
       </div>
     </div>
