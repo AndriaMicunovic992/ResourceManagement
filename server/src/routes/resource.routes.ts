@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { resourceService } from '../services/resource.service.js';
 import { createResourceSchema, updateResourceSchema } from '../schemas/resource.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 import {
   assertCanViewPerson,
   assertNoViewerResources,
@@ -117,7 +118,7 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
-  app.post('/resources', { preHandler: requireRole('admin') }, async (req) => {
+  app.post('/resources', { preHandler: requirePermission('people', 'create') }, async (req) => {
     const data = createResourceSchema.parse(req.body);
     if (data.directManagerIds && data.directManagerIds.length > 0) {
       await assertNoViewerResources(req.orgId, data.directManagerIds);
@@ -125,7 +126,7 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
     return resourceService.create(req.orgId, data);
   });
 
-  app.patch('/resources/:id', { preHandler: requireRole('admin') }, async (req) => {
+  app.patch('/resources/:id', { preHandler: requirePermission('people', 'edit') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updateResourceSchema.parse(req.body);
     if (data.directManagerIds && data.directManagerIds.length > 0) {
@@ -134,7 +135,7 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
     return resourceService.update(req.orgId, id, data);
   });
 
-  app.delete('/resources/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
+  app.delete('/resources/:id', { preHandler: requirePermission('people', 'delete') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await resourceService.delete(req.orgId, id);
     return reply.status(204).send();

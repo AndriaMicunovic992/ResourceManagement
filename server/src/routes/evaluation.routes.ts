@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { requireRole } from '../middleware/requireRole.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 import {
   createEvaluationSchema,
   batchCreateEvaluationSchema,
@@ -94,7 +95,7 @@ export const evaluationRoutes: FastifyPluginAsync = async (app) => {
     return evaluationService.finalize(req.orgId, id, req.userId, req.role, body);
   });
 
-  app.delete('/evaluations/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
+  app.delete('/evaluations/:id', { preHandler: requirePermission('evaluations', 'delete') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await evaluationService.delete(req.orgId, id, req.role);
     return reply.status(204).send();

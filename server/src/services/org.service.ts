@@ -1,7 +1,7 @@
 import { prisma } from '../db/prisma.js';
-import { NotFoundError, ConflictError, ForbiddenError } from '../utils/errors.js';
+import { NotFoundError, ConflictError, ForbiddenError, BadRequestError } from '../utils/errors.js';
 import { inviteService } from './invite.service.js';
-import { ensureSystemRoles } from './role.service.js';
+import { ensureSystemRoles, roleService } from './role.service.js';
 
 export const orgService = {
   /** Membership row for (user, org), or null. Used to gate org switching. */
@@ -98,6 +98,11 @@ export const orgService = {
     if (!member) throw new NotFoundError('Member not found');
     if (member.role === 'owner') throw new ForbiddenError('Cannot change the owner role');
     if (member.userId === requesterId) throw new ForbiddenError('Cannot change your own role');
+    if (role === 'owner') throw new ForbiddenError('There can only be one owner');
+    // The target role must be a real role in this org (system or custom).
+    if (!(await roleService.exists(orgId, role))) {
+      throw new BadRequestError('Unknown role');
+    }
 
     return prisma.orgMember.update({
       where: { id: memberId },

@@ -1,6 +1,13 @@
 import fp from 'fastify-plugin';
 import { prisma } from '../db/prisma.js';
 import { computeVisibility } from '../services/visibility.service.js';
+import {
+  LEGACY_ROLE_LEVEL,
+  normalizeMatrix,
+  systemRoleDef,
+  emptyMatrix,
+  type PermissionMatrix,
+} from '../lib/permissions.js';
 
 // Endpoints reachable without a session token.
 const PUBLIC_PATHS = [
@@ -23,6 +30,8 @@ export default fp(async (app) => {
   app.decorateRequest('userId', '');
   app.decorateRequest('orgId', '');
   app.decorateRequest('role', '');
+  app.decorateRequest('roleLevel', 1);
+  app.decorateRequest('permissions', null);
   app.decorateRequest('visibility', null);
   app.decorateRequest('impersonatorUserId', null);
 
@@ -43,6 +52,18 @@ export default fp(async (app) => {
       req.userId = decoded.userId;
       req.orgId = decoded.orgId;
       req.role = membership.role;
+
+      // Resolve the role's permission matrix + level. Falls back to the code
+      // defaults if the Role row hasn't been seeded yet (e.g. a fresh deploy
+      // before the first /roles read).
+      const roleRow = await prisma.role.findUnique({
+        where: { orgId_key: { orgId: decoded.orgId, key: membership.role } },
+      });
+      const sysDef = systemRoleDef(membership.role);
+      req.roleLevel = roleRow?.level ?? sysDef?.level ?? LEGACY_ROLE_LEVEL[membership.role] ?? 1;
+      req.permissions = roleRow
+        ? normalizeMatrix(roleRow.permissions)
+        : ((sysDef?.permissions ?? emptyMatrix()) as PermissionMatrix);
 
       // Impersonation ("view as") is strictly read-only: an admin sees exactly
       // what the target sees, but cannot mutate data while wearing their hat.
@@ -66,6 +87,6 @@ export default fp(async (app) => {
   // tradeoff is that every handler can call req.visibility.* safely.
   app.addHook('preHandler', async (req) => {
     if (!req.userId || !req.orgId) return;
-    req.visibility = await computeVisibility(req.orgId, req.userId, req.role);
+    req.visibility = await computeVisibility(req.orgId, req.userId, req.roleLevel);
   });
 });

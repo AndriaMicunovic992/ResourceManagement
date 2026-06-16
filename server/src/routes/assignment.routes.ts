@@ -3,6 +3,7 @@ import { prisma } from '../db/prisma.js';
 import { assignmentService } from '../services/assignment.service.js';
 import { upsertAssignmentSchema, updateAssignmentSchema } from '../schemas/assignment.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 
 export const assignmentRoutes: FastifyPluginAsync = async (app) => {
   app.get('/assignments', async (req) => {
@@ -28,18 +29,18 @@ export const assignmentRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
-  app.post('/assignments', { preHandler: requireRole('admin') }, async (req) => {
+  app.post('/assignments', { preHandler: requirePermission('planner', 'create') }, async (req) => {
     const data = upsertAssignmentSchema.parse(req.body);
     return assignmentService.upsertMonth(req.orgId, data);
   });
 
-  app.patch('/assignments/:id', { preHandler: requireRole('admin') }, async (req) => {
+  app.patch('/assignments/:id', { preHandler: requirePermission('planner', 'edit') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updateAssignmentSchema.parse(req.body);
     return assignmentService.update(req.orgId, id, data);
   });
 
-  app.delete('/assignments/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
+  app.delete('/assignments/:id', { preHandler: requirePermission('planner', 'delete') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await assignmentService.delete(req.orgId, id);
     return reply.status(204).send();
