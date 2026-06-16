@@ -31,6 +31,9 @@ model Organization {
 
   members     OrgMember[]
   roles       Role[]
+  domains     Domain[]
+  jobRoles    JobRole[]
+  seniorities Seniority[]
   customers   Customer[]
   projects    Project[]
   resources   Resource[]
@@ -310,6 +313,59 @@ model ResourceRole {
   resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 
   @@index([resourceId])
+}
+
+// --- Editable role taxonomy (per org) -------------------------------------
+// Domains / job roles / seniorities used to define ResourceRole and Need are
+// org-scoped and admin-editable. ResourceRole.domain/role/seniority and
+// Need.domain/role/seniority still store the *name* as a string; these tables
+// are the source of truth for the pickers, planner colors, and seniority
+// ordering. Renames cascade to the string columns (see taxonomy.service).
+model Domain {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name      String
+  color     String   // hex, drives planner bar colors
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobRoles  JobRole[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+}
+
+model JobRole {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  domainId  String
+  domain    Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, domainId, name])
+  @@index([orgId])
+  @@index([domainId])
+}
+
+model Seniority {
+  id         String   @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name       String
+  shortLabel String
+  // Rank used both for display order and need-matching (higher = more senior).
+  level      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([orgId, name])
+  @@index([orgId])
 }
 
 model Need {

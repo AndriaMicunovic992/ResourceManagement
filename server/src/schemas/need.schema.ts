@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 export const createNeedSchema = z.object({
   projectId: z.string().min(1),
-  domain: z.enum(['Data', 'Web', 'General']),
+  // domain/seniority are the org's editable taxonomy, not a fixed enum.
+  domain: z.string().min(1),
   role: z.string().min(1),
-  seniority: z.enum(['Junior', 'Medior', 'Senior', 'Senior Principal']),
+  seniority: z.string().min(1),
   label: z.string().optional().nullable(),
   startMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
   endMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
@@ -13,9 +14,9 @@ export const createNeedSchema = z.object({
 });
 
 export const updateNeedSchema = z.object({
-  domain: z.enum(['Data', 'Web', 'General']).optional(),
+  domain: z.string().min(1).optional(),
   role: z.string().min(1).optional(),
-  seniority: z.enum(['Junior', 'Medior', 'Senior', 'Senior Principal']).optional(),
+  seniority: z.string().min(1).optional(),
   label: z.string().optional().nullable(),
   startMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
   endMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),

@@ -1,8 +1,8 @@
-import { DOMAINS, SENIORITY_SHORT } from '../../lib/constants';
+import { domainColor, domainBg, seniorityShort } from '../../lib/taxonomy';
 
 export default function RoleBadge({ domain, role, seniority, small, full }) {
-  const d = DOMAINS[domain] || { color: '#6B8A9E', bg: '#F0F0F0' };
-  const senShort = seniority ? SENIORITY_SHORT[seniority] : null;
+  const d = { color: domainColor(domain), bg: domainBg(domain) };
+  const senShort = seniority ? seniorityShort(seniority) : null;
 
   if (full) {
     return (

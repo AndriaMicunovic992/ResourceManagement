@@ -3,6 +3,7 @@ import { hashPassword, verifyPassword } from '../utils/password.js';
 import { UnauthorizedError, ConflictError } from '../utils/errors.js';
 import type { SignupInput, LoginInput } from '../schemas/auth.schema.js';
 import { seedDefaultRoles } from './role.service.js';
+import { ensureTaxonomy } from './taxonomy.service.js';
 
 export const authService = {
   async signup(input: SignupInput) {
@@ -29,6 +30,7 @@ export const authService = {
     });
 
     await seedDefaultRoles(org.id);
+    await ensureTaxonomy(org.id);
     return { user: { id: user.id, email: user.email, name: user.name }, org };
   },
 

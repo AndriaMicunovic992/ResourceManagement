@@ -3,12 +3,19 @@ import Modal from '../ui/Modal';
 import Field from '../ui/Field';
 import Button from '../ui/Button';
 import StatusPicker from '../ui/StatusPicker';
-import { DOMAINS, SENIORITIES, fteToHours, hoursToFte } from '../../lib/constants';
+import { fteToHours, hoursToFte } from '../../lib/constants';
+import { useData } from '../../contexts/DataContext';
 
 export default function NeedForm({ initial, project, onSave, onClose }) {
-  const [domain, setDomain] = useState(initial?.domain || 'Web');
-  const [role, setRole] = useState(initial?.role || 'FE');
-  const [seniority, setSeniority] = useState(initial?.seniority || 'Medior');
+  const { domains, seniorities } = useData();
+  const domainNames = domains.map((d) => d.name);
+  const seniorityNames = seniorities.map((s) => s.name);
+  const rolesFor = (name) => domains.find((d) => d.name === name)?.roles.map((r) => r.name) || [];
+  const withCurrent = (opts, current) => (current && !opts.includes(current) ? [current, ...opts] : opts);
+
+  const [domain, setDomain] = useState(initial?.domain || domainNames[0] || 'Web');
+  const [role, setRole] = useState(initial?.role || rolesFor(initial?.domain || domainNames[0])[0] || 'FE');
+  const [seniority, setSeniority] = useState(initial?.seniority || seniorityNames[0] || 'Medior');
   const [label, setLabel] = useState(initial?.label || '');
   const [startMonth, setStartMonth] = useState(initial?.startMonth || project?.startMonth || '');
   const [endMonth, setEndMonth] = useState(initial?.endMonth || project?.endMonth || '');
@@ -36,7 +43,7 @@ export default function NeedForm({ initial, project, onSave, onClose }) {
 
   const handleDomainChange = (d) => {
     setDomain(d);
-    setRole(DOMAINS[d].roles[0]);
+    setRole(rolesFor(d)[0] || '');
   };
 
   const handleSubmit = (e) => {
@@ -60,21 +67,21 @@ export default function NeedForm({ initial, project, onSave, onClose }) {
             <label className="block text-xs font-semibold text-text-mid mb-1">Domain</label>
             <select value={domain} onChange={(e) => handleDomainChange(e.target.value)}
               className="w-full px-2 py-1.5 border border-border rounded-lg text-xs text-text bg-white">
-              {Object.keys(DOMAINS).map((d) => <option key={d} value={d}>{d}</option>)}
+              {withCurrent(domainNames, domain).map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
           <div className="flex-1">
             <label className="block text-xs font-semibold text-text-mid mb-1">Role</label>
             <select value={role} onChange={(e) => setRole(e.target.value)}
               className="w-full px-2 py-1.5 border border-border rounded-lg text-xs text-text bg-white">
-              {DOMAINS[domain].roles.map((r) => <option key={r} value={r}>{r}</option>)}
+              {withCurrent(rolesFor(domain), role).map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div className="flex-1">
             <label className="block text-xs font-semibold text-text-mid mb-1">Seniority</label>
             <select value={seniority} onChange={(e) => setSeniority(e.target.value)}
               className="w-full px-2 py-1.5 border border-border rounded-lg text-xs text-text bg-white">
-              {SENIORITIES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {withCurrent(seniorityNames, seniority).map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { prisma } from './prisma.js';
 import { hashPassword } from '../utils/password.js';
 import { monthRange } from '../utils/months.js';
+import { ensureTaxonomy } from '../services/taxonomy.service.js';
 
 async function seed() {
   // This wipes every table before inserting demo data. Guard against running it
@@ -36,6 +37,9 @@ async function seed() {
   await prisma.orgMember.create({
     data: { userId: user.id, orgId: org.id, role: 'owner' },
   });
+
+  // Seed the default role taxonomy (domains, roles, seniorities).
+  await ensureTaxonomy(org.id);
 
   // Create customer
   const customer = await prisma.customer.create({

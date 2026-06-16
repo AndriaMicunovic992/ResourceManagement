@@ -8,7 +8,8 @@ import { useData } from '../../contexts/DataContext';
 import { useOrg } from '../../contexts/OrgContext';
 import { useComputed } from '../../hooks/useComputed';
 import { api } from '../../lib/api';
-import { MONTHS, SENIORITY_SHORT } from '../../lib/constants';
+import { MONTHS } from '../../lib/constants';
+import { seniorityShort } from '../../lib/taxonomy';
 import { currentMonth } from '../../lib/dateUtils';
 import { resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
 import RemindersPanel from './RemindersPanel';
@@ -135,7 +136,7 @@ export default function PeopleListView() {
                 <span className="w-[220px] min-w-0 shrink-0">
                   <span className="block text-[12.5px] font-bold text-text truncate">{r.name}</span>
                   <span className="block text-[9.5px] font-mono text-text-light truncate mt-0.5">
-                    {(r.roles || []).map((role) => `${role.domain.slice(0, 3)} ${role.role}·${SENIORITY_SHORT[role.seniority] || role.seniority}`).join(' · ') || '—'}
+                    {(r.roles || []).map((role) => `${role.domain.slice(0, 3)} ${role.role}·${seniorityShort(role.seniority)}`).join(' · ') || '—'}
                   </span>
                 </span>
                 {(r.teams || []).slice(0, 2).map((t) => (

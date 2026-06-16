@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Avatar from '../../../components/ui/Avatar';
 import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
-import { SENIORITY_SHORT } from '../../../lib/constants';
+import { seniorityShort } from '../../../lib/taxonomy';
 import { useComputed } from '../../../hooks/useComputed';
 import { monthRange } from '../../../lib/dateUtils';
 
@@ -29,7 +29,7 @@ export default function ResourceCard({ resource, selected, onSelect, timeRange }
   const over = avgUtil > 1.001;
   const barColor = over ? '#E8636F' : avgUtil >= 0.8 ? '#5BC68A' : '#94A3B8';
   const rolesLine = (resource.roles || [])
-    .map((rl) => `${rl.domain.slice(0, 3)} ${rl.role}·${SENIORITY_SHORT[rl.seniority] || rl.seniority}`)
+    .map((rl) => `${rl.domain.slice(0, 3)} ${rl.role}·${seniorityShort(rl.seniority)}`)
     .join(' · ');
   const dimmed = isFullyBooked && !selected;
 

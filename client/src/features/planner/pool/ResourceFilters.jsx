@@ -1,20 +1,21 @@
 import { useMemo } from 'react';
 import ResourceFilterRow from './ResourceFilterRow';
-import { DOMAINS, SENIORITIES, SENIORITY_SHORT } from '../../../lib/constants';
+import { useData } from '../../../contexts/DataContext';
 
 export default function ResourceFilters({ filters, onChange, teams = [] }) {
-  const domainOptions = ['All', ...Object.keys(DOMAINS)];
+  const { domains, seniorities } = useData();
+  const domainOptions = ['All', ...domains.map((d) => d.name)];
 
   const roleOptions = useMemo(() => {
     if (filters.domain === 'All') {
       const all = new Set();
-      Object.values(DOMAINS).forEach((d) => d.roles.forEach((r) => all.add(r)));
+      domains.forEach((d) => d.roles.forEach((r) => all.add(r.name)));
       return ['All', ...all];
     }
-    return ['All', ...DOMAINS[filters.domain].roles];
-  }, [filters.domain]);
+    return ['All', ...(domains.find((d) => d.name === filters.domain)?.roles.map((r) => r.name) || [])];
+  }, [filters.domain, domains]);
 
-  const seniorityOptions = ['All', ...Object.values(SENIORITY_SHORT)];
+  const seniorityOptions = ['All', ...seniorities.map((s) => s.shortLabel)];
   const teamOptions = ['All', ...teams.map((t) => t.name)];
 
   return (

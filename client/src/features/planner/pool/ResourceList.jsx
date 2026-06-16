@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import ResourceCard from './ResourceCard';
-import { SENIORITY_SHORT } from '../../../lib/constants';
+import { seniorityFromShort } from '../../../lib/taxonomy';
 import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import { useData } from '../../../contexts/DataContext';
 
@@ -12,7 +12,7 @@ export default function ResourceList({ resources, filters, heldResource, onHold,
       if (filters.domain !== 'All' && !r.roles?.some((rl) => rl.domain === filters.domain)) return false;
       if (filters.role !== 'All' && !r.roles?.some((rl) => rl.role === filters.role)) return false;
       if (filters.seniority !== 'All') {
-        const senFull = Object.entries(SENIORITY_SHORT).find(([, v]) => v === filters.seniority)?.[0];
+        const senFull = seniorityFromShort(filters.seniority);
         if (senFull && !r.roles?.some((rl) => rl.seniority === senFull)) return false;
       }
       if (filters.team && filters.team !== 'All') {
