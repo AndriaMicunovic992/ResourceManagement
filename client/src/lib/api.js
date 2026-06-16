@@ -102,6 +102,20 @@ export const api = {
   updateTeam: (id, data) => apiFetch('/teams/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteTeam: (id) => apiFetch('/teams/' + id, { method: 'DELETE' }),
 
+  // Role taxonomy (domains / roles / seniorities). Writes return the full
+  // refreshed taxonomy.
+  getTaxonomy: () => apiFetch('/taxonomy'),
+  createDomain: (data) => apiFetch('/taxonomy/domains', { method: 'POST', body: JSON.stringify(data) }),
+  updateDomain: (id, data) => apiFetch('/taxonomy/domains/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteDomain: (id) => apiFetch('/taxonomy/domains/' + id, { method: 'DELETE' }),
+  createJobRole: (domainId, name) => apiFetch('/taxonomy/domains/' + domainId + '/roles', { method: 'POST', body: JSON.stringify({ name }) }),
+  updateJobRole: (id, name) => apiFetch('/taxonomy/roles/' + id, { method: 'PATCH', body: JSON.stringify({ name }) }),
+  deleteJobRole: (id) => apiFetch('/taxonomy/roles/' + id, { method: 'DELETE' }),
+  createSeniority: (data) => apiFetch('/taxonomy/seniorities', { method: 'POST', body: JSON.stringify(data) }),
+  updateSeniority: (id, data) => apiFetch('/taxonomy/seniorities/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  moveSeniority: (id, direction) => apiFetch('/taxonomy/seniorities/' + id + '/move', { method: 'POST', body: JSON.stringify({ direction }) }),
+  deleteSeniority: (id) => apiFetch('/taxonomy/seniorities/' + id, { method: 'DELETE' }),
+
   // Me
   getMyResource: () => apiFetch('/me/resource'),
   getMyAllocations: () => apiFetch('/me/allocations'),

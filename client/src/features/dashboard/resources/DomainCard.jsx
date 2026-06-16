@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { DOMAINS } from '../../../lib/constants';
+import { domainColor } from '../../../lib/taxonomy';
 import { utilColor } from '../../../lib/statusUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
@@ -7,7 +7,6 @@ import { useComputed } from '../../../hooks/useComputed';
 export default function DomainCard({ domain, months, includePotential, teamId }) {
   const { resources } = useData();
   const { rURealised, rU } = useComputed();
-  const d = DOMAINS[domain];
 
   const { count, utilPct, usedFte, totalFte } = useMemo(() => {
     const scoped = teamId ? resources.filter((r) => (r.teams || []).some((t) => t.id === teamId)) : resources;
@@ -39,7 +38,7 @@ export default function DomainCard({ domain, months, includePotential, teamId })
     <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded" style={{ backgroundColor: d.color }} />
+          <div className="w-2.5 h-2.5 rounded" style={{ backgroundColor: domainColor(domain) }} />
           <span className="text-[13px] font-bold text-text">{domain}</span>
         </div>
         <span className="text-xs font-mono text-text-mid">{count}</span>

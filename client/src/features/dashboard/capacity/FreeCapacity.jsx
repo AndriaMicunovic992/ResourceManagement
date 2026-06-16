@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { formatMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
-import { DOMAINS, SENIORITY_SHORT } from '../../../lib/constants';
+import { domainColor, seniorityShort } from '../../../lib/taxonomy';
 
 export default function FreeCapacity({ months, includePotential, teamId }) {
   const { resources: allResources, needs, projects, customers } = useData();
@@ -125,7 +125,7 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
         ))}
       </div>
       {tree.map((d) => {
-        const color = DOMAINS[d.domain]?.color || '#6B8A9E';
+        const color = domainColor(d.domain);
         const domainExpanded = !!expanded[d.domain];
         const dKey = d.domain;
         return (
@@ -173,7 +173,7 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
                       <div key={s.seniority} className="flex items-center border-b border-border-light/50 hover:bg-primary-bg/20">
                         <div className="w-[270px] shrink-0 px-3 py-1 flex items-center gap-2 pl-14">
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-bg text-text-mid font-mono">
-                            {SENIORITY_SHORT[s.seniority] || s.seniority}
+                            {seniorityShort(s.seniority)}
                           </span>
                           <span className="text-[10px] text-text-light">{s.seniority}</span>
                           <span className="text-[10px] text-text-light ml-auto">({s.resources.length})</span>

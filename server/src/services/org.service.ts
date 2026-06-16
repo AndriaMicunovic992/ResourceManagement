@@ -2,6 +2,7 @@ import { prisma } from '../db/prisma.js';
 import { NotFoundError, ConflictError, ForbiddenError, BadRequestError } from '../utils/errors.js';
 import { inviteService } from './invite.service.js';
 import { seedDefaultRoles, roleService } from './role.service.js';
+import { ensureTaxonomy } from './taxonomy.service.js';
 
 export const orgService = {
   /** Membership row for (user, org), or null. Used to gate org switching. */
@@ -28,6 +29,7 @@ export const orgService = {
       data: { userId, orgId: org.id, role: 'owner' },
     });
     await seedDefaultRoles(org.id);
+    await ensureTaxonomy(org.id);
     return org;
   },
 

@@ -1,6 +1,7 @@
-import { createContext, useContext, useCallback } from 'react';
+import { createContext, useContext, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { setTaxonomy } from '../lib/taxonomy';
 import { useOrg } from './OrgContext';
 
 const DataContext = createContext(null);
@@ -76,6 +77,9 @@ export function DataProvider({ children }) {
   });
   const needsQ = useQuery({ queryKey: ['needs', orgId], queryFn: api.getNeeds, enabled });
   const assignmentsQ = useQuery({ queryKey: ['assignments', orgId], queryFn: api.getAssignments, enabled });
+  // Editable role taxonomy (domains/roles/seniorities). Drives the pickers,
+  // planner colors and seniority ordering.
+  const taxonomyQ = useQuery({ queryKey: ['taxonomy', orgId], queryFn: api.getTaxonomy, enabled });
   // Org members back the "responsible person" pickers — responsibility can be
   // any login user, not only staffable resources.
   const membersQ = useQuery({
@@ -99,6 +103,17 @@ export function DataProvider({ children }) {
   const assignments = assignmentsQ.data ?? [];
   const members = membersQ.data ?? [];
   const meResource = meResourceQ.data ?? null;
+  const domains = taxonomyQ.data?.domains ?? [];
+  const seniorities = taxonomyQ.data?.seniorities ?? [];
+
+  // Hydrate the module-level taxonomy registry the moment the data changes, so
+  // the pure lookup helpers (domainColor, seniorityShort, …) reflect this org
+  // on the same render the children paint with.
+  const lastTaxRef = useRef(null);
+  if (taxonomyQ.data && taxonomyQ.data !== lastTaxRef.current) {
+    setTaxonomy(domains, seniorities);
+    lastTaxRef.current = taxonomyQ.data;
+  }
 
   // Gate the app on the collections the planner/dashboards can't render without.
   const coreQueries = [customersQ, projectsQ, resourcesQ, needsQ, assignmentsQ];
@@ -194,6 +209,19 @@ export function DataProvider({ children }) {
     invalidate('skills', 'resources');
   }, [invalidate]);
 
+  // Role-taxonomy CRUD. Renames cascade server-side to people & needs, so those
+  // collections are invalidated alongside the taxonomy.
+  const addDomain = useCallback(async (data) => { await api.createDomain(data); invalidate('taxonomy'); }, [invalidate]);
+  const updateDomain = useCallback(async (id, data) => { await api.updateDomain(id, data); invalidate('taxonomy', 'resources', 'needs'); }, [invalidate]);
+  const deleteDomain = useCallback(async (id) => { await api.deleteDomain(id); invalidate('taxonomy'); }, [invalidate]);
+  const addJobRole = useCallback(async (domainId, name) => { await api.createJobRole(domainId, name); invalidate('taxonomy'); }, [invalidate]);
+  const updateJobRole = useCallback(async (id, name) => { await api.updateJobRole(id, name); invalidate('taxonomy', 'resources', 'needs'); }, [invalidate]);
+  const deleteJobRole = useCallback(async (id) => { await api.deleteJobRole(id); invalidate('taxonomy'); }, [invalidate]);
+  const addSeniority = useCallback(async (data) => { await api.createSeniority(data); invalidate('taxonomy'); }, [invalidate]);
+  const updateSeniority = useCallback(async (id, data) => { await api.updateSeniority(id, data); invalidate('taxonomy', 'resources', 'needs'); }, [invalidate]);
+  const moveSeniority = useCallback(async (id, direction) => { await api.moveSeniority(id, direction); invalidate('taxonomy'); }, [invalidate]);
+  const deleteSeniority = useCallback(async (id) => { await api.deleteSeniority(id); invalidate('taxonomy'); }, [invalidate]);
+
   // Performance log category CRUD
   const addLogCategory = useCallback(async (data) => {
     const created = await api.createLogCategory(data);
@@ -260,6 +288,10 @@ export function DataProvider({ children }) {
   const value = {
     loading, error: loadError,
     customers, projects, resources, teams, skills, logCategories, needs, assignments, members, meResource, reload,
+    domains, seniorities,
+    addDomain, updateDomain, deleteDomain,
+    addJobRole, updateJobRole, deleteJobRole,
+    addSeniority, updateSeniority, moveSeniority, deleteSeniority,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
     addResource, updateResource, deleteResource,

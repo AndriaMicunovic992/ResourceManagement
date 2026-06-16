@@ -6,7 +6,8 @@ import { useData } from '../../contexts/DataContext';
 import { useComputed } from '../../hooks/useComputed';
 import { api } from '../../lib/api';
 import Avatar from '../../components/ui/Avatar';
-import { MONTHS, SENIORITY_SHORT } from '../../lib/constants';
+import { MONTHS } from '../../lib/constants';
+import { seniorityShort } from '../../lib/taxonomy';
 import { currentMonth, addMonths, monthRange, formatMonth } from '../../lib/dateUtils';
 import { firstName, resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
 import { utilColor, utilBg, scoreColor, scoreBg } from '../../lib/statusUtils';
@@ -524,7 +525,7 @@ export default function HomeDashboard() {
                     to={`/people/${r.id}`}
                     avatar={<Avatar name={r.name} size={30} color={domainColor(resourcePrimaryDomain(r))} />}
                     title={r.name}
-                    meta={role ? `${role.domain} ${role.role} · ${SENIORITY_SHORT[role.seniority] || role.seniority}` : '—'}
+                    meta={role ? `${role.domain} ${role.role} · ${seniorityShort(role.seniority)}` : '—'}
                     chip={
                       <span className="text-[9.5px] font-bold font-mono px-1.5 py-0.5 rounded-md shrink-0" style={{ background: pct > 0 ? utilBg(pct) : '#F0F4F8', color: utilColor(pct) }}>
                         {pct}%

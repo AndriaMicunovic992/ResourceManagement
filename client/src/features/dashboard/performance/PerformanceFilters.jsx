@@ -1,18 +1,17 @@
 import { useMemo } from 'react';
 import { useData } from '../../../contexts/DataContext';
-import { DOMAINS, SENIORITIES } from '../../../lib/constants';
 
 export default function PerformanceFilters({ filters, onChange }) {
-  const { teams } = useData();
+  const { teams, domains, seniorities } = useData();
 
   const roleOptions = useMemo(() => {
     if (!filters.domain) {
       const all = new Set();
-      Object.values(DOMAINS).forEach((d) => d.roles.forEach((r) => all.add(r)));
+      domains.forEach((d) => d.roles.forEach((r) => all.add(r.name)));
       return Array.from(all);
     }
-    return DOMAINS[filters.domain]?.roles ?? [];
-  }, [filters.domain]);
+    return domains.find((d) => d.name === filters.domain)?.roles.map((r) => r.name) ?? [];
+  }, [filters.domain, domains]);
 
   const patch = (p) => onChange({ ...filters, ...p });
 
@@ -51,7 +50,7 @@ export default function PerformanceFilters({ filters, onChange }) {
           className="px-2.5 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
         >
           <option value="">All domains</option>
-          {Object.keys(DOMAINS).map((d) => <option key={d} value={d}>{d}</option>)}
+          {domains.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
         </select>
         <select
           value={filters.role ?? ''}
@@ -67,7 +66,7 @@ export default function PerformanceFilters({ filters, onChange }) {
           className="px-2.5 py-1.5 border border-border-light rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
         >
           <option value="">All seniorities</option>
-          {SENIORITIES.map((s) => <option key={s} value={s}>{s}</option>)}
+          {seniorities.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
         </select>
         {(filters.from || filters.to || filters.teamId || filters.domain || filters.role || filters.seniority) && (
           <button

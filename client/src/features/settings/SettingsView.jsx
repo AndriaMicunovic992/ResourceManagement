@@ -9,6 +9,7 @@ import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
 import PageHeader from '../../components/ui/PageHeader';
 import RolesSection from './RolesSection';
+import TaxonomySection from './TaxonomySection';
 
 
 export default function SettingsView() {
@@ -518,6 +519,7 @@ export default function SettingsView() {
           { id: 'reminders', label: 'Reminders' },
           { id: 'trend', label: 'Performance trend' },
           { id: 'teams', label: 'Teams' },
+          { id: 'taxonomy', label: 'Roles taxonomy' },
           { id: 'skills', label: 'Skills' },
           { id: 'categories', label: 'Log categories' },
         ]
@@ -868,6 +870,8 @@ export default function SettingsView() {
           </form>
         </div>
       )}
+
+      {isAdmin && <TaxonomySection />}
 
       {isAdmin && (
         <div id="skills" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">

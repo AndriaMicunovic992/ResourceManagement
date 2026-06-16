@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
+// domain/role/seniority are validated as free strings — the allowed values are
+// the org's editable taxonomy (Domain/JobRole/Seniority), not a fixed enum.
 const roleSchema = z.object({
-  domain: z.enum(['Data', 'Web', 'General']),
+  domain: z.string().min(1),
   role: z.string().min(1),
-  seniority: z.enum(['Junior', 'Medior', 'Senior', 'Senior Principal']),
+  seniority: z.string().min(1),
 });
 
 export const createResourceSchema = z.object({

@@ -18,12 +18,14 @@ import { needRoutes } from './need.routes.js';
 import { assignmentRoutes } from './assignment.routes.js';
 import { evaluationRoutes } from './evaluation.routes.js';
 import { insightsRoutes } from './insights.routes.js';
+import { taxonomyRoutes } from './taxonomy.routes.js';
 
 export const routes: FastifyPluginAsync = async (app) => {
   await app.register(authRoutes);
   await app.register(microsoftAuthRoutes);
   await app.register(orgRoutes);
   await app.register(roleRoutes);
+  await app.register(taxonomyRoutes);
   await app.register(customerRoutes);
   await app.register(projectRoutes);
   await app.register(resourceRoutes);
