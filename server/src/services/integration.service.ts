@@ -189,41 +189,6 @@ export const integrationService = {
     });
   },
 
-  /**
-   * Map one of OUR entities (a customer or project) to a Jira work item, from
-   * the our-entity side. Enforces one Jira item per entity and one entity per
-   * item. Pass workItemId = null to clear the mapping.
-   */
-  async mapEntityToWorkItem(
-    orgId: string,
-    target: { customerId?: string | null; projectId?: string | null },
-    workItemId: string | null
-  ) {
-    const isCustomer = !!target.customerId;
-    const entityId = target.customerId || target.projectId;
-    if (!entityId) throw new BadRequestError('A customer or project is required');
-    if (isCustomer) {
-      const c = await prisma.customer.findFirst({ where: { id: entityId, orgId }, select: { id: true } });
-      if (!c) throw new NotFoundError('Customer not found');
-    } else {
-      const p = await prisma.project.findFirst({ where: { id: entityId, orgId }, select: { id: true } });
-      if (!p) throw new NotFoundError('Project not found');
-    }
-    const field = isCustomer ? 'customerId' : 'projectId';
-    // Clear whatever item currently points at this entity.
-    await prisma.jiraWorkItem.updateMany({ where: { orgId, [field]: entityId }, data: { [field]: null } });
-    if (workItemId) {
-      const item = await prisma.jiraWorkItem.findFirst({ where: { id: workItemId, orgId }, select: { id: true } });
-      if (!item) throw new NotFoundError('Work item not found');
-      // A work item maps to one of ours — set the chosen side, clear the other.
-      await prisma.jiraWorkItem.update({
-        where: { id: workItemId },
-        data: { customerId: target.customerId ?? null, projectId: target.projectId ?? null },
-      });
-    }
-    return this.listWorkItems(orgId);
-  },
-
   async saveConnection(orgId: string, data: ConnectionInput) {
     const jira = tokenPatch(data.jiraApiToken);
     const tempo = tokenPatch(data.tempoApiToken);
