@@ -211,12 +211,13 @@ export default function SettingsView() {
 
   // Assignable roles (system + custom, excluding owner) for the member dropdowns.
   const [roleOptions, setRoleOptions] = useState([]);
-  useEffect(() => {
+  const loadRoleOptions = useCallback(() => {
     if (!isAdmin) return;
     api.getRoles()
       .then((d) => setRoleOptions((d.roles || []).filter((r) => r.key !== 'owner').map((r) => ({ key: r.key, name: r.name }))))
       .catch(() => {});
   }, [isAdmin]);
+  useEffect(() => { loadRoleOptions(); }, [loadRoleOptions]);
 
   const loadInvites = useCallback(async () => {
     try {
@@ -1329,7 +1330,7 @@ export default function SettingsView() {
       {isAdmin && (
         <div id="roles" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-4">Roles &amp; permissions</h3>
-          <RolesSection />
+          <RolesSection onRolesChanged={loadRoleOptions} />
         </div>
       )}
         </div>
