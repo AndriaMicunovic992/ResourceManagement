@@ -1,7 +1,7 @@
 import { prisma } from '../db/prisma.js';
 import { NotFoundError, ConflictError, ForbiddenError, BadRequestError } from '../utils/errors.js';
 import { inviteService } from './invite.service.js';
-import { ensureSystemRoles, roleService } from './role.service.js';
+import { seedDefaultRoles, roleService } from './role.service.js';
 
 export const orgService = {
   /** Membership row for (user, org), or null. Used to gate org switching. */
@@ -27,7 +27,7 @@ export const orgService = {
     await prisma.orgMember.create({
       data: { userId, orgId: org.id, role: 'owner' },
     });
-    await ensureSystemRoles(org.id);
+    await seedDefaultRoles(org.id);
     return org;
   },
 
@@ -72,6 +72,10 @@ export const orgService = {
    * discriminated result so the UI can say "added" vs "invited".
    */
   async addMember(orgId: string, email: string, role: string, invitedByUserId: string) {
+    if (role === 'owner') throw new ForbiddenError('There can only be one owner');
+    if (!(await roleService.exists(orgId, role))) {
+      throw new BadRequestError('Unknown role');
+    }
     const user = await prisma.user.findFirst({
       where: { email: { equals: email.trim().toLowerCase(), mode: 'insensitive' } },
     });

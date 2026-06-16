@@ -62,7 +62,7 @@ export default function RolesSection() {
     setError('');
     try {
       await api.updateRole(active.id, {
-        ...(active.isSystem ? {} : { name: draft.name.trim() }),
+        name: draft.name.trim(),
         permissions: draft.permissions,
       });
       await load(active.id);
@@ -164,7 +164,7 @@ export default function RolesSection() {
 
       {/* header row: name + actions */}
       <div className="flex items-center gap-2 mb-2">
-        {active.isSystem ? (
+        {locked ? (
           <span className="text-sm font-bold text-text">{active.name}</span>
         ) : (
           <input
@@ -176,7 +176,7 @@ export default function RolesSection() {
         {locked && <span className="text-[9.5px] font-bold uppercase tracking-wider text-text-light bg-[#EEF1F5] rounded-full px-2 py-0.5">Full access · locked</span>}
         <span className="flex-1" />
         {savedAt > 0 && !dirty && !busy && <span className="text-[10px] text-success font-semibold">Saved ✓</span>}
-        {!active.isSystem && (
+        {!locked && (
           <button onClick={removeRole} disabled={busy} className="text-[11px] font-bold text-danger bg-danger-bg border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-95">
             Delete
           </button>
