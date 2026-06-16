@@ -739,6 +739,8 @@ model JiraConnection {
   jiraApiToken  String?  // encrypted at rest
   tempoApiToken String?  // encrypted at rest
   enabled       Boolean  @default(false)
+  // Last time worklogs were pulled — the cursor for nightly delta loads.
+  worklogSyncedAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

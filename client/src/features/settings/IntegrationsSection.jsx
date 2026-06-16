@@ -174,15 +174,17 @@ export default function IntegrationsSection() {
   const [expanded, setExpanded] = useState(() => new Set());
   const toggle = (id) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  // ---- Tempo hours sync ----
-  const [range, setRange] = useState(() => {
-    const fmt = (d) => d.toISOString().slice(0, 10);
-    return { from: fmt(new Date(Date.now() - 30 * 86400000)), to: fmt(new Date()) };
-  });
+  // ---- Tempo hours sync (by created/updated date — supports nightly deltas) ----
+  const [updatedFrom, setUpdatedFrom] = useState(() => new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10));
   const [syncResult, setSyncResult] = useState(null);
+  // On first load, default the date to the last sync (so a click does a delta).
+  const didInitDate = useRef(false);
+  useEffect(() => {
+    if (!didInitDate.current && conn?.worklogSyncedAt) { setUpdatedFrom(conn.worklogSyncedAt.slice(0, 10)); didInitDate.current = true; }
+  }, [conn?.worklogSyncedAt]);
   const syncHours = () => run(async () => {
     setBusy('sync'); setStatus(''); setSyncResult(null);
-    try { const r = await api.syncTempo(range.from, range.to); setSyncResult(r); setStatus(`Synced ${r.worklogs} worklogs · ${r.hours}h.`); }
+    try { const r = await api.syncTempo(updatedFrom); setSyncResult(r); setStatus(`Synced ${r.worklogs} worklogs · ${r.hours}h.`); await loadConn(); }
     finally { setBusy(''); }
   })();
 
@@ -233,16 +235,15 @@ export default function IntegrationsSection() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="min-w-0">
               <div className="text-xs font-semibold text-text">Actual hours (Tempo)</div>
-              <div className="text-[10px] text-text-light">Pull Tempo worklogs for a date range and resolve them through the mappings below. {!conn?.tempoApiTokenSet && <span className="text-warning">Add the Tempo API token first.</span>}</div>
+              <div className="text-[10px] text-text-light">
+                Pull worklogs created/edited on or after this date (re-edited ones update in place). First run: pick a far-back date for a full load; after that it's a delta. {!conn?.tempoApiTokenSet && <span className="text-warning">Add the Tempo API token first.</span>}
+                {conn?.worklogSyncedAt && <span className="block text-text-mid mt-0.5">Last synced {new Date(conn.worklogSyncedAt).toLocaleString()}</span>}
+              </div>
             </div>
             <div className="flex items-end gap-2">
               <label className="block">
-                <span className="block text-[10px] font-semibold text-text-mid mb-1">From</span>
-                <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className={inputCls} />
-              </label>
-              <label className="block">
-                <span className="block text-[10px] font-semibold text-text-mid mb-1">To</span>
-                <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className={inputCls} />
+                <span className="block text-[10px] font-semibold text-text-mid mb-1">Updated since</span>
+                <input type="date" value={updatedFrom} onChange={(e) => setUpdatedFrom(e.target.value)} className={inputCls} />
               </label>
               <button onClick={syncHours} disabled={!!busy} className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50">{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>
             </div>
@@ -256,14 +257,28 @@ export default function IntegrationsSection() {
                 {syncResult.unmatchedAccounts > 0 && <span className="text-warning">{syncResult.unmatchedAccounts} Jira accounts unmatched</span>}
                 {syncResult.unmappedWorklogs > 0 && <span className="text-warning">{syncResult.unmappedWorklogs} worklogs not under a mapped project</span>}
               </div>
-              {syncResult.byPerson?.length > 0 && (
-                <div className="mt-2 border-t border-border-light pt-2">
-                  <div className="text-[10px] font-semibold text-text-light uppercase tracking-wider mb-1">Hours by person</div>
-                  <div className="space-y-0.5">
-                    {syncResult.byPerson.map((p) => (
-                      <div key={p.name} className="flex justify-between max-w-[280px]"><span className="text-text">{p.name}</span><span className="font-mono text-text-mid">{p.hours}h</span></div>
-                    ))}
-                  </div>
+              {(syncResult.byPerson?.length > 0 || syncResult.byCustomer?.length > 0) && (
+                <div className="mt-2 border-t border-border-light pt-2 grid grid-cols-2 gap-6 max-w-[600px]">
+                  {syncResult.byPerson?.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold text-text-light uppercase tracking-wider mb-1">Hours by person</div>
+                      <div className="space-y-0.5">
+                        {syncResult.byPerson.map((p) => (
+                          <div key={p.name} className="flex justify-between"><span className="text-text truncate pr-2">{p.name}</span><span className="font-mono text-text-mid shrink-0">{p.hours}h</span></div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {syncResult.byCustomer?.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold text-text-light uppercase tracking-wider mb-1">Hours by customer</div>
+                      <div className="space-y-0.5">
+                        {syncResult.byCustomer.map((c) => (
+                          <div key={c.name} className="flex justify-between"><span className="text-text truncate pr-2">{c.name}</span><span className="font-mono text-text-mid shrink-0">{c.hours}h</span></div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -104,6 +104,7 @@ function maskConnection(c: {
   enabled: boolean;
   jiraApiToken: string | null;
   tempoApiToken: string | null;
+  worklogSyncedAt?: Date | null;
 } | null) {
   return {
     baseUrl: c?.baseUrl ?? '',
@@ -111,6 +112,7 @@ function maskConnection(c: {
     enabled: c?.enabled ?? false,
     jiraApiTokenSet: !!c?.jiraApiToken,
     tempoApiTokenSet: !!c?.tempoApiToken,
+    worklogSyncedAt: c?.worklogSyncedAt ? c.worklogSyncedAt.toISOString() : null,
   };
 }
 
@@ -196,12 +198,12 @@ export const integrationService = {
    * (author → person, issue → epic/project → customer/project), and upsert them
    * as Worklog rows (idempotent by tempoWorklogId). Returns a sync summary.
    */
-  async syncHours(orgId: string, from: string, to: string) {
+  async syncHours(orgId: string, updatedFrom: string) {
     const conn = await this.getSecrets(orgId);
     assertJiraReady(conn);
     if (!conn?.tempoApiToken) throw new BadRequestError('Add the Tempo API token first');
 
-    const worklogs = await callTempo(() => tempoClient.fetchWorklogs(conn.tempoApiToken, from, to));
+    const worklogs = await callTempo(() => tempoClient.fetchWorklogs(conn.tempoApiToken, updatedFrom));
 
     // Resolve the worklogs' Jira issues → project/epic keys.
     const issueIds = [...new Set(worklogs.map((w) => w.issueId).filter(Boolean))];
@@ -235,6 +237,7 @@ export const integrationService = {
     const matchedResourceIds = new Set<string>();
     const unmatchedAccounts = new Set<string>();
     const secondsByResource = new Map<string, number>();
+    const secondsByCustomer = new Map<string, number>();
 
     for (const w of worklogs) {
       const resourceId = resourceByAccount.get(w.accountId) ?? null;
@@ -244,6 +247,7 @@ export const integrationService = {
       const ref = issueById.get(w.issueId) || null;
       const { customerId, projectId } = resolveEntity(ref?.epicKey ?? null, ref?.projectKey ?? null);
       if (customerId || projectId) mapped += 1;
+      if (customerId) secondsByCustomer.set(customerId, (secondsByCustomer.get(customerId) || 0) + w.seconds);
       totalSeconds += w.seconds;
 
       await prisma.worklog.upsert({
@@ -268,8 +272,20 @@ export const integrationService = {
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 10);
 
+    const custNames = await prisma.customer.findMany({ where: { orgId, id: { in: [...secondsByCustomer.keys()] } }, select: { id: true, name: true } });
+    const custNameById = new Map(custNames.map((c) => [c.id, c.name]));
+    const byCustomer = [...secondsByCustomer.entries()]
+      .map(([id, s]) => ({ name: custNameById.get(id) || '?', hours: Math.round((s / 3600) * 10) / 10 }))
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 10);
+
+    // Record the cursor so the next (nightly) run only fetches the delta.
+    const syncedAt = new Date();
+    await prisma.jiraConnection.update({ where: { orgId }, data: { worklogSyncedAt: syncedAt } });
+
     return {
-      from, to,
+      updatedFrom,
+      syncedAt: syncedAt.toISOString(),
       worklogs: worklogs.length,
       hours: Math.round((totalSeconds / 3600) * 10) / 10,
       matchedPeople: matchedResourceIds.size,
@@ -277,7 +293,23 @@ export const integrationService = {
       mappedWorklogs: mapped,
       unmappedWorklogs: worklogs.length - mapped,
       byPerson,
+      byCustomer,
     };
+  },
+
+  /** Actual hours (from synced worklogs) for a customer in a month, per person. */
+  async actualsForCustomerMonth(orgId: string, customerId: string, month: string) {
+    const rows = await prisma.worklog.groupBy({
+      by: ['resourceId'],
+      where: { orgId, customerId, month, resourceId: { not: null } },
+      _sum: { seconds: true },
+    });
+    const out: Record<string, number> = {};
+    for (const r of rows) {
+      if (!r.resourceId) continue;
+      out[r.resourceId] = Math.round(((r._sum.seconds || 0) / 3600) * 10) / 10;
+    }
+    return out;
   },
 
   async listAccounts(orgId: string) {
