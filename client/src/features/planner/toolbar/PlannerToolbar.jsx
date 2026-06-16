@@ -22,7 +22,7 @@ export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregati
   const [showCustomerForm, setShowCustomerForm] = useState(false);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border-light bg-white shrink-0 z-20">
+    <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border-light bg-white shrink-0 relative z-40">
       <div className="flex items-center gap-2 p-1 rounded-xl bg-[#FAFBFD] border border-border-light">
         <AggregationToggle value={aggregation} onChange={onAggregationChange} />
         <TimeRangePicker timeRange={timeRange} onChange={onTimeRangeChange}

@@ -409,7 +409,7 @@ export default function HomeDashboard() {
           <div className="relative bg-white border border-border-light rounded-2xl shadow-card p-4 mb-5">
             <div className="flex items-baseline gap-2 mb-2">
               <h3 className="text-[13px] font-bold text-text m-0">Utilization</h3>
-              <span className="text-[10.5px] text-text-light">realised vs planned</span>
+              <span className="text-[10.5px] text-text-light">planned vs potential</span>
               <span className="flex-1" />
               <span className="text-[10.5px] font-semibold text-text-mid bg-primary-bg border border-border-light rounded-full px-2.5 py-1">Jan – Dec {year}</span>
             </div>
@@ -443,11 +443,11 @@ export default function HomeDashboard() {
             >
               <b className="text-[10.5px]">{formatMonth(windowMonths[tipIdx])}</b>
               <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-1">
-                <i className="w-2 h-2 rounded-full bg-[#4CBAD4]" />Realised
+                <i className="w-2 h-2 rounded-full bg-[#4CBAD4]" />Planned
                 <b className="ml-auto">{Math.round(series.realisedPct[tipIdx] || 0)}%</b>
               </div>
               <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
-                <i className="w-2 h-2 rounded-full bg-[#F5A623]" />Planned
+                <i className="w-2 h-2 rounded-full bg-[#F5A623]" />Potential
                 <b className="ml-auto">{Math.round(series.plannedPct[tipIdx] || 0)}%</b>
               </div>
             </div>

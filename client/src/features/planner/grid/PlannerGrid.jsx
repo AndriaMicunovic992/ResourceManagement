@@ -41,10 +41,12 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
 
   const filteredRows = useMemo(() => {
     if (!filterIds || filterIds.size === 0) return allRows;
+    // A selected customer ('c:') brings along all its projects + needs, even if
+    // only the customer id is set (e.g. a deep-link from a customer page).
     return allRows.filter((row) => {
       if (row.type === 'customer') return filterIds.has('c:' + row.data.id);
-      if (row.type === 'project') return filterIds.has('p:' + row.data.id);
-      if (row.type === 'need') return filterIds.has('p:' + row.project.id);
+      if (row.type === 'project') return filterIds.has('p:' + row.data.id) || filterIds.has('c:' + row.data.customerId);
+      if (row.type === 'need') return filterIds.has('p:' + row.project.id) || filterIds.has('c:' + row.project.customerId);
       return filterIds.has('p:' + row.data.id);
     });
   }, [allRows, filterIds]);
