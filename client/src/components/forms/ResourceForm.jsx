@@ -8,10 +8,12 @@ import { useData } from '../../contexts/DataContext';
 import { useOrg } from '../../contexts/OrgContext';
 import { api } from '../../lib/api';
 
-export default function ResourceForm({ initial, onSave, onClose }) {
+export default function ResourceForm({ initial, onSave, onClose, onDelete }) {
   const { teams, resources } = useData();
   const { role } = useOrg();
   const isAdmin = role === 'admin' || role === 'owner';
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
   const [name, setName] = useState(initial?.name || '');
   const [capacity, setCapacity] = useState(initial?.capacity ?? 1);
   const [capacityHours, setCapacityHours] = useState(fteToHours(initial?.capacity ?? 1));
@@ -71,6 +73,23 @@ export default function ResourceForm({ initial, onSave, onClose }) {
 
   const toggleManager = (id) => {
     setDirectManagerUserIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const handleDelete = async () => {
+    if (
+      !confirm(
+        `Delete ${initial?.name || 'this person'}? This permanently removes their allocations, 1:1s, reviews, evaluations and history. This cannot be undone.`
+      )
+    )
+      return;
+    setDeleting(true);
+    setError('');
+    try {
+      await onDelete();
+    } catch (err) {
+      setError(err.message || 'Failed to delete person');
+      setDeleting(false);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -207,9 +226,23 @@ export default function ResourceForm({ initial, onSave, onClose }) {
         <Field label="Roles">
           <RolePicker roles={roles} onChange={setRoles} />
         </Field>
-        <div className="flex justify-end gap-3 mt-6">
-          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
-          <Button type="submit">Save</Button>
+        {error && <div className="text-xs text-danger bg-danger-bg p-2 rounded mt-3">{error}</div>}
+        <div className="flex items-center mt-6">
+          {initial && onDelete && isAdmin && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-xs font-bold text-danger bg-danger-bg border-0 rounded-lg px-3 py-2 cursor-pointer hover:brightness-95 disabled:opacity-50"
+            >
+              {deleting ? 'Deleting…' : 'Delete person'}
+            </button>
+          )}
+          <div className="flex-1" />
+          <div className="flex gap-3">
+            <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
+            <Button type="submit">Save</Button>
+          </div>
         </div>
       </form>
     </Modal>
