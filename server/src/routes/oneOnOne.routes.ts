@@ -11,6 +11,7 @@ import {
   deleteOneOnOne,
 } from '../services/oneOnOne.service.js';
 import { assertCanViewPerson, isSelf } from '../services/visibility.service.js';
+import { requireView } from '../middleware/requirePermission.js';
 import { ForbiddenError } from '../utils/errors.js';
 
 export const oneOnOneRoutes: FastifyPluginAsync = async (app) => {
@@ -21,7 +22,7 @@ export const oneOnOneRoutes: FastifyPluginAsync = async (app) => {
     return req.impersonatorUserId ? '__impersonated__' : req.userId;
   }
 
-  app.get('/people/:personId/oneonones', async (req) => {
+  app.get('/people/:personId/oneonones', { preHandler: requireView('oneOnOne') }, async (req) => {
     const { personId } = req.params as { personId: string };
     assertCanViewPerson(req.visibility, personId);
     // Subjects may read their own 1:1s in self mode (author-private fields
@@ -29,13 +30,13 @@ export const oneOnOneRoutes: FastifyPluginAsync = async (app) => {
     return listOneOnOnes(req.orgId, personId, viewerId(req));
   });
 
-  app.get('/people/:personId/oneonones/:id', async (req) => {
+  app.get('/people/:personId/oneonones/:id', { preHandler: requireView('oneOnOne') }, async (req) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     return getOneOnOne(req.orgId, id, viewerId(req));
   });
 
-  app.post('/people/:personId/oneonones', async (req, reply) => {
+  app.post('/people/:personId/oneonones', { preHandler: requireView('oneOnOne') }, async (req, reply) => {
     const { personId } = req.params as { personId: string };
     assertCanViewPerson(req.visibility, personId);
     // Subjects cannot create 1:1s on their own profile.
@@ -47,14 +48,14 @@ export const oneOnOneRoutes: FastifyPluginAsync = async (app) => {
     return reply.status(201).send(created);
   });
 
-  app.patch('/people/:personId/oneonones/:id', async (req) => {
+  app.patch('/people/:personId/oneonones/:id', { preHandler: requireView('oneOnOne') }, async (req) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     const body = updateOneOnOneSchema.parse(req.body);
     return updateOneOnOne(req.orgId, id, req.userId, req.role, body);
   });
 
-  app.delete('/people/:personId/oneonones/:id', async (req, reply) => {
+  app.delete('/people/:personId/oneonones/:id', { preHandler: requireView('oneOnOne') }, async (req, reply) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     await deleteOneOnOne(req.orgId, id, req.userId, req.role);

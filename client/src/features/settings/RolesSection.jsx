@@ -9,7 +9,7 @@ const LOCKED = new Set(['owner', 'admin']);
  * and delete custom roles. Owner & admin are full-access and locked. Scope
  * controls visibility; create/edit/delete govern mutations.
  */
-export default function RolesSection() {
+export default function RolesSection({ onRolesChanged }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [activeId, setActiveId] = useState(null);
@@ -25,6 +25,8 @@ export default function RolesSection() {
       .then((d) => {
         setData(d);
         setActiveId((prev) => selectId || prev || d.roles[0]?.id);
+        // Keep the member-assignment dropdowns in sync with role changes.
+        onRolesChanged?.();
       })
       .catch((e) => setError(e.message || 'Failed to load roles'));
 
