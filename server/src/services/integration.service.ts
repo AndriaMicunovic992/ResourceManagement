@@ -3,6 +3,7 @@ import { NotFoundError, ConflictError, BadRequestError } from '../utils/errors.j
 import { encryptSecret, decryptSecret } from '../utils/crypto.js';
 import { jiraClient, JiraError } from './jiraClient.js';
 import type { JiraProject, JiraEpic, JiraAccountRow } from './jiraClient.js';
+import { tempoClient, TempoError } from './tempoClient.js';
 
 type ConnSecrets = { baseUrl: string | null; jiraEmail: string | null; jiraApiToken: string | null } | null;
 
@@ -24,6 +25,15 @@ async function callJira<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } catch (e) {
     if (e instanceof JiraError) throw new BadRequestError(e.message);
+    throw e;
+  }
+}
+
+async function callTempo<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof TempoError) throw new BadRequestError(e.message);
     throw e;
   }
 }
@@ -179,6 +189,95 @@ export const integrationService = {
       ])
     );
     return applyPulled(orgId, { projects, epics, accounts });
+  },
+
+  /**
+   * Pull Tempo worklogs for [from, to], resolve each through the mappings
+   * (author → person, issue → epic/project → customer/project), and upsert them
+   * as Worklog rows (idempotent by tempoWorklogId). Returns a sync summary.
+   */
+  async syncHours(orgId: string, from: string, to: string) {
+    const conn = await this.getSecrets(orgId);
+    assertJiraReady(conn);
+    if (!conn?.tempoApiToken) throw new BadRequestError('Add the Tempo API token first');
+
+    const worklogs = await callTempo(() => tempoClient.fetchWorklogs(conn.tempoApiToken, from, to));
+
+    // Resolve the worklogs' Jira issues → project/epic keys.
+    const issueIds = [...new Set(worklogs.map((w) => w.issueId).filter(Boolean))];
+    const issues = issueIds.length ? await callJira(() => jiraClient.fetchIssues(conn, issueIds)) : [];
+    const issueById = new Map(issues.map((i) => [i.id, i]));
+
+    // Mapping lookups.
+    const [workItems, mappedResources, projectRows] = await Promise.all([
+      prisma.jiraWorkItem.findMany({ where: { orgId }, select: { externalKey: true, customerId: true, projectId: true } }),
+      prisma.resource.findMany({ where: { orgId, externalWorkId: { not: null } }, select: { id: true, externalWorkId: true } }),
+      prisma.project.findMany({ where: { orgId }, select: { id: true, customerId: true } }),
+    ]);
+    const workItemByKey = new Map(workItems.map((w) => [w.externalKey, w]));
+    const resourceByAccount = new Map(mappedResources.map((r) => [r.externalWorkId as string, r.id]));
+    const customerByProject = new Map(projectRows.map((p) => [p.id, p.customerId]));
+
+    // Resolve to our entity, most-specific (epic) first, then the Jira project.
+    const resolveEntity = (epicKey: string | null, projectKey: string | null): { customerId: string | null; projectId: string | null } => {
+      for (const key of [epicKey, projectKey]) {
+        if (!key) continue;
+        const wi = workItemByKey.get(key);
+        if (!wi) continue;
+        if (wi.projectId) return { projectId: wi.projectId, customerId: customerByProject.get(wi.projectId) ?? null };
+        if (wi.customerId) return { projectId: null, customerId: wi.customerId };
+      }
+      return { customerId: null, projectId: null };
+    };
+
+    let totalSeconds = 0;
+    let mapped = 0;
+    const matchedResourceIds = new Set<string>();
+    const unmatchedAccounts = new Set<string>();
+    const secondsByResource = new Map<string, number>();
+
+    for (const w of worklogs) {
+      const resourceId = resourceByAccount.get(w.accountId) ?? null;
+      if (resourceId) { matchedResourceIds.add(resourceId); secondsByResource.set(resourceId, (secondsByResource.get(resourceId) || 0) + w.seconds); }
+      else if (w.accountId) unmatchedAccounts.add(w.accountId);
+
+      const ref = issueById.get(w.issueId) || null;
+      const { customerId, projectId } = resolveEntity(ref?.epicKey ?? null, ref?.projectKey ?? null);
+      if (customerId || projectId) mapped += 1;
+      totalSeconds += w.seconds;
+
+      await prisma.worklog.upsert({
+        where: { orgId_tempoWorklogId: { orgId, tempoWorklogId: w.tempoWorklogId } },
+        create: {
+          orgId, tempoWorklogId: w.tempoWorklogId, accountId: w.accountId, resourceId,
+          customerId, projectId, jiraIssueKey: ref?.key ?? null, jiraEpicKey: ref?.epicKey ?? null,
+          workDate: w.date, month: (w.date || '').slice(0, 7), seconds: w.seconds, description: w.description,
+        },
+        update: {
+          accountId: w.accountId, resourceId, customerId, projectId,
+          jiraIssueKey: ref?.key ?? null, jiraEpicKey: ref?.epicKey ?? null,
+          workDate: w.date, month: (w.date || '').slice(0, 7), seconds: w.seconds, description: w.description,
+        },
+      });
+    }
+
+    const names = await prisma.resource.findMany({ where: { orgId, id: { in: [...secondsByResource.keys()] } }, select: { id: true, name: true } });
+    const nameById = new Map(names.map((n) => [n.id, n.name]));
+    const byPerson = [...secondsByResource.entries()]
+      .map(([id, s]) => ({ name: nameById.get(id) || '?', hours: Math.round((s / 3600) * 10) / 10 }))
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 10);
+
+    return {
+      from, to,
+      worklogs: worklogs.length,
+      hours: Math.round((totalSeconds / 3600) * 10) / 10,
+      matchedPeople: matchedResourceIds.size,
+      unmatchedAccounts: unmatchedAccounts.size,
+      mappedWorklogs: mapped,
+      unmappedWorklogs: worklogs.length - mapped,
+      byPerson,
+    };
   },
 
   async listAccounts(orgId: string) {

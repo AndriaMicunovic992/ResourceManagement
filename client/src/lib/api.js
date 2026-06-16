@@ -123,6 +123,7 @@ export const api = {
   testJiraConnection: () => apiFetch('/integration/jira/test', { method: 'POST', body: '{}' }),
   refreshJira: () => apiFetch('/integration/jira/refresh', { method: 'POST', body: '{}' }),
   getJiraAccounts: () => apiFetch('/integration/jira/accounts'),
+  syncTempo: (from, to) => apiFetch('/integration/tempo/sync', { method: 'POST', body: JSON.stringify({ from, to }) }),
   getJiraWorkItems: () => apiFetch('/integration/jira/work-items'),
   createJiraWorkItem: (data) => apiFetch('/integration/jira/work-items', { method: 'POST', body: JSON.stringify(data) }),
   updateJiraWorkItem: (id, data) => apiFetch('/integration/jira/work-items/' + id, { method: 'PATCH', body: JSON.stringify(data) }),

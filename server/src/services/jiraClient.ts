@@ -148,4 +148,52 @@ export async function fetchAccounts(conn: JiraConn): Promise<JiraAccountRow[]> {
   return out;
 }
 
-export const jiraClient = { testConnection, fetchProjects, fetchEpics, fetchAccounts };
+export interface JiraIssueRef { id: string; key: string; projectKey: string | null; epicKey: string | null }
+
+type IssueDetail = {
+  id: string;
+  key: string;
+  fields?: { project?: { key?: string }; issuetype?: { name?: string }; parent?: { key?: string; fields?: { issuetype?: { name?: string } } } };
+};
+
+function toIssueRef(i: IssueDetail): JiraIssueRef {
+  const itype = i.fields?.issuetype?.name;
+  const parent = i.fields?.parent;
+  const parentIsEpic = parent?.fields?.issuetype?.name === 'Epic';
+  // The epic a worklog rolls up to: the issue itself if it's an epic, else its
+  // parent epic (one level up). Deeper nesting falls back to project level.
+  const epicKey = itype === 'Epic' ? i.key : parentIsEpic ? parent?.key ?? null : null;
+  return { id: String(i.id), key: i.key, projectKey: i.fields?.project?.key ?? null, epicKey };
+}
+
+/** Resolve a set of Jira issue ids to their project + epic (for Tempo rollup). */
+export async function fetchIssues(conn: JiraConn, issueIds: string[]): Promise<JiraIssueRef[]> {
+  const ids = [...new Set(issueIds.filter(Boolean))];
+  const out: JiraIssueRef[] = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const jql = `id in (${ids.slice(i, i + 50).join(',')})`;
+    let nextPageToken: string | undefined;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const q: Record<string, string | number> = { jql, fields: 'project,issuetype,parent', maxResults: 100 };
+      if (nextPageToken) q.nextPageToken = nextPageToken;
+      let data: { issues?: IssueDetail[]; nextPageToken?: string; isLast?: boolean };
+      try {
+        data = await jiraGet(conn, '/rest/api/3/search/jql', q);
+      } catch (e) {
+        if (e instanceof JiraError && e.status === 404) {
+          // Data Center: classic search.
+          const legacy = await jiraGet<{ issues?: IssueDetail[] }>(conn, '/rest/api/3/search', { jql, fields: 'project,issuetype,parent', startAt: 0, maxResults: 100 });
+          for (const it of legacy.issues || []) out.push(toIssueRef(it));
+          break;
+        }
+        throw e;
+      }
+      for (const it of data.issues || []) out.push(toIssueRef(it));
+      if (data.isLast || !data.nextPageToken || !(data.issues || []).length) break;
+      nextPageToken = data.nextPageToken;
+    }
+  }
+  return out;
+}
+
+export const jiraClient = { testConnection, fetchProjects, fetchEpics, fetchAccounts, fetchIssues };
