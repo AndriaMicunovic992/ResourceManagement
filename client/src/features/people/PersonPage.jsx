@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Outlet, Navigate } from 'react-router-dom';
+import { useParams, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 import { useOrg } from '../../contexts/OrgContext';
 import { useVisibility } from '../../contexts/VisibilityContext';
@@ -9,7 +9,8 @@ import ResourceForm from '../../components/forms/ResourceForm';
 
 export default function PersonPage() {
   const { id } = useParams();
-  const { resources, loading, updateResource } = useData();
+  const navigate = useNavigate();
+  const { resources, loading, updateResource, deleteResource } = useData();
   const { canEdit } = useOrg();
   const { viewModeForPerson, loading: visLoading } = useVisibility();
   const [editing, setEditing] = useState(false);
@@ -32,6 +33,11 @@ export default function PersonPage() {
     setEditing(false);
   };
 
+  const handleDelete = async () => {
+    await deleteResource(resource.id);
+    navigate('/people', { replace: true });
+  };
+
   return (
     <div className="max-w-[1100px] mx-auto px-5 py-6">
       <PersonPageHeader
@@ -48,6 +54,7 @@ export default function PersonPage() {
           initial={resource}
           onSave={handleSave}
           onClose={() => setEditing(false)}
+          onDelete={handleDelete}
         />
       )}
     </div>
