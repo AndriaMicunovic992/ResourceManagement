@@ -9,12 +9,16 @@ const VisibilityContext = createContext(null);
  * Arrays are exposed as Sets to make membership checks O(1) in consumers.
  */
 export function VisibilityProvider({ children }) {
-  const { currentOrg } = useOrg();
+  const { currentOrg, loading: orgLoading } = useOrg();
   const [scope, setScope] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    if (!currentOrg) { setScope(null); setLoading(false); return; }
+    // No org yet: stay "loading" while the org is still resolving (boot /
+    // deep-link / refresh) so consumers don't briefly see an empty scope and
+    // wrongly bounce the user. Only settle to "not loading" once we know there
+    // genuinely is no org.
+    if (!currentOrg) { setScope(null); setLoading(orgLoading); return; }
     setLoading(true);
     try {
       const s = await api.getMyVisibility();
@@ -24,7 +28,7 @@ export function VisibilityProvider({ children }) {
       setScope(null);
     }
     setLoading(false);
-  }, [currentOrg]);
+  }, [currentOrg, orgLoading]);
 
   useEffect(() => { reload(); }, [reload]);
 
