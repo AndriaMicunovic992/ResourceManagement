@@ -472,10 +472,15 @@ export default function CustomerReviewCockpit() {
   }, [assignments, needs, custProjects, resources]);
 
   // Planned (allocations on this customer's needs) vs actual (Tempo) hours/month.
+  // custActuals = whole-customer totals; actualsByResource = per-person, so the
+  // chart can narrow to the focused person.
   const [custActuals, setCustActuals] = useState({});
+  const [actualsByResource, setActualsByResource] = useState({});
   useEffect(() => {
     if (!customerId) return;
-    api.getMonthlyActualsByCustomer(chartMonths[0], chartMonths[chartMonths.length - 1]).then(setCustActuals).catch(() => setCustActuals({}));
+    const from = chartMonths[0], to = chartMonths[chartMonths.length - 1];
+    api.getMonthlyActualsByCustomer(from, to).then(setCustActuals).catch(() => setCustActuals({}));
+    api.getCustomerActualsByResource(customerId, from, to).then(setActualsByResource).catch(() => setActualsByResource({}));
   }, [customerId, chartMonths]);
   const plannedActualData = useMemo(() => {
     const needIds = new Set(needs.filter((n) => custProjects.some((p) => p.id === n.projectId)).map((n) => n.id));
@@ -483,11 +488,15 @@ export default function CustomerReviewCockpit() {
       let fte = 0;
       for (const a of assignments) {
         if (!needIds.has(a.needId)) continue;
+        if (focusedPersonId && a.resourceId !== focusedPersonId) continue;
         fte += (a.monthAllocations || {})[m] || 0;
       }
-      return { month: m, planned: fte * MONTHLY_HOURS_PER_FTE, actual: custActuals[customerId]?.[m] || 0 };
+      const actual = focusedPersonId
+        ? (actualsByResource[focusedPersonId]?.[m] || 0)
+        : (custActuals[customerId]?.[m] || 0);
+      return { month: m, planned: fte * MONTHLY_HOURS_PER_FTE, actual };
     });
-  }, [chartMonths, needs, custProjects, assignments, custActuals, customerId]);
+  }, [chartMonths, needs, custProjects, assignments, custActuals, customerId, focusedPersonId, actualsByResource]);
 
   // Customer satisfaction chart: monthly average across all rated people.
   const chartPoints = useMemo(() => {
@@ -633,7 +642,12 @@ export default function CustomerReviewCockpit() {
           <SignalChart points={chartPoints} height={200} />
 
           <div className="mt-4 pt-4 border-t border-border-light">
-            <h3 className="text-[13px] font-bold text-text m-0 mb-2">Planned vs actual hours</h3>
+            <h3 className="text-[13px] font-bold text-text m-0 mb-2">
+              Planned vs actual hours
+              {focusedPersonId && (
+                <span className="font-semibold text-text-mid"> · {people.find((p) => p.person.id === focusedPersonId)?.person.name || 'focused'}</span>
+              )}
+            </h3>
             <PlannedVsActualChart data={plannedActualData} />
           </div>
 

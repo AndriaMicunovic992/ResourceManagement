@@ -557,18 +557,15 @@ export default function OneOnOneCockpit() {
   const { rURealised } = useComputed();
   const chartMonths = useMemo(() => monthRange(addMonths(currentMonth(), -8), addMonths(currentMonth(), 3)), []);
   const [actualsRange, setActualsRange] = useState({});
+  // Actual hours for this person broken down by customer, so the chart can
+  // narrow to the focused project's customer.
+  const [actualsByCustomer, setActualsByCustomer] = useState({});
   useEffect(() => {
     if (!personId) return;
-    api.getMonthlyActuals(chartMonths[0], chartMonths[chartMonths.length - 1]).then(setActualsRange).catch(() => setActualsRange({}));
+    const from = chartMonths[0], to = chartMonths[chartMonths.length - 1];
+    api.getMonthlyActuals(from, to).then(setActualsRange).catch(() => setActualsRange({}));
+    api.getResourceActualsByCustomer(personId, from, to).then(setActualsByCustomer).catch(() => setActualsByCustomer({}));
   }, [personId, chartMonths]);
-  const plannedActualData = useMemo(
-    () => chartMonths.map((mo) => ({
-      month: mo,
-      planned: (rURealised[personId]?.[mo] || 0) * MONTHLY_HOURS_PER_FTE,
-      actual: actualsRange[personId]?.[mo] || 0,
-    })),
-    [chartMonths, rURealised, personId, actualsRange]
-  );
 
   // The cockpit is a manager/admin tool — subjects use their profile tabs.
   const isSelf = !visibility.loading && visibility.selfResourceId === personId && !visibility.isAdmin;
@@ -672,6 +669,41 @@ export default function OneOnOneCockpit() {
     [activeProjects, focusedProjectId]
   );
   const focusedCustomerName = focusedProject?.customer?.name || null;
+  const focusedCustomerId = focusedProject?.customer?.id || null;
+
+  // Person's planned FTE per customer per month (from their assignments), so the
+  // chart's planned line can narrow to the focused project's customer.
+  const plannedByCustomer = useMemo(() => {
+    const out = {};
+    for (const a of assignments) {
+      if (a.resourceId !== personId) continue;
+      const need = needs.find((n) => n.id === a.needId);
+      if (!need) continue;
+      const project = projects.find((p) => p.id === need.projectId);
+      const cid = project?.customerId;
+      if (!cid) continue;
+      const byMonth = (out[cid] = out[cid] || {});
+      for (const [m, v] of Object.entries(a.monthAllocations || {})) byMonth[m] = (byMonth[m] || 0) + (v || 0);
+    }
+    return out;
+  }, [assignments, needs, projects, personId]);
+
+  // Planned vs actual hours for the chart. When a project is focused the lines
+  // narrow to that project's customer; otherwise they show the person overall.
+  const plannedActualData = useMemo(
+    () => chartMonths.map((mo) => (focusedCustomerId
+      ? {
+          month: mo,
+          planned: (plannedByCustomer[focusedCustomerId]?.[mo] || 0) * MONTHLY_HOURS_PER_FTE,
+          actual: actualsByCustomer[focusedCustomerId]?.[mo] || 0,
+        }
+      : {
+          month: mo,
+          planned: (rURealised[personId]?.[mo] || 0) * MONTHLY_HOURS_PER_FTE,
+          actual: actualsRange[personId]?.[mo] || 0,
+        })),
+    [chartMonths, focusedCustomerId, plannedByCustomer, actualsByCustomer, rURealised, personId, actualsRange]
+  );
 
   const personSkills = useMemo(() => {
     const list = person?.personSkills || [];
@@ -907,7 +939,10 @@ export default function OneOnOneCockpit() {
           )}
 
           <div className="mt-4 pt-4 border-t border-border-light">
-            <h3 className="text-[13px] font-bold text-text m-0 mb-2">Planned vs actual hours</h3>
+            <h3 className="text-[13px] font-bold text-text m-0 mb-2">
+              Planned vs actual hours
+              {focusedCustomerName && <span className="font-semibold text-text-mid"> · {focusedCustomerName}</span>}
+            </h3>
             <PlannedVsActualChart data={plannedActualData} />
           </div>
 

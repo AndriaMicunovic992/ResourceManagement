@@ -354,6 +354,44 @@ export const integrationService = {
     return out;
   },
 
+  /**
+   * Actual hours for one person, broken down by customer + month. Feeds the
+   * 1:1 cockpit chart when a project (→ customer) is focused.
+   * Returned as { [customerId]: { [month]: hours } }.
+   */
+  async actualsForResourceByCustomer(orgId: string, resourceId: string, fromMonth: string, toMonth: string) {
+    const rows = await prisma.worklog.groupBy({
+      by: ['customerId', 'month'],
+      where: { orgId, resourceId, month: { gte: fromMonth, lte: toMonth }, customerId: { not: null } },
+      _sum: { seconds: true },
+    });
+    const out: Record<string, Record<string, number>> = {};
+    for (const r of rows) {
+      if (!r.customerId) continue;
+      (out[r.customerId] = out[r.customerId] || {})[r.month] = Math.round(((r._sum.seconds || 0) / 3600) * 10) / 10;
+    }
+    return out;
+  },
+
+  /**
+   * Actual hours for one customer, broken down by person + month. Feeds the
+   * PM-review chart when a person is focused.
+   * Returned as { [resourceId]: { [month]: hours } }.
+   */
+  async actualsForCustomerByResource(orgId: string, customerId: string, fromMonth: string, toMonth: string) {
+    const rows = await prisma.worklog.groupBy({
+      by: ['resourceId', 'month'],
+      where: { orgId, customerId, month: { gte: fromMonth, lte: toMonth }, resourceId: { not: null } },
+      _sum: { seconds: true },
+    });
+    const out: Record<string, Record<string, number>> = {};
+    for (const r of rows) {
+      if (!r.resourceId) continue;
+      (out[r.resourceId] = out[r.resourceId] || {})[r.month] = Math.round(((r._sum.seconds || 0) / 3600) * 10) / 10;
+    }
+    return out;
+  },
+
   async listAccounts(orgId: string) {
     return prisma.jiraAccount.findMany({
       where: { orgId },

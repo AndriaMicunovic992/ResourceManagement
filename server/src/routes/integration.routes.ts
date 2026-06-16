@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { integrationService } from '../services/integration.service.js';
 import { requireRole } from '../middleware/requireRole.js';
-import { assertCanViewCustomer } from '../services/visibility.service.js';
+import { assertCanViewCustomer, assertCanViewPerson } from '../services/visibility.service.js';
 import { BadRequestError } from '../utils/errors.js';
 import {
   saveConnectionSchema,
@@ -74,6 +74,30 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     const v = req.visibility;
     const visibleIds = v.isAdmin ? null : [...v.visibleCustomerIds];
     return integrationService.actualsByCustomer(req.orgId, from, to, visibleIds);
+  });
+
+  // Actual hours for one person, broken down by customer + month. Feeds the
+  // 1:1 cockpit chart when a project (→ customer) is focused.
+  app.get('/integration/tempo/actuals/resource-by-customer', async (req) => {
+    const q = req.query as { resourceId?: string; from?: string; to?: string };
+    if (!q.resourceId) throw new BadRequestError('resourceId is required');
+    assertCanViewPerson(req.visibility, q.resourceId);
+    const cur = new Date().toISOString().slice(0, 7);
+    const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
+    const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
+    return integrationService.actualsForResourceByCustomer(req.orgId, q.resourceId, from, to);
+  });
+
+  // Actual hours for one customer, broken down by person + month. Feeds the
+  // PM-review chart when a person is focused.
+  app.get('/integration/tempo/actuals/customer-by-resource', async (req) => {
+    const q = req.query as { customerId?: string; from?: string; to?: string };
+    if (!q.customerId) throw new BadRequestError('customerId is required');
+    assertCanViewCustomer(req.visibility, q.customerId);
+    const cur = new Date().toISOString().slice(0, 7);
+    const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
+    const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
+    return integrationService.actualsForCustomerByResource(req.orgId, q.customerId, from, to);
   });
 
   app.get('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {
