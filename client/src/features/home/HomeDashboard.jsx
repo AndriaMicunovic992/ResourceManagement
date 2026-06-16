@@ -6,7 +6,7 @@ import { useData } from '../../contexts/DataContext';
 import { useComputed } from '../../hooks/useComputed';
 import { api } from '../../lib/api';
 import Avatar from '../../components/ui/Avatar';
-import { MONTHS } from '../../lib/constants';
+import { MONTHS, MONTHLY_HOURS_PER_FTE } from '../../lib/constants';
 import { seniorityShort } from '../../lib/taxonomy';
 import { currentMonth, addMonths, monthRange, formatMonth } from '../../lib/dateUtils';
 import { firstName, resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
@@ -139,11 +139,13 @@ export default function HomeDashboard() {
   const windowMonths = useMemo(() => monthRange(`${year}-01`, `${year}-12`), [year]);
   const m0idx = windowMonths.indexOf(m0);
 
-  // Actual hours (Tempo) this month, per person — shown beside planned in the rail.
+  // Actual hours (Tempo) over the whole year window, per person → used both in
+  // the rail (this month) and the utilization chart (actual line per month).
   const [actuals, setActuals] = useState({});
   useEffect(() => {
-    api.getMonthlyActuals(m0, m0).then(setActuals).catch(() => setActuals({}));
-  }, [m0]);
+    if (!windowMonths.length) return;
+    api.getMonthlyActuals(windowMonths[0], windowMonths[windowMonths.length - 1]).then(setActuals).catch(() => setActuals({}));
+  }, [windowMonths]);
 
   /* ----- per-month series over the year ----- */
   const series = useMemo(() => {
@@ -212,14 +214,25 @@ export default function HomeDashboard() {
   }, [resources]);
 
   /* ----- chart ----- */
+  // Actual utilization % per month: actual hours → FTE / total capacity.
+  const actualPct = useMemo(
+    () => windowMonths.map((m) => {
+      let hours = 0;
+      for (const r of resources) hours += actuals[r.id]?.[m] || 0;
+      return ((hours / MONTHLY_HOURS_PER_FTE) / series.capacity) * 100;
+    }),
+    [windowMonths, resources, actuals, series.capacity]
+  );
+  const hasActual = actualPct.some((v) => v > 0);
   const [hover, setHover] = useState(null);
   const tipIdx = hover ?? (m0idx >= 0 ? m0idx : 0);
   const W = 720, H = 150;
-  const maxScale = Math.max(100, Math.ceil(Math.max(...series.plannedPct, 1) / 20) * 20);
+  const maxScale = Math.max(100, Math.ceil(Math.max(...series.plannedPct, ...actualPct, 1) / 20) * 20);
   const x = (i) => (i / 11) * W;
   const y = (pct) => H - 8 - (pct / maxScale) * (H - 28);
   const realisedPts = series.realisedPct.map((v, i) => [x(i), y(v)]);
   const plannedPts = series.plannedPct.map((v, i) => [x(i), y(v)]);
+  const actualPts = actualPct.map((v, i) => [x(i), y(v)]);
   const realisedLine = smoothPath(realisedPts);
 
   /* ----- evaluations table ----- */
@@ -412,7 +425,7 @@ export default function HomeDashboard() {
           <div className="relative bg-white border border-border-light rounded-2xl shadow-card p-4 mb-5">
             <div className="flex items-baseline gap-2 mb-2">
               <h3 className="text-[13px] font-bold text-text m-0">Utilization</h3>
-              <span className="text-[10.5px] text-text-light">planned vs potential</span>
+              <span className="text-[10.5px] text-text-light">planned · actual · potential</span>
               <span className="flex-1" />
               <span className="text-[10.5px] font-semibold text-text-mid bg-primary-bg border border-border-light rounded-full px-2.5 py-1">Jan – Dec {year}</span>
             </div>
@@ -436,6 +449,7 @@ export default function HomeDashboard() {
               <path d={`${realisedLine} L${W} ${H} L0 ${H}Z`} fill="url(#homeUtilFill)" />
               <path d={smoothPath(plannedPts)} fill="none" stroke="#F5A623" strokeWidth="2" strokeDasharray="5 4" opacity="0.7" />
               <path d={realisedLine} fill="none" stroke="#4CBAD4" strokeWidth="2.5" />
+              {hasActual && <path d={smoothPath(actualPts)} fill="none" stroke="#34C98E" strokeWidth="2.5" />}
               <line x1={x(tipIdx)} y1={y(series.realisedPct[tipIdx] || 0)} x2={x(tipIdx)} y2={H} stroke="#4CBAD4" strokeDasharray="3 3" opacity="0.4" />
               <circle cx={x(tipIdx)} cy={y(series.realisedPct[tipIdx] || 0)} r="4.5" fill="#4CBAD4" stroke="#fff" strokeWidth="2" />
             </svg>
@@ -449,6 +463,12 @@ export default function HomeDashboard() {
                 <i className="w-2 h-2 rounded-full bg-[#4CBAD4]" />Planned
                 <b className="ml-auto">{Math.round(series.realisedPct[tipIdx] || 0)}%</b>
               </div>
+              {hasActual && (
+                <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
+                  <i className="w-2 h-2 rounded-full bg-[#34C98E]" />Actual
+                  <b className="ml-auto">{Math.round(actualPct[tipIdx] || 0)}%</b>
+                </div>
+              )}
               <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
                 <i className="w-2 h-2 rounded-full bg-[#F5A623]" />Potential
                 <b className="ml-auto">{Math.round(series.plannedPct[tipIdx] || 0)}%</b>
