@@ -5,7 +5,7 @@ import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import { utilColor } from '../../../lib/statusUtils';
 import { useComputed } from '../../../hooks/useComputed';
 
-export default function ResourceHeatmapRow({ resource, months, onClick, includePotential }) {
+export default function ResourceHeatmapRow({ resource, months, onClick, includePotential, actualHours }) {
   const { rURealised, rU } = useComputed();
   const color = domainColor(resourcePrimaryDomain(resource));
 
@@ -38,7 +38,7 @@ export default function ResourceHeatmapRow({ resource, months, onClick, includeP
         <Avatar name={resource.name} color={color} size={28} className="text-[10px]" />
         <div className="flex-1 min-w-0">
           <div className="text-xs font-semibold text-text truncate">{resource.name}</div>
-          <div className="text-[10px] font-mono" style={{ color: avgColor }}>{avgPct}% avg</div>
+          <div className="text-[10px] font-mono" style={{ color: avgColor }}>{avgPct}% avg <span className="text-text-light">· {actualHours != null ? `${Math.round(actualHours)}h actual` : '— actual'}</span></div>
         </div>
       </div>
       {months.map((m) => (

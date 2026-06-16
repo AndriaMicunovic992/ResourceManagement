@@ -312,6 +312,27 @@ export const integrationService = {
     return out;
   },
 
+  /**
+   * Actual hours per person per month over [fromMonth, toMonth]. Scoped to the
+   * given resource ids (the caller's visible people); null = all (admin).
+   * Returned as { [resourceId]: { [month]: hours } } for easy lookup.
+   */
+  async actualsByResource(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null) {
+    const where: any = { orgId, month: { gte: fromMonth, lte: toMonth } };
+    where.resourceId = visibleIds ? { in: visibleIds } : { not: null };
+    const rows = await prisma.worklog.groupBy({
+      by: ['resourceId', 'month'],
+      where,
+      _sum: { seconds: true },
+    });
+    const out: Record<string, Record<string, number>> = {};
+    for (const r of rows) {
+      if (!r.resourceId) continue;
+      (out[r.resourceId] = out[r.resourceId] || {})[r.month] = Math.round(((r._sum.seconds || 0) / 3600) * 10) / 10;
+    }
+    return out;
+  },
+
   async listAccounts(orgId: string) {
     return prisma.jiraAccount.findMany({
       where: { orgId },

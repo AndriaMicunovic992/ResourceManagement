@@ -1,13 +1,30 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import ResourceHeatmapRow from './ResourceHeatmapRow';
 import { formatMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { utilColor } from '../../../lib/statusUtils';
+import { api } from '../../../lib/api';
 
 export default function ResourceHeatmap({ months, onResourceClick, includePotential, teamId }) {
   const { resources } = useData();
   const { rURealised, rU } = useComputed();
+
+  // Actual hours (Tempo) over the visible range, summed per person.
+  const [actualsMap, setActualsMap] = useState({});
+  const from = months[0];
+  const to = months[months.length - 1];
+  useEffect(() => {
+    if (!from || !to) return;
+    api.getMonthlyActuals(from, to).then(setActualsMap).catch(() => setActualsMap({}));
+  }, [from, to]);
+  const actualByResource = useMemo(() => {
+    const out = {};
+    for (const [rid, byMonth] of Object.entries(actualsMap)) {
+      out[rid] = Object.values(byMonth).reduce((s, h) => s + h, 0);
+    }
+    return out;
+  }, [actualsMap]);
 
   const visibleResources = useMemo(
     () => (teamId ? resources.filter((r) => (r.teams || []).some((t) => t.id === teamId)) : resources),
@@ -44,7 +61,8 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
       </div>
       {visibleResources.map((r) => (
         <ResourceHeatmapRow key={r.id} resource={r} months={months}
-          onClick={() => onResourceClick(r)} includePotential={includePotential} />
+          onClick={() => onResourceClick(r)} includePotential={includePotential}
+          actualHours={actualByResource[r.id]} />
       ))}
       {/* Totals row */}
       <div className="flex items-center border-t-2 border-border bg-primary-bg/30 sticky bottom-0">

@@ -139,6 +139,12 @@ export default function HomeDashboard() {
   const windowMonths = useMemo(() => monthRange(`${year}-01`, `${year}-12`), [year]);
   const m0idx = windowMonths.indexOf(m0);
 
+  // Actual hours (Tempo) this month, per person — shown beside planned in the rail.
+  const [actuals, setActuals] = useState({});
+  useEffect(() => {
+    api.getMonthlyActuals(m0, m0).then(setActuals).catch(() => setActuals({}));
+  }, [m0]);
+
   /* ----- per-month series over the year ----- */
   const series = useMemo(() => {
     const capacity = resources.reduce((s, r) => s + (r.capacity || 1), 0) || 1;
@@ -525,7 +531,7 @@ export default function HomeDashboard() {
                     to={`/people/${r.id}`}
                     avatar={<Avatar name={r.name} size={30} color={domainColor(resourcePrimaryDomain(r))} />}
                     title={r.name}
-                    meta={role ? `${role.domain} ${role.role} · ${seniorityShort(role.seniority)}` : '—'}
+                    meta={`${role ? `${role.domain} ${role.role} · ${seniorityShort(role.seniority)}` : '—'} · act ${actuals[r.id]?.[m0] != null ? `${actuals[r.id][m0]}h` : '—'}`}
                     chip={
                       <span className="text-[9.5px] font-bold font-mono px-1.5 py-0.5 rounded-md shrink-0" style={{ background: pct > 0 ? utilBg(pct) : '#F0F4F8', color: utilColor(pct) }}>
                         {pct}%
