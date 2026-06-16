@@ -17,18 +17,18 @@ export default function ProjectLabel({ project, customer, onEdit, onDelete, onAd
   return (
     <div className="group flex items-center gap-1.5 h-[34px]" style={{ paddingLeft: 24, opacity: isPotential ? 0.7 : 1 }}>
       {(ok || hasNeeds) && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ok ? 'bg-success' : 'bg-warning'}`} />}
-      <span className="text-xs font-semibold text-text-mid truncate flex-1">
+      <span className="text-xs font-semibold text-text-mid truncate flex-1 min-w-0" title={project.name}>
         {project.name}
         {responsible && <span className="text-[9px] font-normal text-text-light ml-1">({responsible.name})</span>}
       </span>
-      <span className="text-[9px] font-mono text-text-light mr-1">{formatMonth(project.startMonth)}</span>
+      <span className="text-[9px] font-mono text-text-light mr-1 shrink-0">{formatMonth(project.startMonth)}</span>
       <StatusBadge status={project.status} small />
       {canEdit && (
-        <>
+        <div className="hidden group-hover:flex items-center gap-1.5 shrink-0">
           <button onClick={onAddNeed}
-            className="opacity-0 group-hover:opacity-100 text-[9px] font-bold text-primary bg-primary-light border-0 rounded-full px-2 py-0.5 cursor-pointer hover:bg-primary hover:text-white transition">＋ Need</button>
+            className="text-[9px] font-bold text-primary bg-primary-light border-0 rounded-full px-2 py-0.5 cursor-pointer hover:bg-primary hover:text-white transition">＋ Need</button>
           <HoverButtons onEdit={onEdit} onDelete={onDelete} size="small" />
-        </>
+        </div>
       )}
     </div>
   );
