@@ -4,7 +4,7 @@ import { CW } from '../../../../lib/constants';
  * Cells encode state instead of printing it: amber tint = gap, green tint =
  * filled, a 2px meter shows filled/needed. Exact numbers appear on hover.
  */
-export default function NeedCell({ width, needed, filled, inRange, canPlace, paintActive, qEnd, onPointerDown }) {
+export default function NeedCell({ width, needed, filled, inRange, canPlace, paintActive, onPointerDown }) {
   const cellWidth = width || CW;
 
   if (!inRange) {
@@ -14,7 +14,6 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, pai
         style={{
           width: cellWidth,
           background: paintActive ? '#4CBAD422' : undefined,
-          borderRight: qEnd ? '1px solid #E2ECF2' : '1px solid #F2F6FA',
         }}
         onPointerDown={onPointerDown}
       />
@@ -39,7 +38,6 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, pai
         width: cellWidth, minHeight: 42, background: bg, cursor,
         opacity: canPlace === false ? 0.4 : 1,
         boxShadow: paintActive ? 'inset 0 0 0 1px #4CBAD4' : undefined,
-        borderRight: qEnd ? '1px solid #E2ECF2' : '1px solid #F2F6FA',
       }}
       onPointerDown={isClickable || canPlace === undefined ? onPointerDown : undefined}
     >

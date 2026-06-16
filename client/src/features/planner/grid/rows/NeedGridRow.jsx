@@ -156,7 +156,6 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
             inRange={periodInRange}
             canPlace={!heldResource ? undefined : canHeldPlace && periodInRange ? true : false}
             paintActive={inPaintRange(i)}
-            qEnd={parseInt(p.months[p.months.length - 1].slice(5), 10) % 3 === 0}
             onPointerDown={handlePointerDown(i)}
           />
         );
