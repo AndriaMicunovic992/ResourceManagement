@@ -5,10 +5,12 @@ import { useData } from '../../contexts/DataContext';
 
 const inputCls = 'px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white';
 
-// A dropdown you can tick multiple Jira items in. Options are grouped by kind;
-// toggling a checkbox calls onToggle(item, willBeChecked).
-function JiraMultiSelect({ options, selectedIds, onToggle }) {
+// A dropdown you can tick multiple Jira items in. Jira projects are expandable
+// to reveal their epics (nested by parentId). Items already mapped to another
+// customer/project show their owner and are locked to avoid moving them.
+function JiraMultiSelect({ items, selectedIds, onToggle, ownerName }) {
   const [open, setOpen] = useState(false);
+  const [openProjects, setOpenProjects] = useState(() => new Set());
   const ref = useRef(null);
   useEffect(() => {
     if (!open) return;
@@ -17,9 +19,33 @@ function JiraMultiSelect({ options, selectedIds, onToggle }) {
     return () => document.removeEventListener('mousedown', h);
   }, [open]);
 
-  const selected = options.filter((o) => selectedIds.has(o.id));
-  const summary = selected.length === 0 ? 'Select Jira…' : selected.map((o) => o.externalKey).join(', ');
-  const groups = [['Jira projects', 'project'], ['Epics', 'epic'], ['Other', null]];
+  const projects = items.filter((i) => i.kind === 'project');
+  const projectIds = new Set(projects.map((p) => p.id));
+  const epicsByParent = {};
+  for (const e of items.filter((i) => i.kind === 'epic')) {
+    const k = e.parentId && projectIds.has(e.parentId) ? e.parentId : '__loose__';
+    (epicsByParent[k] = epicsByParent[k] || []).push(e);
+  }
+  const looseEpics = epicsByParent.__loose__ || [];
+  const others = items.filter((i) => i.kind !== 'project' && i.kind !== 'epic');
+
+  const selected = items.filter((i) => selectedIds.has(i.id));
+  const summary = selected.length ? selected.map((i) => i.externalKey).join(', ') : 'Select Jira…';
+  const toggleProject = (id) => setOpenProjects((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const checkRow = (item, indent = 0) => {
+    const checked = selectedIds.has(item.id);
+    const owner = ownerName(item);
+    const locked = owner && !checked;
+    return (
+      <label className={`flex items-center gap-2 py-1 pr-2 rounded ${locked ? 'opacity-60' : 'hover:bg-primary-bg/40 cursor-pointer'}`} style={{ paddingLeft: 8 + indent }}>
+        <input type="checkbox" checked={checked} disabled={locked} onChange={() => onToggle(item, !checked)} />
+        <span className="font-mono text-[10px] text-text-mid shrink-0">{item.externalKey}</span>
+        <span className="text-[11px] text-text truncate">{item.name}</span>
+        {locked && <span className="text-[9px] text-text-light ml-auto shrink-0 whitespace-nowrap">→ {owner}</span>}
+      </label>
+    );
+  };
 
   return (
     <div className="relative" ref={ref}>
@@ -29,27 +55,31 @@ function JiraMultiSelect({ options, selectedIds, onToggle }) {
         <span className="text-text-light text-[9px] shrink-0">▾</span>
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-1 w-[280px] max-h-64 overflow-auto bg-white border border-border rounded-lg shadow-xl p-1">
-          {options.length === 0 && <div className="px-2 py-2 text-[11px] text-text-light">No Jira items — Refresh from Jira first.</div>}
-          {groups.map(([label, kind]) => {
-            const opts = options.filter((o) => (kind ? o.kind === kind : o.kind !== 'project' && o.kind !== 'epic'));
-            if (opts.length === 0) return null;
+        <div className="absolute right-0 z-30 mt-1 w-[300px] max-h-72 overflow-auto bg-white border border-border rounded-lg shadow-xl p-1">
+          {items.length === 0 && <div className="px-2 py-2 text-[11px] text-text-light">No Jira items — Refresh from Jira first.</div>}
+          {projects.map((p) => {
+            const epics = epicsByParent[p.id] || [];
+            const pOpen = openProjects.has(p.id);
             return (
-              <div key={label}>
-                <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wide text-text-light">{label}</div>
-                {opts.map((o) => {
-                  const checked = selectedIds.has(o.id);
-                  return (
-                    <label key={o.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-primary-bg/40 cursor-pointer">
-                      <input type="checkbox" checked={checked} onChange={() => onToggle(o, !checked)} />
-                      <span className="font-mono text-[10px] text-text-mid shrink-0">{o.externalKey}</span>
-                      <span className="text-[11px] text-text truncate">{o.name}</span>
-                    </label>
-                  );
-                })}
+              <div key={p.id}>
+                <div className="flex items-stretch">
+                  {epics.length > 0 ? (
+                    <button type="button" onClick={() => toggleProject(p.id)} title={pOpen ? 'Collapse' : 'Expand epics'}
+                      className="w-5 shrink-0 text-text-light hover:text-primary text-[10px] bg-transparent border-0 cursor-pointer">{pOpen ? '▾' : '▸'}</button>
+                  ) : <span className="w-5 shrink-0" />}
+                  <div className="flex-1 min-w-0">{checkRow(p)}</div>
+                </div>
+                {pOpen && epics.map((e) => <div key={e.id}>{checkRow(e, 22)}</div>)}
               </div>
             );
           })}
+          {looseEpics.length > 0 && (
+            <div>
+              <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wide text-text-light">Epics</div>
+              {looseEpics.map((e) => <div key={e.id}>{checkRow(e)}</div>)}
+            </div>
+          )}
+          {others.map((e) => <div key={e.id}>{checkRow(e)}</div>)}
         </div>
       )}
     </div>
@@ -128,9 +158,10 @@ export default function IntegrationsSection() {
   }, [projects]);
   const itemsForCustomer = (cId) => items.filter((i) => i.customerId === cId);
   const itemsForProject = (pId) => items.filter((i) => i.projectId === pId);
-  // Each entity's dropdown shows the unmapped pool plus its own current picks.
-  const optionsFor = (type, id) =>
-    items.filter((i) => (!i.customerId && !i.projectId) || (type === 'customer' ? i.customerId === id : i.projectId === id));
+  // The entity a Jira item is currently mapped to (for the "→ owner" lock).
+  const custName = useMemo(() => new Map(customers.map((c) => [c.id, c.name])), [customers]);
+  const projName = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
+  const ownerName = (i) => (i.customerId ? custName.get(i.customerId) || 'a customer' : i.projectId ? projName.get(i.projectId) || 'a project' : null);
   const assign = (workItemId, target) => run(async () => {
     await api.updateJiraWorkItem(workItemId, { customerId: target.customerId ?? null, projectId: target.projectId ?? null });
     await loadRefs();
@@ -236,7 +267,7 @@ export default function IntegrationsSection() {
                     <span className="text-xs font-bold text-text truncate">{c.name}</span>
                     <span className="text-[9px] text-text-light shrink-0">{cProjects.length === 1 ? '1 project' : `${cProjects.length} projects`}</span>
                   </div>
-                  <JiraMultiSelect options={optionsFor('customer', c.id)} selectedIds={cSel}
+                  <JiraMultiSelect items={items} selectedIds={cSel} ownerName={ownerName}
                     onToggle={(o, checked) => (checked ? assign(o.id, { customerId: c.id }) : unassign(o.id))} />
                 </div>
                 {open && cProjects.map((p) => {
@@ -247,7 +278,7 @@ export default function IntegrationsSection() {
                         <span className="text-text-light text-[11px] shrink-0">↳</span>
                         <span className="text-xs text-text truncate">{p.name}</span>
                       </div>
-                      <JiraMultiSelect options={optionsFor('project', p.id)} selectedIds={pSel}
+                      <JiraMultiSelect items={items} selectedIds={pSel} ownerName={ownerName}
                         onToggle={(o, checked) => (checked ? assign(o.id, { projectId: p.id }) : unassign(o.id))} />
                     </div>
                   );
