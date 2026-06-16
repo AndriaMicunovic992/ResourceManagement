@@ -37,6 +37,7 @@ model Organization {
   jiraConnection JiraConnection?
   jiraWorkItems  JiraWorkItem[]
   jiraAccounts   JiraAccount[]
+  worklogs       Worklog[]
   customers   Customer[]
   projects    Project[]
   resources   Resource[]
@@ -170,6 +171,7 @@ model Customer {
   clientSignals ClientSignal[]
   reviews     CustomerReview[]
   jiraWorkItems JiraWorkItem[]
+  worklogs    Worklog[]
 
   @@index([orgId])
   @@index([responsibleUserId])
@@ -197,6 +199,7 @@ model Project {
   logs        Log[]
   evaluations Evaluation[]
   jiraWorkItems JiraWorkItem[]
+  worklogs    Worklog[]
 
   @@index([orgId])
   @@index([customerId])
@@ -231,6 +234,7 @@ model Resource {
   followUps     FollowUp[]
   careerEntries CareerEntry[]
   clientSignals ClientSignal[]
+  worklogs      Worklog[]
 
   @@unique([orgId, userId])
   @@index([orgId])
@@ -784,4 +788,37 @@ model JiraAccount {
 
   @@unique([orgId, accountId])
   @@index([orgId])
+}
+
+// Actual hours pulled from Tempo, resolved through the integration mappings.
+// One row per Tempo worklog (the finest grain: person × issue × day), carrying
+// the resolved person / customer / project plus the Jira epic & issue for
+// traceability. Upserted by tempoWorklogId so re-syncs are idempotent.
+model Worklog {
+  id             String   @id @default(cuid())
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tempoWorklogId String
+  accountId      String   // Jira author accountId (kept even when unmatched)
+  resourceId     String?
+  resource       Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  projectId      String?
+  project        Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  jiraIssueKey   String?
+  jiraEpicKey    String?
+  workDate       String   // "YYYY-MM-DD"
+  month          String   // "YYYY-MM"
+  seconds        Int
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([orgId, tempoWorklogId])
+  @@index([orgId])
+  @@index([orgId, month])
+  @@index([resourceId])
+  @@index([customerId])
+  @@index([projectId])
 }
