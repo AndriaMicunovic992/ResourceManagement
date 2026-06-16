@@ -5,7 +5,6 @@ import {
   saveConnectionSchema,
   createWorkItemSchema,
   updateWorkItemSchema,
-  mapEntitySchema,
 } from '../schemas/integration.schema.js';
 
 // All integration settings are admin-only. The connection endpoint never
@@ -37,16 +36,6 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {
     return integrationService.listWorkItems(req.orgId);
-  });
-
-  // Map one of our customers/projects to a Jira work item (our-entity side).
-  app.put('/integration/jira/mapping', { preHandler: requireRole('admin') }, async (req) => {
-    const data = mapEntitySchema.parse(req.body);
-    return integrationService.mapEntityToWorkItem(
-      req.orgId,
-      { customerId: data.customerId ?? null, projectId: data.projectId ?? null },
-      data.workItemId
-    );
   });
 
   app.post('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {

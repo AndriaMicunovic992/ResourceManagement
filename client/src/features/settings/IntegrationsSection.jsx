@@ -1,22 +1,34 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Button from '../../components/ui/Button';
 import { api } from '../../lib/api';
 import { useData } from '../../contexts/DataContext';
 
 const inputCls = 'px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white';
 
-// A select over pulled Jira work items, grouped by kind.
-function WorkItemSelect({ value, items, onChange }) {
-  const byKind = (k) => items.filter((i) => i.kind === k);
-  const others = items.filter((i) => i.kind !== 'project' && i.kind !== 'epic');
+// Mapped Jira items shown as removable chips, plus a dropdown to add another
+// (an entity can map to many Jira projects/epics). The add list is the pool of
+// items not yet mapped to anything, grouped by kind.
+function MappingControls({ mapped, unmapped, onAdd, onRemove }) {
+  const byKind = (k) => unmapped.filter((i) => i.kind === k);
+  const others = unmapped.filter((i) => i.kind !== 'project' && i.kind !== 'epic');
   const opt = (i) => <option key={i.id} value={i.id}>{i.externalKey} · {i.name}</option>;
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value || null)} className={`${inputCls} max-w-[260px]`}>
-      <option value="">— not mapped —</option>
-      {byKind('project').length > 0 && <optgroup label="Jira projects">{byKind('project').map(opt)}</optgroup>}
-      {byKind('epic').length > 0 && <optgroup label="Epics">{byKind('epic').map(opt)}</optgroup>}
-      {others.length > 0 && <optgroup label="Other">{others.map(opt)}</optgroup>}
-    </select>
+    <div className="flex items-center gap-1.5 flex-wrap justify-end flex-1 min-w-0">
+      {mapped.map((i) => (
+        <span key={i.id} className="inline-flex items-center gap-1 text-[10px] font-semibold bg-primary-bg text-text-mid rounded-full pl-2 pr-1 py-0.5 shrink-0">
+          <span className="text-[8px] uppercase tracking-wide text-text-light">{i.kind}</span>
+          <span className="font-mono">{i.externalKey}</span>
+          <button onClick={() => onRemove(i.id)} title="Remove" className="bg-transparent border-0 cursor-pointer text-text-light hover:text-danger leading-none">×</button>
+        </span>
+      ))}
+      <select value="" onChange={(e) => { if (e.target.value) onAdd(e.target.value); }}
+        className="px-2 py-1 border border-dashed border-border rounded-full text-[10px] text-text-mid outline-none focus:border-primary bg-white cursor-pointer shrink-0">
+        <option value="">+ map Jira…</option>
+        {byKind('project').length > 0 && <optgroup label="Jira projects">{byKind('project').map(opt)}</optgroup>}
+        {byKind('epic').length > 0 && <optgroup label="Epics">{byKind('epic').map(opt)}</optgroup>}
+        {others.length > 0 && <optgroup label="Other">{others.map(opt)}</optgroup>}
+      </select>
+    </div>
   );
 }
 
@@ -53,8 +65,7 @@ export default function IntegrationsSection() {
   }, [loadConn, loadRefs]);
 
   // Persist the form (incl. any newly-typed tokens) without a status message.
-  // Test/Refresh act on the *saved* connection, so they save first — otherwise
-  // typing creds and hitting Test would act on stale stored values.
+  // Test/Refresh act on the *saved* connection, so they save first.
   const persist = async () => {
     await api.saveJiraConnection({
       baseUrl: form.baseUrl || null, jiraEmail: form.jiraEmail || null, enabled: form.enabled,
@@ -66,13 +77,11 @@ export default function IntegrationsSection() {
   };
 
   const saveConn = () => run(async () => { await persist(); setStatus('Connection saved.'); })();
-
   const testConn = () => run(async () => {
     setBusy('test'); setStatus('');
     try { await persist(); const r = await api.testJiraConnection(); setStatus(`Connected to Jira as ${r.user?.displayName || 'user'}.`); }
     finally { setBusy(''); }
   })();
-
   const refresh = () => run(async () => {
     setBusy('refresh'); setStatus('');
     try {
@@ -83,17 +92,34 @@ export default function IntegrationsSection() {
     } finally { setBusy(''); }
   })();
 
-  // ---- people mapping (external work id, edited locally) ----
+  // ---- people mapping ----
   const accountOptions = (current) => {
     const opts = accounts.map((a) => ({ value: a.accountId, label: a.email ? `${a.displayName} (${a.email})` : a.displayName }));
     if (current && !opts.some((o) => o.value === current)) opts.unshift({ value: current, label: `${current} (unknown)` });
     return opts;
   };
 
-  // ---- customer/project mapping (our-entity side) ----
-  const itemForCustomer = (cId) => items.find((i) => i.customerId === cId)?.id || '';
-  const itemForProject = (pId) => items.find((i) => i.projectId === pId)?.id || '';
-  const mapEntity = (target, workItemId) => run(async () => { setItems(await api.setJiraMapping({ ...target, workItemId })); })();
+  // ---- customer/project mapping (our entities → many Jira items) ----
+  const projectsByCustomer = useMemo(() => {
+    const m = {};
+    for (const p of projects) (m[p.customerId] = m[p.customerId] || []).push(p);
+    return m;
+  }, [projects]);
+  const unmappedItems = useMemo(() => items.filter((i) => !i.customerId && !i.projectId), [items]);
+  const itemsForCustomer = (cId) => items.filter((i) => i.customerId === cId);
+  const itemsForProject = (pId) => items.filter((i) => i.projectId === pId);
+  const assign = (workItemId, target) => run(async () => {
+    await api.updateJiraWorkItem(workItemId, { customerId: target.customerId ?? null, projectId: target.projectId ?? null });
+    await loadRefs();
+  })();
+  const unassign = (workItemId) => run(async () => {
+    await api.updateJiraWorkItem(workItemId, { customerId: null, projectId: null });
+    await loadRefs();
+  })();
+
+  // Customers collapsed by default; expand to map their projects.
+  const [expanded, setExpanded] = useState(() => new Set());
+  const toggle = (id) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   return (
     <div id="integrations" className="scroll-mt-4">
@@ -142,18 +168,18 @@ export default function IntegrationsSection() {
         <p className="text-[10px] text-text-light mb-3">
           Connect each person to their login account and their Jira account. {accounts.length === 0 && <span className="text-warning">Refresh from Jira to load accounts.</span>}
         </p>
-        <div className="grid grid-cols-[1.2fr_1.4fr_1.4fr] gap-2 text-[10px] font-semibold text-text-light uppercase tracking-wider px-1 mb-1">
+        <div className="grid grid-cols-[2fr_1fr_1fr] gap-2 text-[10px] font-semibold text-text-light uppercase tracking-wider px-1 mb-1">
           <span>Person</span><span>Registered user</span><span>Account</span>
         </div>
         <div className="space-y-1">
           {resources.map((r) => (
-            <div key={r.id} className="grid grid-cols-[1.2fr_1.4fr_1.4fr] gap-2 items-center px-1 py-1 rounded hover:bg-primary-bg/20">
+            <div key={r.id} className="grid grid-cols-[2fr_1fr_1fr] gap-2 items-center px-1 py-1 rounded hover:bg-primary-bg/20">
               <span className="text-xs font-semibold text-text truncate">{r.name}</span>
-              <select value={r.user?.id || ''} onChange={(e) => run(updateResource)(r.id, { userId: e.target.value || null })} className={inputCls}>
+              <select value={r.user?.id || ''} onChange={(e) => run(updateResource)(r.id, { userId: e.target.value || null })} className={`${inputCls} min-w-0`}>
                 <option value="">— not linked —</option>
                 {members.map((m) => <option key={m.user.id} value={m.user.id}>{m.user.name} ({m.user.email})</option>)}
               </select>
-              <select value={r.externalWorkId || ''} onChange={(e) => run(updateResource)(r.id, { externalWorkId: e.target.value || null })} className={inputCls}>
+              <select value={r.externalWorkId || ''} onChange={(e) => run(updateResource)(r.id, { externalWorkId: e.target.value || null })} className={`${inputCls} min-w-0`}>
                 <option value="">— not mapped —</option>
                 {accountOptions(r.externalWorkId).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
@@ -163,33 +189,37 @@ export default function IntegrationsSection() {
         </div>
       </div>
 
-      {/* Customer / project mapping (our entities → Jira) */}
+      {/* Customer / project mapping (our hierarchy → many Jira items) */}
       <div className="bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-1">Customer / project mapping</h3>
         <p className="text-[10px] text-text-light mb-3">
-          Map each of your customers and projects to a Jira project or epic. {items.length === 0 && <span className="text-warning">Refresh from Jira to load projects &amp; epics.</span>}
+          Map your customers and projects to one or more Jira projects/epics. Mapping a Jira project pulls in everything under it (its epics &amp; issues); a customer covers all its projects. {items.length === 0 && <span className="text-warning">Refresh from Jira to load projects &amp; epics.</span>}
         </p>
 
-        <div className="text-[10px] font-bold text-text-mid uppercase tracking-wider mb-1">Customers</div>
-        <div className="space-y-1 mb-3">
-          {customers.map((c) => (
-            <div key={c.id} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-primary-bg/20">
-              <span className="text-xs font-semibold text-text flex-1 truncate">{c.name}</span>
-              <WorkItemSelect value={itemForCustomer(c.id)} items={items} onChange={(wid) => mapEntity({ customerId: c.id }, wid)} />
-            </div>
-          ))}
+        <div className="space-y-0.5">
+          {customers.map((c) => {
+            const cProjects = projectsByCustomer[c.id] || [];
+            const open = expanded.has(c.id);
+            return (
+              <div key={c.id} className="border-b border-border-light/50 last:border-0 pb-0.5">
+                <div className="flex items-center gap-2 px-1 py-1.5">
+                  <button onClick={() => toggle(c.id)} className="w-4 text-text-light bg-transparent border-0 cursor-pointer hover:text-primary text-[11px] shrink-0">{open ? '▾' : '▸'}</button>
+                  <span className="text-xs font-bold text-text shrink-0">{c.name}</span>
+                  <span className="text-[9px] text-text-light shrink-0">{cProjects.length === 1 ? '1 project' : `${cProjects.length} projects`}</span>
+                  <MappingControls mapped={itemsForCustomer(c.id)} unmapped={unmappedItems} onAdd={(wid) => assign(wid, { customerId: c.id })} onRemove={unassign} />
+                </div>
+                {open && cProjects.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 px-1 py-1 pl-8">
+                    <span className="text-text-light text-[11px] shrink-0">↳</span>
+                    <span className="text-xs text-text shrink-0">{p.name}</span>
+                    <MappingControls mapped={itemsForProject(p.id)} unmapped={unmappedItems} onAdd={(wid) => assign(wid, { projectId: p.id })} onRemove={unassign} />
+                  </div>
+                ))}
+                {open && cProjects.length === 0 && <div className="pl-8 py-1 text-[10px] text-text-light">No projects.</div>}
+              </div>
+            );
+          })}
           {customers.length === 0 && <p className="text-xs text-text-light py-1">No customers yet.</p>}
-        </div>
-
-        <div className="text-[10px] font-bold text-text-mid uppercase tracking-wider mb-1">Projects</div>
-        <div className="space-y-1">
-          {projects.map((p) => (
-            <div key={p.id} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-primary-bg/20">
-              <span className="text-xs font-semibold text-text flex-1 truncate">{p.name}</span>
-              <WorkItemSelect value={itemForProject(p.id)} items={items} onChange={(wid) => mapEntity({ projectId: p.id }, wid)} />
-            </div>
-          ))}
-          {projects.length === 0 && <p className="text-xs text-text-light py-1">No projects yet.</p>}
         </div>
       </div>
     </div>
