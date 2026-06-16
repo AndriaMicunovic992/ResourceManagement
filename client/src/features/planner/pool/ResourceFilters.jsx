@@ -18,7 +18,7 @@ export default function ResourceFilters({ filters, onChange, teams = [] }) {
   const teamOptions = ['All', ...teams.map((t) => t.name)];
 
   return (
-    <div className="px-3 pb-3 border-b border-border-light">
+    <div className="px-3 pt-1 pb-3 border-b border-border-light">
       <ResourceFilterRow label="Domain" options={domainOptions} value={filters.domain}
         onChange={(v) => onChange({ ...filters, domain: v, role: 'All' })} />
       <ResourceFilterRow label="Role" options={roleOptions} value={filters.role}
