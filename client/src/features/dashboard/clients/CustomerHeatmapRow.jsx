@@ -4,11 +4,11 @@ import HeatmapCell from './HeatmapCell';
 import ProjectHeatmapRow from './ProjectHeatmapRow';
 import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
-import { ACCENT_COLORS, MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
+import { ACCENT_COLORS } from '../../../lib/constants';
 import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 
-export default function CustomerHeatmapRow({ customer, index, months, includePotential, actualByMonth }) {
+export default function CustomerHeatmapRow({ customer, index, months, includePotential }) {
   const [expanded, setExpanded] = useState(false);
   const { projects, needs, assignments } = useData();
   const { canViewCustomer } = useVisibility();
@@ -83,8 +83,7 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
           const d = staffingByMonth[m];
           return (
             <HeatmapCell key={m} value={d.ratio} totalNeeded={d.totalNeeded} totalFilled={d.totalFilled}
-              isPotential={d.isPotential && includePotential}
-              actualFte={(actualByMonth?.[m] || 0) / MONTHLY_HOURS_PER_FTE} />
+              isPotential={d.isPotential && includePotential} />
           );
         })}
       </div>

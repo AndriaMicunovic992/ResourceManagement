@@ -148,12 +148,29 @@ export default function CustomerPeople() {
                   })}
                   <span className="text-text-light"> · by {r.authorUser?.name || '—'}</span>
                 </span>
-                <button
-                  onClick={() => navigate(`/customers/${customer.id}/reviews/${r.id}/cockpit`)}
-                  className="text-xs font-semibold text-primary bg-transparent border border-primary rounded px-2 py-1 cursor-pointer hover:bg-primary hover:text-white"
-                >
-                  Open
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => navigate(`/customers/${customer.id}/reviews/${r.id}/cockpit`)}
+                    className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-105"
+                  >
+                    Open
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Delete this PM review and its session entries?')) return;
+                      setReviewError('');
+                      try {
+                        await api.deleteCustomerReview(customer.id, r.id);
+                        setReviews((prev) => prev.filter((x) => x.id !== r.id));
+                      } catch (err) {
+                        setReviewError(err.message || 'Failed to delete review');
+                      }
+                    }}
+                    className="text-[11px] font-bold text-danger bg-danger-bg border-0 rounded-lg px-3 py-1.5 cursor-pointer hover:brightness-95"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>

@@ -46,7 +46,7 @@ export default function OneOnOneCard({ record, onDelete, readOnly = false }) {
             to={`/people/${record.resourceId}/oneonones/${record.id}/cockpit`}
             className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-3 py-1.5 no-underline hover:brightness-105"
           >
-            Cockpit
+            Open
           </Link>
           <button
             onClick={onDelete}
