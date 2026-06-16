@@ -333,6 +333,27 @@ export const integrationService = {
     return out;
   },
 
+  /**
+   * Actual hours per customer per month over [fromMonth, toMonth], scoped to the
+   * given customer ids (caller's visible customers); null = all (admin).
+   * Returned as { [customerId]: { [month]: hours } }.
+   */
+  async actualsByCustomer(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null) {
+    const where: any = { orgId, month: { gte: fromMonth, lte: toMonth }, customerId: { not: null } };
+    if (visibleIds) where.customerId = { in: visibleIds };
+    const rows = await prisma.worklog.groupBy({
+      by: ['customerId', 'month'],
+      where,
+      _sum: { seconds: true },
+    });
+    const out: Record<string, Record<string, number>> = {};
+    for (const r of rows) {
+      if (!r.customerId) continue;
+      (out[r.customerId] = out[r.customerId] || {})[r.month] = Math.round(((r._sum.seconds || 0) / 3600) * 10) / 10;
+    }
+    return out;
+  },
+
   async listAccounts(orgId: string) {
     return prisma.jiraAccount.findMany({
       where: { orgId },

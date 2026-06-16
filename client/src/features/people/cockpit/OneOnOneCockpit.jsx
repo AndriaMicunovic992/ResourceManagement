@@ -8,10 +8,14 @@ import Avatar from '../../../components/ui/Avatar';
 import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import MiniThread, { ReplyToggle } from '../../../components/ui/MiniThread';
 import SignalChart from '../../../components/ui/SignalChart';
+import PlannedVsActualChart from '../../../components/ui/PlannedVsActualChart';
 import { LockIcon } from '../../../components/ui/icons';
+import { useComputed } from '../../../hooks/useComputed';
+import { monthRange, addMonths, currentMonth } from '../../../lib/dateUtils';
 import {
   LOG_KIND_COLORS,
   LOG_KIND_LABELS,
+  MONTHLY_HOURS_PER_FTE,
 } from '../../../lib/constants';
 
 function currentMonthKey() {
@@ -517,13 +521,23 @@ export default function OneOnOneCockpit() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Actual hours (Tempo) for this person this month, shown beside the plan.
-  const [actualThisMonth, setActualThisMonth] = useState(null);
+  // Planned (from allocations) vs actual (Tempo) hours per month for this person.
+  const { rURealised } = useComputed();
+  const chartMonths = useMemo(() => monthRange(addMonths(currentMonth(), -11), currentMonth()), []);
+  const [actualsRange, setActualsRange] = useState({});
   useEffect(() => {
     if (!personId) return;
-    const m = currentMonthKey();
-    api.getMonthlyActuals(m, m).then((r) => setActualThisMonth(r[personId]?.[m] ?? null)).catch(() => setActualThisMonth(null));
-  }, [personId]);
+    api.getMonthlyActuals(chartMonths[0], chartMonths[chartMonths.length - 1]).then(setActualsRange).catch(() => setActualsRange({}));
+  }, [personId, chartMonths]);
+  const actualThisMonth = actualsRange[personId]?.[currentMonthKey()] ?? null;
+  const plannedActualData = useMemo(
+    () => chartMonths.map((mo) => ({
+      month: mo,
+      planned: (rURealised[personId]?.[mo] || 0) * MONTHLY_HOURS_PER_FTE,
+      actual: actualsRange[personId]?.[mo] || 0,
+    })),
+    [chartMonths, rURealised, personId, actualsRange]
+  );
 
   // The cockpit is a manager/admin tool — subjects use their profile tabs.
   const isSelf = !visibility.loading && visibility.selfResourceId === personId && !visibility.isAdmin;
@@ -869,6 +883,11 @@ export default function OneOnOneCockpit() {
                 </tbody>
               </table>
             )}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-border-light">
+            <h3 className="text-[13px] font-bold text-text m-0 mb-2">Planned vs actual hours</h3>
+            <PlannedVsActualChart data={plannedActualData} />
           </div>
 
           <div className="mt-4 pt-4 border-t border-border-light">

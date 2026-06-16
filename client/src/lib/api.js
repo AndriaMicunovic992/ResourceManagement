@@ -126,6 +126,7 @@ export const api = {
   syncTempo: (updatedFrom) => apiFetch('/integration/tempo/sync', { method: 'POST', body: JSON.stringify({ updatedFrom }) }),
   getActualHours: (customerId, month) => apiFetch(`/integration/tempo/actuals?customerId=${encodeURIComponent(customerId)}&month=${encodeURIComponent(month)}`),
   getMonthlyActuals: (from, to) => apiFetch(`/integration/tempo/actuals/monthly?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  getMonthlyActualsByCustomer: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-by-customer?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getJiraWorkItems: () => apiFetch('/integration/jira/work-items'),
   createJiraWorkItem: (data) => apiFetch('/integration/jira/work-items', { method: 'POST', body: JSON.stringify(data) }),
   updateJiraWorkItem: (id, data) => apiFetch('/integration/jira/work-items/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
