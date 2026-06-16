@@ -525,6 +525,25 @@ export default function SettingsView() {
     ...(isAdmin ? [{ id: 'roles', label: 'Roles & permissions' }] : []),
   ];
 
+  // Scroll-spy: highlight the section currently near the top of the viewport.
+  useEffect(() => {
+    const ids = NAV_SECTIONS.map((s) => s.id);
+    const els = ids.map((id) => document.getElementById(id)).filter(Boolean);
+    if (els.length === 0) return;
+    const seen = {};
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen[e.target.id] = e.isIntersecting;
+        const top = ids.find((id) => seen[id]);
+        if (top) setActiveSection(top);
+      },
+      { rootMargin: '-12% 0px -78% 0px', threshold: 0 }
+    );
+    els.forEach((el) => obs.observe(el));
+    return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
   return (
     <div className="max-w-[920px] mx-auto px-5 py-6">
       <PageHeader title="Settings" subtitle={`${currentOrg?.name || ''} · organization`} />
@@ -1197,7 +1216,7 @@ export default function SettingsView() {
         </div>
       )}
 
-      <div id="members" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5">
+      <div id="members" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-4">Members</h3>
 
         {error && (
