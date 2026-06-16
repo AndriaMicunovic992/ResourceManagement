@@ -214,16 +214,41 @@ export default function HomeDashboard() {
   }, [resources]);
 
   /* ----- chart ----- */
-  // Actual utilization % per month: actual hours → FTE / total capacity.
+  // Matched people = those linked to the external actual-hours system. Actual
+  // utilization is computed only over them, so the % is a true rate (their
+  // logged hours ÷ their capacity) rather than being diluted by people we
+  // don't yet track in Tempo/Jira.
+  const matchedCapacity = useMemo(
+    () => resources.filter((r) => r.externalWorkId).reduce((s, r) => s + (r.capacity || 1), 0),
+    [resources]
+  );
+  // Actual utilization % per month: matched-people actual hours → FTE / matched capacity.
   const actualPct = useMemo(
     () => windowMonths.map((m) => {
+      if (matchedCapacity <= 0) return 0;
       let hours = 0;
-      for (const r of resources) hours += actuals[r.id]?.[m] || 0;
-      return ((hours / MONTHLY_HOURS_PER_FTE) / series.capacity) * 100;
+      for (const r of resources) {
+        if (!r.externalWorkId) continue;
+        hours += actuals[r.id]?.[m] || 0;
+      }
+      return ((hours / MONTHLY_HOURS_PER_FTE) / matchedCapacity) * 100;
     }),
-    [windowMonths, resources, actuals, series.capacity]
+    [windowMonths, resources, actuals, matchedCapacity]
   );
   const hasActual = actualPct.some((v) => v > 0);
+  // Potential utilization of matched people this month — the baseline the
+  // actual-vs-potential KPI compares against.
+  const potentialMatchedNow = useMemo(() => {
+    if (matchedCapacity <= 0) return 0;
+    let fte = 0;
+    for (const r of resources) {
+      if (!r.externalWorkId) continue;
+      fte += rU[r.id]?.[m0] || 0;
+    }
+    return (fte / matchedCapacity) * 100;
+  }, [resources, rU, m0, matchedCapacity]);
+  const actualNow = actualPct[m0idx] ?? 0;
+  const showActualKpi = hasActual && matchedCapacity > 0;
   const [hover, setHover] = useState(null);
   const tipIdx = hover ?? (m0idx >= 0 ? m0idx : 0);
   const W = 720, H = 150;
@@ -393,10 +418,17 @@ export default function HomeDashboard() {
             <Kpi label="Active projects" chip="▦" chipBg="#E7F6FA" chipColor="#4CBAD4" spark={series.activeCount} sparkColor="#4CBAD4">
               {activeProjects} <span className="text-[11px] font-medium text-text-light">of {projects.length}</span>
             </Kpi>
-            <Kpi label="Realised utilization" chip="◔" chipBg="#EAFAF0" chipColor="#34C98E" spark={series.realisedPct} sparkColor="#34C98E">
-              {Math.round(utilNow)}<span className="text-[11px] font-medium text-text-light">%</span>
-              <Delta value={utilPrev == null ? null : utilNow - utilPrev} suffix="%" />
-            </Kpi>
+            {showActualKpi ? (
+              <Kpi label="Actual vs potential" chip="◔" chipBg="#EAFAF0" chipColor="#34C98E" spark={actualPct} sparkColor="#34C98E">
+                {Math.round(actualNow)}<span className="text-[11px] font-medium text-text-light">%</span>
+                <Delta value={actualNow - potentialMatchedNow} suffix="%" />
+              </Kpi>
+            ) : (
+              <Kpi label="Realised utilization" chip="◔" chipBg="#EAFAF0" chipColor="#34C98E" spark={series.realisedPct} sparkColor="#34C98E">
+                {Math.round(utilNow)}<span className="text-[11px] font-medium text-text-light">%</span>
+                <Delta value={utilPrev == null ? null : utilNow - utilPrev} suffix="%" />
+              </Kpi>
+            )}
             <Kpi label={`Unfilled (${MONTHS[today.getMonth()]})`} chip="◌" chipBg="#FDE8EA" chipColor="#E8636F" spark={series.gapFte} sparkColor="#E8636F">
               {Math.round(gapNow * 10) / 10} <span className="text-[11px] font-medium text-text-light">FTE</span>
               <Delta value={gapPrev == null ? null : gapNow - gapPrev} goodWhenDown />
