@@ -31,4 +31,5 @@ export const updateWorkItemSchema = z.object({
 });
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
-export const syncHoursSchema = z.object({ from: ymd, to: ymd });
+// Pull worklogs created/updated on or after this date (delta cursor).
+export const syncHoursSchema = z.object({ updatedFrom: ymd });

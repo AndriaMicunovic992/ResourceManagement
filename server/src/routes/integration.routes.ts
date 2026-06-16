@@ -1,6 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { integrationService } from '../services/integration.service.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { assertCanViewCustomer } from '../services/visibility.service.js';
+import { BadRequestError } from '../utils/errors.js';
 import {
   saveConnectionSchema,
   createWorkItemSchema,
@@ -37,8 +39,17 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
 
   // Pull Tempo worklogs for a date range and resolve them through the mappings.
   app.post('/integration/tempo/sync', { preHandler: requireRole('admin') }, async (req) => {
-    const { from, to } = syncHoursSchema.parse(req.body);
-    return integrationService.syncHours(req.orgId, from, to);
+    const { updatedFrom } = syncHoursSchema.parse(req.body);
+    return integrationService.syncHours(req.orgId, updatedFrom);
+  });
+
+  // Actual hours per person for a customer + month (feeds the review cockpit).
+  // Not admin-only — visibility-gated on the customer, like other read endpoints.
+  app.get('/integration/tempo/actuals', async (req) => {
+    const { customerId, month } = req.query as { customerId?: string; month?: string };
+    if (!customerId || !month) throw new BadRequestError('customerId and month are required');
+    assertCanViewCustomer(req.visibility, customerId);
+    return integrationService.actualsForCustomerMonth(req.orgId, customerId, month);
   });
 
   app.get('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {

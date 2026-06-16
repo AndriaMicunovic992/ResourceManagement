@@ -218,6 +218,7 @@ function PersonReviewCard({
   customer,
   reviewId,
   fte,
+  actualHours,
   custProjects,
   logCategories,
   monthSignal,
@@ -270,7 +271,7 @@ function PersonReviewCard({
             </Link>
             <div className="text-[10px] text-text-light">
               Planned this month: {fte > 0 ? `${fte.toFixed(1)} FTE (≈${fteToHours(fte)}h)` : '—'}
-              {' · '}actual hours: coming with Tempo
+              {' · '}actual: {actualHours != null ? <span className="font-semibold text-text-mid">{actualHours}h</span> : '—'}
             </div>
           </div>
         </div>
@@ -458,6 +459,14 @@ export default function CustomerReviewCockpit() {
 
   const month = currentMonth();
 
+  // Actual hours (from synced Tempo worklogs) for this customer this month,
+  // per person — shown next to the planned figure.
+  const [actualHours, setActualHours] = useState({});
+  useEffect(() => {
+    if (!customer?.id) return;
+    api.getActualHours(customer.id, month).then(setActualHours).catch(() => setActualHours({}));
+  }, [customer?.id, month]);
+
   if (visLoading || loading) {
     return (
       <div className="max-w-[1200px] mx-auto px-5 py-10 text-center text-xs text-text-light">
@@ -536,6 +545,7 @@ export default function CustomerReviewCockpit() {
                 customer={customer}
                 reviewId={reviewId}
                 fte={fte}
+                actualHours={actualHours[person.id]}
                 custProjects={custProjects}
                 logCategories={logCategories}
                 monthSignal={signals.find((s) => s.resourceId === person.id && s.month === month)}

@@ -20,20 +20,24 @@ export class TempoError extends Error {
 
 const DEFAULT_BASE = process.env.TEMPO_BASE_URL || 'https://api.tempo.io/4';
 
+// Pull worklogs *updated* on/after `updatedFrom` (created or edited date), so
+// nightly runs only fetch the delta. The from/to window filters the logged
+// (start) date — kept very wide so an old worklog edited recently still comes
+// back. Re-pulled worklogs upsert by tempoWorklogId, so edits update in place.
 export async function fetchWorklogs(
   token: string | null,
-  from: string,
-  to: string,
+  updatedFrom: string,
   baseUrl: string = DEFAULT_BASE
 ): Promise<TempoWorklog[]> {
   if (!token) throw new TempoError('Missing Tempo API token');
   const out: TempoWorklog[] = [];
   const limit = 50;
   let offset = 0;
-  for (let page = 0; page < 500; page++) {
+  for (let page = 0; page < 1000; page++) {
     const url = new URL(baseUrl.replace(/\/+$/, '') + '/worklogs');
-    url.searchParams.set('from', from);
-    url.searchParams.set('to', to);
+    url.searchParams.set('from', '2000-01-01');
+    url.searchParams.set('to', '2999-12-31');
+    url.searchParams.set('updatedFrom', updatedFrom);
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('offset', String(offset));
     let res: Response;
