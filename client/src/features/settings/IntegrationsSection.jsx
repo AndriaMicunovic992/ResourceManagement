@@ -227,6 +227,48 @@ export default function IntegrationsSection() {
             <Button type="button" onClick={() => saveConn()}>Save connection</Button>
           </div>
         </div>
+
+        {/* Actual hours pull (Tempo) */}
+        <div className="mt-4 pt-3 border-t border-border-light">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-text">Actual hours (Tempo)</div>
+              <div className="text-[10px] text-text-light">Pull Tempo worklogs for a date range and resolve them through the mappings below. {!conn?.tempoApiTokenSet && <span className="text-warning">Add the Tempo API token first.</span>}</div>
+            </div>
+            <div className="flex items-end gap-2">
+              <label className="block">
+                <span className="block text-[10px] font-semibold text-text-mid mb-1">From</span>
+                <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className={inputCls} />
+              </label>
+              <label className="block">
+                <span className="block text-[10px] font-semibold text-text-mid mb-1">To</span>
+                <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className={inputCls} />
+              </label>
+              <button onClick={syncHours} disabled={!!busy} className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50">{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>
+            </div>
+          </div>
+          {syncResult && (
+            <div className="mt-3 text-xs text-text-mid">
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <span><b className="text-text">{syncResult.worklogs}</b> worklogs</span>
+                <span><b className="text-text">{syncResult.hours}</b> h</span>
+                <span><b className="text-text">{syncResult.matchedPeople}</b> people matched</span>
+                {syncResult.unmatchedAccounts > 0 && <span className="text-warning">{syncResult.unmatchedAccounts} Jira accounts unmatched</span>}
+                {syncResult.unmappedWorklogs > 0 && <span className="text-warning">{syncResult.unmappedWorklogs} worklogs not under a mapped project</span>}
+              </div>
+              {syncResult.byPerson?.length > 0 && (
+                <div className="mt-2 border-t border-border-light pt-2">
+                  <div className="text-[10px] font-semibold text-text-light uppercase tracking-wider mb-1">Hours by person</div>
+                  <div className="space-y-0.5">
+                    {syncResult.byPerson.map((p) => (
+                      <div key={p.name} className="flex justify-between max-w-[280px]"><span className="text-text">{p.name}</span><span className="font-mono text-text-mid">{p.hours}h</span></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* People mapping */}
@@ -301,46 +343,6 @@ export default function IntegrationsSection() {
           })}
           {customers.length === 0 && <p className="text-xs text-text-light py-2">No customers yet.</p>}
         </div>
-      </div>
-
-      {/* Tempo hours sync */}
-      <div className="bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
-        <h3 className="text-sm font-bold text-text mb-1">Actual hours (Tempo)</h3>
-        <p className="text-[10px] text-text-light mb-3">
-          Pull Tempo worklogs for a date range and resolve them through the mappings above (person → account, issue → its epic/project → your customer/project). {!conn?.tempoApiTokenSet && <span className="text-warning">Add the Tempo API token first.</span>}
-        </p>
-        <div className="flex items-end gap-2 flex-wrap">
-          <label className="block">
-            <span className="block text-[10px] font-semibold text-text-mid mb-1">From</span>
-            <input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className={inputCls} />
-          </label>
-          <label className="block">
-            <span className="block text-[10px] font-semibold text-text-mid mb-1">To</span>
-            <input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className={inputCls} />
-          </label>
-          <button onClick={syncHours} disabled={!!busy} className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50">{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>
-        </div>
-        {syncResult && (
-          <div className="mt-3 text-xs text-text-mid">
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <span><b className="text-text">{syncResult.worklogs}</b> worklogs</span>
-              <span><b className="text-text">{syncResult.hours}</b> h</span>
-              <span><b className="text-text">{syncResult.matchedPeople}</b> people matched</span>
-              {syncResult.unmatchedAccounts > 0 && <span className="text-warning">{syncResult.unmatchedAccounts} Jira accounts unmatched</span>}
-              {syncResult.unmappedWorklogs > 0 && <span className="text-warning">{syncResult.unmappedWorklogs} worklogs not under a mapped project</span>}
-            </div>
-            {syncResult.byPerson?.length > 0 && (
-              <div className="mt-2 border-t border-border-light pt-2">
-                <div className="text-[10px] font-semibold text-text-light uppercase tracking-wider mb-1">Hours by person</div>
-                <div className="space-y-0.5">
-                  {syncResult.byPerson.map((p) => (
-                    <div key={p.name} className="flex justify-between max-w-[280px]"><span className="text-text">{p.name}</span><span className="font-mono text-text-mid">{p.hours}h</span></div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
