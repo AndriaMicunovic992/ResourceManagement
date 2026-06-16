@@ -4,6 +4,7 @@ import { api } from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { useOrg } from '../../../../contexts/OrgContext';
 import { useData } from '../../../../contexts/DataContext';
+import { useVisibility } from '../../../../contexts/VisibilityContext';
 import EmptyState from '../../../../components/ui/EmptyState';
 import NewEvaluationModal from './NewEvaluationModal';
 import EvaluationDetail from './EvaluationDetail';
@@ -209,19 +210,10 @@ export default function PersonPerformance() {
     return `Default (${orgDefaultMonths}m)`;
   }, [orgDefaultKind, orgDefaultMonths, currentOrg]);
 
-  // Client-side manager check: is the viewing user a manager of this person?
-  const isManager = useMemo(() => {
-    if (!meResource) return false;
-    const direct = Array.isArray(resource.managerLinks)
-      ? resource.managerLinks.some(
-          (l) => (l.managerId || l.manager?.id) === meResource.id
-        )
-      : false;
-    const viaTeam = Array.isArray(resource.teams)
-      ? resource.teams.some((t) => t.managerId === meResource.id)
-      : false;
-    return direct || viaTeam;
-  }, [resource, meResource]);
+  // Is the viewing user a manager of this person? Managers are login users now,
+  // so read it from the server-computed visibility scope (direct + via teams).
+  const { managedPersonIds } = useVisibility();
+  const isManager = managedPersonIds.has(resource.id);
 
   const isSelf = meResource?.id === resource.id;
   const canView = isAdmin || isManager || isSelf;

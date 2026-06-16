@@ -6,7 +6,7 @@ import { requireRole } from '../middleware/requireRole.js';
 import { requirePermission } from '../middleware/requirePermission.js';
 import {
   assertCanViewPerson,
-  assertNoViewerResources,
+  assertManagerUsersAllowed,
 } from '../services/visibility.service.js';
 import { NotFoundError } from '../utils/errors.js';
 import { prisma } from '../db/prisma.js';
@@ -123,8 +123,8 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/resources', { preHandler: requirePermission('people', 'create') }, async (req) => {
     const data = createResourceSchema.parse(req.body);
-    if (data.directManagerIds && data.directManagerIds.length > 0) {
-      await assertNoViewerResources(req.orgId, data.directManagerIds);
+    if (data.directManagerUserIds && data.directManagerUserIds.length > 0) {
+      await assertManagerUsersAllowed(req.orgId, data.directManagerUserIds);
     }
     return resourceService.create(req.orgId, data);
   });
@@ -132,8 +132,8 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
   app.patch('/resources/:id', { preHandler: requirePermission('people', 'edit') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updateResourceSchema.parse(req.body);
-    if (data.directManagerIds && data.directManagerIds.length > 0) {
-      await assertNoViewerResources(req.orgId, data.directManagerIds);
+    if (data.directManagerUserIds && data.directManagerUserIds.length > 0) {
+      await assertManagerUsersAllowed(req.orgId, data.directManagerUserIds);
     }
     return resourceService.update(req.orgId, id, data);
   });

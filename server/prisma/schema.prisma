@@ -84,6 +84,9 @@ model User {
   // A responsible person is any org user (not necessarily a staffable Resource).
   responsibleCustomers  Customer[] @relation("CustomerResponsibleUser")
   responsibleProjects   Project[]  @relation("ProjectResponsibleUser")
+  // Likewise, a manager (of people / teams) is any org user.
+  managedTeams          Team[]          @relation("TeamManagerUser")
+  managedPeople         PersonManager[] @relation("PersonManagerUser")
 }
 
 model OrgMember {
@@ -212,9 +215,7 @@ model Resource {
   personSkills PersonSkill[]
   oneOnOnes   OneOnOne[]
   logs        Log[]
-  managedTeams Team[] @relation("TeamManager")
   managerLinks       PersonManager[] @relation("PersonSide")
-  managedPersonLinks PersonManager[] @relation("ManagerSide")
   evaluations        Evaluation[] @relation("EvaluationSubject")
   followUps     FollowUp[]
   careerEntries CareerEntry[]
@@ -237,25 +238,27 @@ model Team {
 
   resources Resource[] @relation("ResourceTeams")
 
-  managerId String?
-  manager   Resource? @relation("TeamManager", fields: [managerId], references: [id], onDelete: SetNull)
+  managerUserId String?
+  managerUser   User? @relation("TeamManagerUser", fields: [managerUserId], references: [id], onDelete: SetNull)
 
   @@unique([orgId, name])
   @@index([orgId])
-  @@index([managerId])
+  @@index([managerUserId])
 }
 
 model PersonManager {
-  personId  String
-  person    Resource @relation("PersonSide", fields: [personId], references: [id], onDelete: Cascade)
-  managerId String
-  manager   Resource @relation("ManagerSide", fields: [managerId], references: [id], onDelete: Cascade)
+  personId      String
+  person        Resource @relation("PersonSide", fields: [personId], references: [id], onDelete: Cascade)
+  // The manager is any org User (a login user), not necessarily a staffable
+  // Resource — same model as a customer/project responsible person.
+  managerUserId String
+  managerUser   User @relation("PersonManagerUser", fields: [managerUserId], references: [id], onDelete: Cascade)
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  @@id([personId, managerId])
-  @@index([managerId])
+  @@id([personId, managerUserId])
+  @@index([managerUserId])
   @@index([orgId])
 }
 

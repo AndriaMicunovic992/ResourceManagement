@@ -125,20 +125,22 @@ export const reminderService = {
     //    or via being the customer's responsible person)
     const self = scope.selfResourceId;
     let managedIds: string[] = [];
-    if (self) {
+    {
+      // Managers are keyed on the login user, so 1:1 duties follow whoever is
+      // set as manager — no need for the user to be a staffable Resource.
       const [links, teams] = await Promise.all([
         prisma.personManager.findMany({
-          where: { orgId, managerId: self },
+          where: { orgId, managerUserId: userId },
           select: { personId: true },
         }),
         prisma.team.findMany({
-          where: { orgId, managerId: self },
+          where: { orgId, managerUserId: userId },
           select: { resources: { select: { id: true } } },
         }),
       ]);
       const set = new Set<string>(links.map((l) => l.personId));
       for (const t of teams) for (const r of t.resources) set.add(r.id);
-      set.delete(self);
+      if (self) set.delete(self);
       managedIds = Array.from(set);
     }
 

@@ -3,7 +3,7 @@ import { teamService } from '../services/team.service.js';
 import { createTeamSchema, updateTeamSchema } from '../schemas/team.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { requirePermission } from '../middleware/requirePermission.js';
-import { assertNoViewerResources } from '../services/visibility.service.js';
+import { assertManagerUsersAllowed } from '../services/visibility.service.js';
 
 export const teamRoutes: FastifyPluginAsync = async (app) => {
   app.get('/teams', async (req) => {
@@ -12,14 +12,14 @@ export const teamRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/teams', { preHandler: requirePermission('teams', 'create') }, async (req) => {
     const data = createTeamSchema.parse(req.body);
-    if (data.managerId) await assertNoViewerResources(req.orgId, [data.managerId]);
+    if (data.managerUserId) await assertManagerUsersAllowed(req.orgId, [data.managerUserId]);
     return teamService.create(req.orgId, data);
   });
 
   app.patch('/teams/:id', { preHandler: requirePermission('teams', 'edit') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updateTeamSchema.parse(req.body);
-    if (data.managerId) await assertNoViewerResources(req.orgId, [data.managerId]);
+    if (data.managerUserId) await assertManagerUsersAllowed(req.orgId, [data.managerUserId]);
     return teamService.update(req.orgId, id, data);
   });
 

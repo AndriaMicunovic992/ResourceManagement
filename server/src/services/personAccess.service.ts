@@ -5,48 +5,42 @@ export function isAdminRole(role: string): boolean {
 }
 
 /**
- * Resource ids (managers) for a given person. Includes direct managers from
- * PersonManager and inherited managers from any team the person belongs to.
- * Excludes self.
+ * Login-user ids of the managers for a given person. Includes direct managers
+ * from PersonManager and inherited managers from any team the person belongs
+ * to. A manager is an org User (a member), not a Resource.
  */
-export async function getManagerResourceIds(
+export async function getManagerUserIds(
   orgId: string,
   personResourceId: string
 ): Promise<Set<string>> {
   const person = await prisma.resource.findFirst({
     where: { id: personResourceId, orgId },
     include: {
-      managerLinks: { select: { managerId: true } },
-      teams: { select: { managerId: true } },
+      managerLinks: { select: { managerUserId: true } },
+      teams: { select: { managerUserId: true } },
     },
   });
   if (!person) return new Set();
   const ids = new Set<string>();
-  for (const link of person.managerLinks) ids.add(link.managerId);
+  for (const link of person.managerLinks) ids.add(link.managerUserId);
   for (const t of person.teams) {
-    if (t.managerId) ids.add(t.managerId);
+    if (t.managerUserId) ids.add(t.managerUserId);
   }
-  ids.delete(personResourceId);
   return ids;
 }
 
 /**
  * Returns true if the requesting user (by their User.id) is a manager of the
- * given person (resourceId). Maps the user to a Resource within the org and
- * checks against getManagerResourceIds.
+ * given person (resourceId) — directly or via a team they manage. Managers are
+ * keyed on the login user, so we match the requesting user id directly.
  */
 export async function userIsManagerOf(
   orgId: string,
   requestingUserId: string,
   personResourceId: string
 ): Promise<boolean> {
-  const me = await prisma.resource.findFirst({
-    where: { orgId, userId: requestingUserId },
-    select: { id: true },
-  });
-  if (!me) return false;
-  const managerIds = await getManagerResourceIds(orgId, personResourceId);
-  return managerIds.has(me.id);
+  const managerUserIds = await getManagerUserIds(orgId, personResourceId);
+  return managerUserIds.has(requestingUserId);
 }
 
 /**

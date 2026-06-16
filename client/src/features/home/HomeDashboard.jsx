@@ -118,7 +118,7 @@ function RailRow({ to, avatar, title, meta, chip, hot }) {
 
 export default function HomeDashboard() {
   const { user } = useAuth();
-  const { selfResourceId } = useVisibility();
+  const { managedPersonIds } = useVisibility();
   const { customers, projects, resources, needs, assignments } = useData();
   const { rU, rURealised } = useComputed();
   const navigate = useNavigate();
@@ -233,18 +233,14 @@ export default function HomeDashboard() {
     finalized: ['Finalized', 'bg-success-bg text-success'],
   };
 
-  /* ----- right rail: people I personally manage (directly or via team) ----- */
-  const railPeople = useMemo(() => {
-    if (!selfResourceId) return [];
-    return resources
-      .filter(
-        (r) =>
-          r.id !== selfResourceId &&
-          ((r.managerLinks || []).some((l) => (l.managerId || l.manager?.id) === selfResourceId) ||
-            (r.teams || []).some((t) => t.managerId === selfResourceId))
-      )
-      .slice(0, 12);
-  }, [resources, selfResourceId]);
+  /* ----- right rail: people I personally manage (directly or via team) -----
+     Managers are login users now; managedPersonIds is the server-computed set
+     of people this user manages (direct links + teams they manage, self
+     excluded). */
+  const railPeople = useMemo(
+    () => resources.filter((r) => managedPersonIds.has(r.id)).slice(0, 12),
+    [resources, managedPersonIds]
+  );
 
   /* ----- PM slice: customers I'm personally responsible for ----- */
   const myUserId = user?.id;

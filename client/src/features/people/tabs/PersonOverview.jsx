@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import StatCard from '../../dashboard/stats/StatCard';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
+import { useVisibility } from '../../../contexts/VisibilityContext';
 import { orgDefaultWindow } from './performance/PersonPerformance';
 import { useComputed } from '../../../hooks/useComputed';
 import { currentMonth, addMonths, monthRange } from '../../../lib/dateUtils';
@@ -42,21 +43,13 @@ export default function PersonOverview() {
   const { assignments, needs, projects, customers, meResource } = useData();
   const { role, currentOrg } = useOrg();
   const { rURealised } = useComputed();
+  const { managedPersonIds } = useVisibility();
   const navigate = useNavigate();
   const isAdmin = role === 'admin' || role === 'owner';
 
-  const isManager = useMemo(() => {
-    if (!meResource) return false;
-    const direct = Array.isArray(resource.managerLinks)
-      ? resource.managerLinks.some(
-          (l) => (l.managerId || l.manager?.id) === meResource.id
-        )
-      : false;
-    const viaTeam = Array.isArray(resource.teams)
-      ? resource.teams.some((t) => t.managerId === meResource.id)
-      : false;
-    return direct || viaTeam;
-  }, [resource, meResource]);
+  // Managers are login users now; the server-computed visibility scope already
+  // knows who this user manages (direct + via teams), so read it from there.
+  const isManager = managedPersonIds.has(resource.id);
   const canSeePerformance = isAdmin || isManager || meResource?.id === resource.id;
 
   const [lastOneOnOne, setLastOneOnOne] = useState(null);
