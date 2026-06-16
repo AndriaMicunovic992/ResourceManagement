@@ -19,6 +19,7 @@ import { assignmentRoutes } from './assignment.routes.js';
 import { evaluationRoutes } from './evaluation.routes.js';
 import { insightsRoutes } from './insights.routes.js';
 import { taxonomyRoutes } from './taxonomy.routes.js';
+import { integrationRoutes } from './integration.routes.js';
 
 export const routes: FastifyPluginAsync = async (app) => {
   await app.register(authRoutes);
@@ -26,6 +27,7 @@ export const routes: FastifyPluginAsync = async (app) => {
   await app.register(orgRoutes);
   await app.register(roleRoutes);
   await app.register(taxonomyRoutes);
+  await app.register(integrationRoutes);
   await app.register(customerRoutes);
   await app.register(projectRoutes);
   await app.register(resourceRoutes);

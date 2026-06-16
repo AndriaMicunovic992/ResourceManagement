@@ -14,6 +14,8 @@ export const createResourceSchema = z.object({
   teamIds: z.array(z.string()).optional(),
   directManagerUserIds: z.array(z.string()).optional(),
   userId: z.string().nullable().optional(),
+  // Identifier in the external actual-hours system (e.g. Jira accountId).
+  externalWorkId: z.string().max(200).nullable().optional(),
   roles: z.array(roleSchema).min(1),
 });
 
