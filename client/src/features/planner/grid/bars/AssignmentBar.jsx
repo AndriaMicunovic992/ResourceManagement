@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, Fragment } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import AssignmentSegment from './AssignmentSegment';
 import ResizeHandle from './ResizeHandle';
 import { buildSegments } from '../../../../lib/gridUtils';
@@ -130,7 +130,7 @@ export default function AssignmentBar({ assignment, need, resource, months, over
 
   return (
     <div
-      className="absolute flex items-center group/bar"
+      className="absolute group/bar"
       style={{ left: baseStartIdx * CW, top: 0, height: BAR_H, width: baseSpanCount * CW }}
     >
       {visibleSegments.map((seg, i) => {
@@ -146,54 +146,58 @@ export default function AssignmentBar({ assignment, need, resource, months, over
         const roundLeft = (i === 0 && !clippedLeft) || gapBefore > 0;
         const roundRight = (i === visibleSegments.length - 1 && !clippedRight) || gapAfter > 0;
         const isLast = i === visibleSegments.length - 1;
+
+        // While dragging this segment's edge, render it at the previewed extent
+        // so a shrink is just as visible as a stretch (the bar follows the
+        // cursor instead of a ghost hiding inside the full-size bar).
+        const preview = resizePreview && resizePreview.segIndex === i ? resizePreview : null;
+        const showStartIdx = preview ? preview.newStartIdx : segStartIdx;
+        const showEndIdx = preview ? preview.newEndIdx : segEndIdx;
+        const left = (showStartIdx - baseStartIdx) * CW;
+        const width = (showEndIdx - showStartIdx + 1) * CW;
+
         return (
-          <Fragment key={i}>
-            {gapBefore > 0 && <div className="shrink-0 self-stretch" style={{ width: gapBefore * CW }} />}
-            <div className="relative shrink-0" style={{ height: BAR_H }}>
-              {/* A resize handle on every free edge — including the start of a
-                  second engagement after a gap. */}
-              {roundLeft && <ResizeHandle side="left" onMouseDown={startSegResize(i, 'left')} />}
-              <AssignmentSegment
-                segment={seg} resource={resource} domainColor={color}
-                barHeight={BAR_H}
-                roundLeft={roundLeft}
-                roundRight={roundRight}
-                showLabel={i === 0}
-                contLeft={contLeft}
-                contRight={contRight}
-                overloadMonths={overloadMonths}
-                totalSegments={visibleSegments.length}
-                onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}
-              />
-              {roundRight && <ResizeHandle side="right" onMouseDown={startSegResize(i, 'right')} />}
-              {isLast && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteAssignment(assignment.id); }}
-                  className="opacity-0 group-hover/bar:opacity-100 absolute -right-4 top-0 w-4 flex items-center justify-center text-[8px] text-danger bg-white/80 border-0 cursor-pointer rounded hover:bg-danger-bg transition-opacity"
-                  style={{ height: BAR_H }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </Fragment>
+          <div
+            key={i}
+            className="absolute"
+            style={{ left, top: 0, height: BAR_H, width, transition: preview ? 'none' : 'left 0.12s ease, width 0.12s ease' }}
+          >
+            {/* A resize handle on every free edge — including the start of a
+                second engagement after a gap. */}
+            {roundLeft && <ResizeHandle side="left" onMouseDown={startSegResize(i, 'left')} />}
+            <AssignmentSegment
+              segment={seg} resource={resource} domainColor={color}
+              barHeight={BAR_H}
+              roundLeft={roundLeft}
+              roundRight={roundRight}
+              showLabel={i === 0}
+              contLeft={contLeft}
+              contRight={contRight}
+              overloadMonths={overloadMonths}
+              totalSegments={visibleSegments.length}
+              onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}
+            />
+            {roundRight && <ResizeHandle side="right" onMouseDown={startSegResize(i, 'right')} />}
+            {preview && (
+              <span
+                className="absolute left-1/2 -translate-x-1/2 -top-5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap pointer-events-none shadow-sm"
+                style={{ background: color, color: '#fff' }}
+              >
+                {showEndIdx - showStartIdx + 1} mo
+              </span>
+            )}
+            {isLast && (
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteAssignment(assignment.id); }}
+                className="opacity-0 group-hover/bar:opacity-100 absolute -right-4 top-0 w-4 flex items-center justify-center text-[8px] text-danger bg-white/80 border-0 cursor-pointer rounded hover:bg-danger-bg transition-opacity"
+                style={{ height: BAR_H }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
         );
       })}
-      {/* Ghost of the new extent while dragging a segment edge. */}
-      {resizePreview && (
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            left: (resizePreview.newStartIdx - baseStartIdx) * CW,
-            width: (resizePreview.newEndIdx - resizePreview.newStartIdx + 1) * CW,
-            top: 0,
-            height: BAR_H,
-            border: `1.5px dashed ${color}`,
-            borderRadius: 12,
-            background: color + '22',
-          }}
-        />
-      )}
     </div>
   );
 }

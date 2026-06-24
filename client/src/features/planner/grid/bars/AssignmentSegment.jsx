@@ -4,7 +4,6 @@ import { CW } from '../../../../lib/constants';
 /** Hero pill segment: saturated gradient, white label, avatar inside,
  * white FTE chip. contLeft/contRight mark continuation beyond the window. */
 export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, roundLeft, roundRight, totalSegments, showLabel = false, contLeft, contRight, overloadMonths, onClickMonth }) {
-  const width = segment.months.length * CW;
   // A separator line only sits where two segments actually touch (an FTE
   // change), not where there's a gap or a free/continuation end.
   const hasLeftSeparator = !roundLeft && !contLeft && totalSegments > 1;
@@ -15,7 +14,7 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
     <div
       className="flex items-center relative"
       style={{
-        width,
+        width: '100%',
         height: barHeight,
         background: `linear-gradient(100deg, ${domainColor}, color-mix(in srgb, ${domainColor} 72%, white))`,
         borderRadius: `${rl}px ${rr}px ${rr}px ${rl}px`,
