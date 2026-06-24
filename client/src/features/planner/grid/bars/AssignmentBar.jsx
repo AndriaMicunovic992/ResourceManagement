@@ -3,6 +3,7 @@ import AssignmentSegment from './AssignmentSegment';
 import ResizeHandle from './ResizeHandle';
 import { buildSegments } from '../../../../lib/gridUtils';
 import { domainColor } from '../../../../lib/resourceUtils';
+import { monthRange } from '../../../../lib/dateUtils';
 import { CW } from '../../../../lib/constants';
 import { useData } from '../../../../contexts/DataContext';
 
@@ -30,7 +31,7 @@ export default function AssignmentBar({ assignment, need, resource, months, over
   const visibleSegments = [];
   for (const seg of segments) {
     const vis = seg.months.filter((m) => monthSet.has(m));
-    if (vis.length > 0) visibleSegments.push({ ...seg, months: vis, start: vis[0] });
+    if (vis.length > 0) visibleSegments.push({ ...seg, months: vis, start: vis[0], full: seg });
   }
   if (visibleSegments.length === 0) return null;
 
@@ -107,10 +108,22 @@ export default function AssignmentBar({ assignment, need, resource, months, over
       const { newStartIdx, newEndIdx } = resolve(uE.clientX);
       if (newStartIdx === segStartIdx && newEndIdx === segEndIdx) { setResizePreview(null); return; }
 
+      // Operate on the FULL segment (months may extend off the visible window):
+      // a clipped bar still trims/keeps its off-screen part correctly.
+      const fullMonths = seg.full.months;
+      const fullFirst = fullMonths[0];
+      const fullLast = fullMonths[fullMonths.length - 1];
       const allocs = assignment.monthAllocations || {};
       const newAllocs = { ...allocs };
-      for (let i = segStartIdx; i <= segEndIdx; i++) newAllocs[months[i]] = 0;
-      for (let i = newStartIdx; i <= newEndIdx; i++) newAllocs[months[i]] = fte;
+      if (side === 'left') {
+        const newStartMonth = months[newStartIdx];
+        for (const m of fullMonths) if (m < newStartMonth) newAllocs[m] = 0;
+        for (const m of monthRange(newStartMonth, fullLast)) newAllocs[m] = fte;
+      } else {
+        const newEndMonth = months[newEndIdx];
+        for (const m of fullMonths) if (m > newEndMonth) newAllocs[m] = 0;
+        for (const m of monthRange(fullFirst, newEndMonth)) newAllocs[m] = fte;
+      }
 
       const prevAllocs = { ...allocs };
       try {
@@ -146,6 +159,10 @@ export default function AssignmentBar({ assignment, need, resource, months, over
         const roundLeft = (i === 0 && !clippedLeft) || gapBefore > 0;
         const roundRight = (i === visibleSegments.length - 1 && !clippedRight) || gapAfter > 0;
         const isLast = i === visibleSegments.length - 1;
+        // Show a handle on free edges AND on clipped edges (a bar that runs off
+        // the window can still have its visible start/end dragged).
+        const showLeftHandle = roundLeft || contLeft;
+        const showRightHandle = roundRight || contRight;
 
         // While dragging this segment's edge, render it at the previewed extent
         // so a shrink is just as visible as a stretch (the bar follows the
@@ -163,8 +180,8 @@ export default function AssignmentBar({ assignment, need, resource, months, over
             style={{ left, top: 0, height: BAR_H, width, transition: preview ? 'none' : 'left 0.12s ease, width 0.12s ease' }}
           >
             {/* A resize handle on every free edge — including the start of a
-                second engagement after a gap. */}
-            {roundLeft && <ResizeHandle side="left" onMouseDown={startSegResize(i, 'left')} />}
+                second engagement after a gap, or an edge that runs off-window. */}
+            {showLeftHandle && <ResizeHandle side="left" onMouseDown={startSegResize(i, 'left')} />}
             <AssignmentSegment
               segment={seg} resource={resource} domainColor={color}
               barHeight={BAR_H}
@@ -177,14 +194,18 @@ export default function AssignmentBar({ assignment, need, resource, months, over
               totalSegments={visibleSegments.length}
               onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}
             />
-            {roundRight && <ResizeHandle side="right" onMouseDown={startSegResize(i, 'right')} />}
+            {showRightHandle && <ResizeHandle side="right" onMouseDown={startSegResize(i, 'right')} />}
+            {/* Duration readout sits INSIDE the bar so the row's clipping never
+                hides it (it used to float above and get cut off). */}
             {preview && (
-              <span
-                className="absolute left-1/2 -translate-x-1/2 -top-5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap pointer-events-none shadow-sm"
-                style={{ background: color, color: '#fff' }}
-              >
-                {showEndIdx - showStartIdx + 1} mo
-              </span>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                <span
+                  className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm"
+                  style={{ background: '#fff', color }}
+                >
+                  {showEndIdx - showStartIdx + 1} mo
+                </span>
+              </div>
             )}
             {isLast && (
               <button
