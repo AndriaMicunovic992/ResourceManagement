@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useMemo, useCallback, useState, useEffect, Fragment } from 'react';
 import AssignmentSegment from './AssignmentSegment';
 import ResizeHandle from './ResizeHandle';
 import { buildSegments } from '../../../../lib/gridUtils';
@@ -152,20 +152,26 @@ export default function AssignmentBar({ assignment, need, resource, months, over
   const clippedRight = allSegMonths[allSegMonths.length - 1] !== visibleMonths[visibleMonths.length - 1];
 
   const firstMonth = visibleSegments[0].start;
+  const lastSeg = visibleSegments[visibleSegments.length - 1];
+  const lastMonth = lastSeg.months[lastSeg.months.length - 1];
   const baseStartIdx = months.indexOf(firstMonth);
+  const baseEndIdx = months.indexOf(lastMonth);
   if (baseStartIdx < 0) return null;
 
-  const baseMonthCount = visibleMonths.length;
+  // Span the full extent first→last visible month INCLUDING internal gaps (a
+  // month covered by someone else), so the bar renders a real gap there instead
+  // of bridging across it. Segments sit at their true month offset in this span.
+  const baseSpanCount = baseEndIdx - baseStartIdx + 1;
 
   // Apply live resize preview offsets
   let displayStartIdx = baseStartIdx;
-  let displayMonthCount = baseMonthCount;
+  let displaySpanCount = baseSpanCount;
   if (resizePreview) {
     if (resizePreview.side === 'left') {
       displayStartIdx = baseStartIdx + resizePreview.delta;
-      displayMonthCount = baseMonthCount - resizePreview.delta;
+      displaySpanCount = baseSpanCount - resizePreview.delta;
     } else {
-      displayMonthCount = baseMonthCount + resizePreview.delta;
+      displaySpanCount = baseSpanCount + resizePreview.delta;
     }
   }
 
@@ -176,7 +182,7 @@ export default function AssignmentBar({ assignment, need, resource, months, over
         left: displayStartIdx * CW,
         top: 0,
         height: BAR_H,
-        width: displayMonthCount * CW,
+        width: displaySpanCount * CW,
         transition: resizePreview ? 'none' : 'left 0.15s, width 0.15s',
       }}
     >
@@ -189,23 +195,41 @@ export default function AssignmentBar({ assignment, need, resource, months, over
           <span className="text-[9px] font-semibold truncate" style={{ color }}>{resource.name}</span>
           <div className="flex-1" />
           <span className="text-[8px] font-mono px-0.5 rounded shrink-0"
-            style={{ backgroundColor: color + '15', color }}>{displayMonthCount}mo</span>
+            style={{ backgroundColor: color + '15', color }}>{displaySpanCount}mo</span>
         </div>
       ) : (
-        visibleSegments.map((seg, i) => (
-          <AssignmentSegment
-            key={i} segment={seg} resource={resource} domainColor={color}
-            barHeight={BAR_H}
-            isFirst={i === 0 && !clippedLeft}
-            isLast={i === visibleSegments.length - 1 && !clippedRight}
-            showLabel={i === 0}
-            contLeft={i === 0 && clippedLeft}
-            contRight={i === visibleSegments.length - 1 && clippedRight}
-            overloadMonths={overloadMonths}
-            totalSegments={visibleSegments.length}
-            onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}
-          />
-        ))
+        visibleSegments.map((seg, i) => {
+          const prevSeg = visibleSegments[i - 1];
+          const nextSeg = visibleSegments[i + 1];
+          const gapBefore = prevSeg
+            ? months.indexOf(seg.months[0]) - months.indexOf(prevSeg.months[prevSeg.months.length - 1]) - 1
+            : 0;
+          const gapAfter = nextSeg
+            ? months.indexOf(nextSeg.months[0]) - months.indexOf(seg.months[seg.months.length - 1]) - 1
+            : 0;
+          const contLeft = i === 0 && clippedLeft;
+          const contRight = i === visibleSegments.length - 1 && clippedRight;
+          // A free (rounded) end: the bar's outer edge, or a side facing a gap.
+          const roundLeft = (i === 0 && !clippedLeft) || gapBefore > 0;
+          const roundRight = (i === visibleSegments.length - 1 && !clippedRight) || gapAfter > 0;
+          return (
+            <Fragment key={i}>
+              {gapBefore > 0 && <div className="shrink-0 self-stretch" style={{ width: gapBefore * CW }} />}
+              <AssignmentSegment
+                segment={seg} resource={resource} domainColor={color}
+                barHeight={BAR_H}
+                roundLeft={roundLeft}
+                roundRight={roundRight}
+                showLabel={i === 0}
+                contLeft={contLeft}
+                contRight={contRight}
+                overloadMonths={overloadMonths}
+                totalSegments={visibleSegments.length}
+                onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}
+              />
+            </Fragment>
+          );
+        })
       )}
       <ResizeHandle side="right" onMouseDown={handleResize('right')} />
       {!resizePreview && (

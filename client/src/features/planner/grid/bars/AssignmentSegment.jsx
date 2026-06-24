@@ -3,9 +3,13 @@ import { CW } from '../../../../lib/constants';
 
 /** Hero pill segment: saturated gradient, white label, avatar inside,
  * white FTE chip. contLeft/contRight mark continuation beyond the window. */
-export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, isFirst, isLast, totalSegments, showLabel = isFirst, contLeft, contRight, overloadMonths, onClickMonth }) {
+export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, roundLeft, roundRight, totalSegments, showLabel = false, contLeft, contRight, overloadMonths, onClickMonth }) {
   const width = segment.months.length * CW;
-  const hasLeftSeparator = !isFirst && totalSegments > 1 && !contLeft;
+  // A separator line only sits where two segments actually touch (an FTE
+  // change), not where there's a gap or a free/continuation end.
+  const hasLeftSeparator = !roundLeft && !contLeft && totalSegments > 1;
+  const rl = roundLeft ? 999 : contLeft ? 8 : 0;
+  const rr = roundRight ? 999 : contRight ? 8 : 0;
 
   return (
     <div
@@ -14,16 +18,7 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
         width,
         height: barHeight,
         background: `linear-gradient(100deg, ${domainColor}, color-mix(in srgb, ${domainColor} 72%, white))`,
-        borderRadius:
-          isFirst && isLast
-            ? 999
-            : isFirst
-              ? '999px 0 0 999px'
-              : isLast
-                ? `${contLeft ? '8px' : '0'} 999px 999px ${contLeft ? '8px' : '0'}`
-                : contLeft
-                  ? '8px 0 0 8px'
-                  : 0,
+        borderRadius: `${rl}px ${rr}px ${rr}px ${rl}px`,
         boxShadow: `0 5px 12px -3px ${domainColor}99`,
       }}
     >
