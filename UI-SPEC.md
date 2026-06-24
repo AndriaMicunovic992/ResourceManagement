@@ -87,10 +87,14 @@ Organization (tenant boundary)
 └── Resource
     ├── name: string
     ├── capacity: number (0.1–1.0 FTE)
+    ├── userId: string?            // optional link to a login User (self-service)
+    ├── externalWorkId: string?    // Jira accountId when matched for actual-hours sync
     └── roles: [{ domain, role, seniority }]  // a resource can have multiple roles
 ```
 
 Seniority short forms (for compact display): `Junior→Jr`, `Medior→Mid`, `Senior→Sr`, `Senior Principal→SP`.
+
+**Integration models (actual hours).** `JiraConnection` (per-org Jira/Tempo config, **encrypted** tokens), `JiraAccount` (cached Jira users for the matching dropdown), `JiraWorkItem` (Jira epic/project → customer/project mapping), and `Worklog` (one synced Tempo entry → resolved `{ resourceId?, customerId?, projectId? }`, `month: "YYYY-MM"`, `seconds`). A person is "matched" once `Resource.externalWorkId` is set. See `CLAUDE.md` → *Data model notes* for the read endpoints.
 
 ### Key Computed Values
 
@@ -553,10 +557,11 @@ Accessible to owners and admins:
 
 ### Planner: Place a resource on a need
 
-1. User clicks a resource card in the pool → it becomes "held" (highlighted, banner appears)
-2. User clicks a cell in a need row → FTE popover opens at that position
-3. User enters FTE and confirms → assignment is created/updated, bar appears
-4. User can keep placing the same resource on other cells, or click "Deselect" / click the same resource again to stop
+1. User clicks a resource card in the pool → it becomes "held" (highlighted banner appears). Cells in needs the held person can't fill (domain/role/seniority mismatch via `resourceMatchesNeed`) aren't placeable.
+2. User clicks a cell in a matching need row → the person is **auto-filled** into that need's still-open months (capacity- and gap-aware, `buildAutoFill`) — no popover. If the person is **already** on the need for some months, the click **extends** them into the remaining open months instead of doing nothing (only positive fills are applied, so existing months and anyone else's are never overwritten).
+3. The person keeps placing on other needs, or clicks "Deselect" / the same resource again to stop. (Dragging across a need's cells "paints" a custom range instead of auto-filling.)
+
+> With **no** held resource, clicking a cell opens the FTE popover to edit that need's per-month requirement.
 
 ### Planner: Edit existing assignment
 
@@ -566,10 +571,12 @@ Accessible to owners and admins:
 
 ### Planner: Resize a bar
 
-1. User presses mouse on the left or right edge handle of a bar
-2. User drags horizontally → bar extends/contracts month by month
-3. New months get the reference FTE (the original FTE of the bar segment); removed months are set to 0
-4. Mouse up → assignment is saved
+Resize is **per-segment**: every free edge has its own handle — the bar's outer ends, the start of a second engagement after a gap, **and** an edge that runs off the visible window (shown with a `‹`/`›` continuation marker).
+
+1. User presses an edge handle of a segment.
+2. User drags horizontally → that segment **follows the cursor live** (grows or shrinks; a small "N mo" badge inside the bar shows the resulting duration). It can extend into adjacent months that still have room (and belong to the need) but never crosses the neighbouring segment or a month someone else fills.
+3. New months get the segment's FTE; removed months are set to 0. For a clipped (off-window) edge the drag operates on the **full** segment, so trimming the visible start removes the hidden off-screen months too.
+4. Mouse up → assignment is saved (undoable).
 
 ### Planner: Delete an assignment
 
@@ -607,9 +614,27 @@ Accessible to owners and admins:
 
 ---
 
+## Actual Hours, Cockpits & Plan-vs-Actual (Tempo/Jira)
+
+The app pulls **actual logged hours** from Tempo/Jira to compare against the plan.
+
+- **Settings → Integrations.** Admins connect Jira/Tempo (tokens stored encrypted, never echoed back), map Jira projects/epics → customers/projects, and **match people**: each person's `externalWorkId` is set to their Jira `accountId` via a searchable dropdown. A nightly/manual sync pulls Tempo worklogs (by created/updated date so edits update in place, not duplicate) into per-month actual hours per person/customer/project.
+- **Planned vs actual chart** (`PlannedVsActualChart`): grouped monthly bars, planned (teal) vs actual (green). Planned FTE converts to hours via `MONTHLY_HOURS_PER_FTE` (≈173.33). It appears on the home dashboard utilization view and inside both cockpits, and runs a few months into the **future** so the plan ahead is visible.
+- **Dashboard utilization.** The actual line and the "Actual vs potential" KPI count **only matched people** (`externalWorkId` set), divided by *matched* capacity, so the rate isn't diluted by people not yet tracked. When no actuals are synced, the KPI falls back to realised-plan utilization.
+- **Insights heatmaps (Client Staffing, People Capacity) are plan-only** — actuals live on the cockpit charts, not the heatmaps.
+
+### Cockpits (1:1 review & PM review)
+
+Both cockpits share a **general-first, click-to-filter** shape:
+
+1. The **general** section is filled first (the 1:1 meeting recap; the whole-customer recap).
+2. The per-item cards — **per-project** in the 1:1, **per-person** in the PM review — render **greyed/de-emphasised until clicked**.
+3. Clicking a card **focuses** it (full opacity + ring, with an "unfocus" affordance) and **filters the right-hand context** — recent entries, client signals, and the planned-vs-actual chart — down to that project's **customer** (1:1) or that **person** (PM review). A chip shows the active filter and clears it.
+
 ## Notes on Behavior
 
 - **Same resource on same need = one assignment.** When placing, if an assignment already exists for that resource+need combo, update the existing one's `monthAllocations[month]` rather than creating a duplicate. This is enforced at the database level via a unique constraint.
+- **Bars render real gaps.** A person who works a need, stops for a month (covered by someone else), then returns shows as **two separate rounded pills with a gap** — never one bar bridged across the empty month. Each gap-separated run is independently resizable.
 - **Bars only render for months with FTE > 0.** If a month has 0 FTE, it's not part of the bar. This is why segments exist — a bar can have "holes".
 - **Potential items affect the UI but not realised stats.** Dashboard "Realised Utilization" excludes assignments whose need/project/customer chain contains any potential item. But the full `rU` is still shown in the planner, just with the potential items in reduced opacity.
 - **Time aggregation (M/Q/Y) changes the grid's column granularity.** In quarter mode, each column represents 3 months and the filled/needed display averages across those months. Bars still track per-month data internally.

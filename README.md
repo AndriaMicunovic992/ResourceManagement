@@ -8,12 +8,14 @@ It began as a Gantt-style resource planner — a timeline grid where you assign 
 
 ## Features
 
-- **Planner** — a month-by-month timeline grid. Allocate people (resources) to project *needs* with per-month FTE, drag to resize allocations, and watch coverage roll up green from cell → need → project → customer.
-- **Dashboard** — utilization stats, free-capacity view, and heatmaps for clients, resources, and performance.
+- **Planner** — a month-by-month timeline grid. Allocate people (resources) to project *needs* with per-month FTE, drag to resize allocations (per-segment, with real gaps when someone else covers a month), and watch coverage roll up green from cell → need → project → customer.
+- **Dashboard & Insights** — utilization stats (planned · actual · potential), free-capacity view, and heatmaps for clients and people.
 - **People** — per-person pages with tabs for overview, allocation, skills, 1:1 meetings, activity log, and performance.
 - **Customers** — customer detail pages with access-gated tabs (overview, projects, people, activity, performance).
+- **1:1 & PM-review cockpits** — focused review surfaces: fill the general recap, then click a project/person to filter the recent activity, signals, and planned-vs-actual chart to it.
 - **Skills** — an org-wide skills matrix and per-person skill levels.
 - **Performance** — an evaluation workflow (draft → employee/responsible submit → finalize) with immutable category snapshots and weighted scoring.
+- **Jira/Tempo integration** — sync **actual logged hours** and compare them against the plan (planned-vs-actual charts on the dashboard and in the cockpits). People are matched to Jira accounts; tokens are stored encrypted.
 - **Multi-tenant & role-aware** — every record is scoped to an organization; four roles (owner / admin / member / viewer) control what each user can see and edit.
 
 ---
@@ -149,15 +151,17 @@ All entities are scoped to an `Organization`.
 ```
 Organization
  ├── Customer ──► Project ──► Need ──► Assignment ──► Resource (person)
- ├── Resource (people, with ResourceRole[] = Domain/Role/Seniority)
- ├── Team, PersonManager        # org structure & management graph
- ├── Skill / PersonSkill        # skills matrix
- ├── OneOnOne, Log              # 1:1 notes & activity/performance journal
- └── Evaluation                 # review workflow with category snapshots & scores
+ ├── Resource (people, with ResourceRole[] = Domain/Role/Seniority; optional login + Jira match)
+ ├── Team, PersonManager                  # org structure & management graph
+ ├── Skill / PersonSkill                   # skills matrix
+ ├── OneOnOne, Log, CustomerReview, …      # 1:1 notes, activity/review journal
+ ├── Evaluation                            # review workflow with category snapshots & scores
+ └── JiraConnection, JiraAccount, Worklog  # Jira/Tempo integration & synced actual hours
 ```
 
-- **Needs** and **Assignments** store per-month FTE as a JSON map keyed by `"YYYY-MM"` (e.g. `{ "2026-04": 0.5, "2026-05": 1.0 }`).
+- **Needs** and **Assignments** store per-month FTE as a JSON map keyed by `"YYYY-MM"` (e.g. `{ "2026-04": 0.5, "2026-05": 1.0 }`). One Assignment per `(need, resource)`.
 - **Roles** are a three-level system: **Domain** (Data / Web / General) → **Role** (FE, BE, PM, …) → **Seniority** (Junior / Medior / Senior / Senior Principal).
+- **Actual hours**: `Worklog` rows (synced from Tempo) hold per-month logged hours per person/customer/project; a person is matched when `Resource.externalWorkId` holds their Jira account id.
 
 ---
 

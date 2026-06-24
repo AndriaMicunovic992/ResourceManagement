@@ -684,13 +684,26 @@ PATCH  /api/needs/:id
 DELETE /api/needs/:id
 
 GET    /api/assignments
-POST   /api/assignments               # Upsert: { needId, resourceId, month, fte }
+POST   /api/assignments               # Upsert+merge: { needId, resourceId, (month|months[]|monthAllocations{}), fte }
+PATCH  /api/assignments/:id
 DELETE /api/assignments/:id
 
 # Dashboard
 GET    /api/dashboard/stats           # Aggregated KPIs for current org
 GET    /api/dashboard/heatmap         # Per-resource utilization by month
+
+# Integrations — Jira/Tempo (admin to configure; actuals reads are visibility-scoped)
+GET/PUT /api/integration/jira         # Connection config (tokens never returned)
+POST   /api/integration/jira/test | /refresh | /jira/accounts
+POST   /api/integration/tempo/sync    # Pull Tempo worklogs → actual hours
+GET    /api/integration/tempo/actuals[/monthly | /monthly-by-customer
+        | /resource-by-customer | /customer-by-resource]
 ```
+
+> This lists the **core** routes only. People-management & integration features add many more
+> (`/people/:id/{logs,oneonones,career,followups,evaluations}`, `/customers/:id/{reviews,signals,activity}`,
+> `/me/*`, `/log-categories`, `/roles`, …). The **routes directory is the source of truth**:
+> `server/src/routes/*.routes.ts` (and the flat `api` object in `client/src/lib/api.js`).
 
 ### Tenant Isolation Tests (Critical)
 
@@ -1575,18 +1588,29 @@ The following features must be implemented (full details in `UI-SPEC.md`):
 - **Row hierarchy**: Customer → Project → Need → (empty project placeholder)
 - **Click-to-place**: select resource → click grid cell → FTE popover → set allocation
 - **Same resource, same need**: updates existing assignment (no duplicates), different FTE per month shown as connected segmented bars
-- **Segmented bars**: rounded capsule shape, avatar circles, FTE badge per segment, drag-resize edges
+- **Segmented bars**: rounded capsule shape, avatar circles, FTE badge per segment. A break in a person's allocation (a month someone else covers) renders as a **real gap between two pills**, never a bridged bar (`buildSegments`).
+- **Per-segment resize**: every free edge has its own handle (outer ends, the start of a post-gap segment, **and** an off-window/clipped edge). Dragging previews live with an "N mo" badge and operates on the full segment (incl. off-screen months).
 - **Green cascade**: filled cells → filled needs → filled projects → filled customers → filled columns
 - **Status field**: "realised" / "potential" on customers, projects, needs — potential shown with orange badges, reduced opacity
 - **FTE popover**: number input with max cap, Enter to confirm, Escape to cancel
 
-### Dashboard Tab
-- **Stats cards**: Active Projects, Team Size, Realised Utilization %, Unfilled Slots
-- **Sub-tabs**: Client Overview | Resource Capacity
-- **Client heatmap**: customer/project rows with staffing % per month, collapsible, assigned team chips
-- **Resource heatmap**: utilization % per month per resource, avg utilization next to name, clickable → profile modal
+### Dashboard Tab (home `/` + Insights `/dashboard`)
+- **Home stats cards**: Active Projects, "Actual vs potential" (or Realised Utilization fallback), Unfilled Slots, By-domain donut
+- **Utilization chart**: planned · actual · potential lines over the year. The **actual** line counts only Jira-**matched** people (`externalWorkId`) over matched capacity.
+- **"Your people" rail**: people you manage, falling back to the org's people for admins who manage no one
+- **Insights sub-tabs**: Client Overview | People Capacity | Free Capacity — the Client-Staffing and People-Capacity heatmaps are **plan-only** (actuals live on the cockpit charts)
 - **Resource profile modal**: avatar, roles, monthly utilization bars, assigned-to list grouped by customer/project with engagement time ranges
 - **Color thresholds**: ≥80% green, 50-79% orange, <50% red
+
+### People, customers & cockpits
+- **People**: list + per-person detail (overview, allocation, skills, activity journal, **1:1s**, performance/evaluations). Admins can delete a person from the edit dialog.
+- **1:1 cockpit** & **PM review cockpit**: both lead with a **general** recap; per-project (1:1) / per-person (PM) cards are **greyed until clicked**, and clicking one **focuses** it and filters the right-hand context (recent entries, signals, planned-vs-actual chart) to that customer / person.
+- **Evaluations**: `draft → submitted → finalized` with snapshotted categories; whole-customer (`resourceId: null`) review entries roll into everyone on the customer.
+
+### Integrations & actual hours (Settings → Integrations)
+- Connect Jira/Tempo (encrypted tokens), map Jira projects/epics → customers/projects, and **match people** (`Resource.externalWorkId` = Jira accountId).
+- Sync pulls Tempo worklogs → `Worklog` rows (idempotent by `tempoWorklogId`), aggregated into monthly **actual hours** per person/customer/project.
+- Actual hours feed the **planned-vs-actual** charts (cockpits + dashboard). Endpoints: `GET /integration/tempo/actuals[/monthly | /monthly-by-customer | /resource-by-customer | /customer-by-resource]` (all visibility-scoped). FTE→hours via `MONTHLY_HOURS_PER_FTE`.
 
 ### Design Language
 - Primary color: `#4CBAD4` (sky blue)
@@ -1601,12 +1625,16 @@ The following features must be implemented (full details in `UI-SPEC.md`):
 ### Data Model
 ```
 Organization (tenant boundary)
-  └── Customer (name, status)
-        └── Project (name, startMonth, endMonth, status)
+  └── Customer (name, status, responsibleUserId?)
+        └── Project (name, startMonth, endMonth, status, responsibleUserId?)
               └── Need (domain, role, seniority, label, startMonth, endMonth, monthAllocations{}, status)
-                    └── Assignment (resourceId, monthAllocations{})
-  └── Resource (name, capacity, roles[{domain, role, seniority}])
+                    └── Assignment (resourceId, monthAllocations{})   // @@unique([needId, resourceId])
+  └── Resource (name, capacity, roles[{domain, role, seniority}], userId?, externalWorkId?)
+  └── (people-mgmt) OneOnOne, Log, FollowUp, CareerEntry, ClientSignal, CustomerReview,
+        Evaluation (+ category snapshots), Role/permission matrix, Invite
+  └── (integrations) JiraConnection (encrypted tokens), JiraAccount, JiraWorkItem, Worklog
 ```
+`Resource.externalWorkId` = Jira accountId (set when "matched"); `Resource.userId` = optional login link. Per-month FTE in `monthAllocations` is keyed by `"YYYY-MM"`. Full schema: `server/prisma/schema.prisma`; conventions in `CLAUDE.md`.
 
 ### Role System
 | Domain  | Roles |
