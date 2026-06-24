@@ -6,7 +6,7 @@ export default function HeldResourceBanner({ resource, onDeselect }) {
   const color = domainColor(resourcePrimaryDomain(resource));
 
   return (
-    <div className="mx-3 mb-3 p-3 rounded-xl border-2 border-primary"
+    <div className="m-3 p-3 rounded-xl border-2 border-primary"
       style={{ background: 'linear-gradient(135deg, #E0F4FA, white)' }}>
       <div className="flex items-center gap-2.5 mb-2">
         <Avatar name={resource.name} color={color} size={36} />
