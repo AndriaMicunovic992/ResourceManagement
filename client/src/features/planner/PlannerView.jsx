@@ -130,14 +130,36 @@ export default function PlannerView() {
 
   const handleCellClick = useCallback((need, month, periodMonths, e) => {
     if (heldResource) {
-      // Already assigned — use resize handles to adjust
       const existing = assignments.find((a) => a.needId === need.id && a.resourceId === heldResource.id);
-      if (existing) return;
 
+      // Auto-fill the still-open months of this need with the held person.
       const monthAllocations = buildAutoFill(need, heldResource, assignments);
       if (!monthAllocations) return;
 
       const heldName = heldResource.name;
+
+      if (existing) {
+        // The person is already on this need for some months (e.g. earlier in
+        // the year, before someone else covered a gap). Extend them into the
+        // remaining open months instead of doing nothing — apply only the
+        // positive fills so their existing months are never wiped.
+        const additions = {};
+        for (const [m, fte] of Object.entries(monthAllocations)) {
+          if (fte > 0) additions[m] = fte;
+        }
+        if (Object.keys(additions).length === 0) return;
+        const undoAllocs = {};
+        for (const m of Object.keys(additions)) undoAllocs[m] = 0;
+        Promise.resolve(
+          upsertAssignment({ needId: need.id, resourceId: heldResource.id, monthAllocations: additions })
+        ).then(() => {
+          pushUndo(`Assigned ${heldName}`, () =>
+            upsertAssignment({ needId: need.id, resourceId: heldResource.id, monthAllocations: undoAllocs })
+          );
+        });
+        return;
+      }
+
       Promise.resolve(
         upsertAssignment({ needId: need.id, resourceId: heldResource.id, monthAllocations })
       ).then((created) => {
