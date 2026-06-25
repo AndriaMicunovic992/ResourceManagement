@@ -88,6 +88,7 @@ interface ConnectionInput {
   baseUrl?: string | null;
   jiraEmail?: string | null;
   enabled?: boolean;
+  autoSyncEnabled?: boolean;
   jiraApiToken?: TokenInput;
   tempoApiToken?: TokenInput;
 }
@@ -105,6 +106,10 @@ function maskConnection(c: {
   jiraApiToken: string | null;
   tempoApiToken: string | null;
   worklogSyncedAt?: Date | null;
+  autoSyncEnabled?: boolean;
+  lastAutoSyncAt?: Date | null;
+  lastAutoSyncStatus?: string | null;
+  lastAutoSyncError?: string | null;
 } | null) {
   return {
     baseUrl: c?.baseUrl ?? '',
@@ -113,6 +118,10 @@ function maskConnection(c: {
     jiraApiTokenSet: !!c?.jiraApiToken,
     tempoApiTokenSet: !!c?.tempoApiToken,
     worklogSyncedAt: c?.worklogSyncedAt ? c.worklogSyncedAt.toISOString() : null,
+    autoSyncEnabled: c?.autoSyncEnabled ?? true,
+    lastAutoSyncAt: c?.lastAutoSyncAt ? c.lastAutoSyncAt.toISOString() : null,
+    lastAutoSyncStatus: c?.lastAutoSyncStatus ?? null,
+    lastAutoSyncError: c?.lastAutoSyncError ?? null,
   };
 }
 
@@ -403,6 +412,9 @@ export const integrationService = {
   async saveConnection(orgId: string, data: ConnectionInput) {
     const jira = tokenPatch(data.jiraApiToken);
     const tempo = tokenPatch(data.tempoApiToken);
+    // Leave autoSyncEnabled untouched when the caller omits it (create defaults
+    // to true via the schema).
+    const autoSync = data.autoSyncEnabled !== undefined ? { autoSyncEnabled: data.autoSyncEnabled } : {};
     const base = {
       baseUrl: data.baseUrl ?? null,
       jiraEmail: data.jiraEmail ?? null,
@@ -413,11 +425,13 @@ export const integrationService = {
       create: {
         orgId,
         ...base,
+        ...autoSync,
         jiraApiToken: jira === undefined ? null : jira,
         tempoApiToken: tempo === undefined ? null : tempo,
       },
       update: {
         ...base,
+        ...autoSync,
         ...(jira !== undefined ? { jiraApiToken: jira } : {}),
         ...(tempo !== undefined ? { tempoApiToken: tempo } : {}),
       },

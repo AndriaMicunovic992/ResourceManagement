@@ -741,6 +741,14 @@ model JiraConnection {
   enabled       Boolean  @default(false)
   // Last time worklogs were pulled — the cursor for nightly delta loads.
   worklogSyncedAt DateTime?
+  // Nightly automatic sync. On by default for an enabled connection; the manual
+  // "Sync now" button works regardless. The fields below record the last
+  // scheduled run so the in-process scheduler is idempotent and the UI can show
+  // status (they are NOT touched by manual syncs — that's worklogSyncedAt).
+  autoSyncEnabled   Boolean   @default(true)
+  lastAutoSyncAt    DateTime?
+  lastAutoSyncStatus String?  // "ok" | "error"
+  lastAutoSyncError String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

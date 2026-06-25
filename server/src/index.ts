@@ -11,6 +11,7 @@ import authPlugin from './plugins/auth.js';
 import errorPlugin from './plugins/errorHandler.js';
 import { routes } from './routes/index.js';
 import { prisma } from './db/prisma.js';
+import { startScheduler } from './services/scheduler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -53,6 +54,10 @@ async function start() {
   const port = parseInt(process.env.PORT || '3000', 10);
   await app.listen({ port, host: '0.0.0.0' });
 
+  // Background scheduler (daily Jira/Tempo auto-sync). Started after listen so a
+  // scheduler hiccup can't keep the server from coming up.
+  const stopScheduler = startScheduler(app.log);
+
   // Graceful shutdown: drain in-flight requests and close the DB pool so the
   // platform (e.g. Railway sending SIGTERM on redeploy) doesn't kill us mid-query.
   let shuttingDown = false;
@@ -61,6 +66,7 @@ async function start() {
     shuttingDown = true;
     app.log.info(`Received ${signal}, shutting down...`);
     try {
+      stopScheduler();
       await app.close();
       await prisma.$disconnect();
       process.exit(0);
