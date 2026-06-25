@@ -24,6 +24,12 @@ model Organization {
   pmLogReminderEvery    Int?
   pmLogReminderUnit     String?
   pmLogReminderStart    String?
+  // Push the in-app reminders into Microsoft Teams as private DMs (per person).
+  // Off by default; only takes effect when the bot is also configured (config.teams).
+  teamsRemindersEnabled Boolean @default(false)
+  // Comma-separated subset of reminder types to push (oneOnOne,pmUpdate,clientSignal).
+  // Null/empty = all types.
+  teamsReminderTypes    String?
   performanceTrendDefaultFrom String?
   performanceTrendDefaultTo   String?
   createdAt       DateTime @default(now())
@@ -94,6 +100,25 @@ model User {
   // Likewise, a manager (of people / teams) is any org user.
   managedTeams          Team[]          @relation("TeamManagerUser")
   managedPeople         PersonManager[] @relation("PersonManagerUser")
+  teamsLink             TeamsUserLink?  @relation("UserTeamsLink")
+}
+
+// Per-user Microsoft Teams link. Captured when the bot is installed for a person:
+// the bot receives an activity carrying their conversation reference, which we
+// persist so we can later DM them proactively. Matched to a User via the Entra
+// object id we already store on User.microsoftId.
+model TeamsUserLink {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation("UserTeamsLink", fields: [userId], references: [id], onDelete: Cascade)
+  aadObjectId     String?   // Entra object id from the bot activity (matches User.microsoftId)
+  serviceUrl      String    // Bot Framework service URL for this user's channel
+  conversationRef Json      // serialized ConversationReference for proactive sends
+  lastSentAt      DateTime? // last reminder DM we pushed — for daily de-dupe
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([aadObjectId])
 }
 
 model OrgMember {
