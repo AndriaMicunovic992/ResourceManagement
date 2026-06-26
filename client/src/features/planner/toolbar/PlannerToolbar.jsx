@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Button from '../../../components/ui/Button';
 import TimeRangePicker from './TimeRangePicker';
-import AggregationToggle from './AggregationToggle';
 import CustomerForm from '../../../components/forms/CustomerForm';
 import { useData } from '../../../contexts/DataContext';
 import { useOrg } from '../../../contexts/OrgContext';
@@ -16,7 +15,7 @@ const SORT_OPTIONS = [
   { value: 'oldest', label: 'Oldest' },
 ];
 
-export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregation, onAggregationChange, showUnassignedOnly, onToggleUnassigned, customerSort, onCustomerSortChange, filterIds, onFilterChange, resourceFilterIds, onResourceFilterChange, myProjectsOnly, onToggleMyProjects }) {
+export default function PlannerToolbar({ timeRange, onTimeRangeChange, showUnassignedOnly, onToggleUnassigned, customerSort, onCustomerSortChange, filterIds, onFilterChange, resourceFilterIds, onResourceFilterChange, myProjectsOnly, onToggleMyProjects }) {
   const { customers, addCustomer } = useData();
   const { canEdit, currentOrg } = useOrg();
   const [showCustomerForm, setShowCustomerForm] = useState(false);
@@ -24,7 +23,6 @@ export default function PlannerToolbar({ timeRange, onTimeRangeChange, aggregati
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border-light bg-white shrink-0 relative z-40">
       <div className="flex items-center gap-2 p-1 rounded-xl bg-[#FAFBFD] border border-border-light">
-        <AggregationToggle value={aggregation} onChange={onAggregationChange} />
         <TimeRangePicker timeRange={timeRange} onChange={onTimeRangeChange}
           minDate={currentOrg?.minPlanningDate} maxDate={currentOrg?.maxPlanningDate} />
       </div>
