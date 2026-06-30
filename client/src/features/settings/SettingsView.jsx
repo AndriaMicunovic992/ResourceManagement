@@ -120,6 +120,19 @@ export default function SettingsView() {
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderSuccess, setReminderSuccess] = useState(false);
 
+  // Microsoft Teams reminder delivery (per-org). Empty type filter = all types.
+  const parseTeamsTypes = (csv) => {
+    const all = { oneOnOne: true, pmUpdate: true, clientSignal: true };
+    if (!csv || !csv.trim()) return all;
+    const set = new Set(csv.split(',').map((s) => s.trim()));
+    return { oneOnOne: set.has('oneOnOne'), pmUpdate: set.has('pmUpdate'), clientSignal: set.has('clientSignal') };
+  };
+  const [teamsEnabled, setTeamsEnabled] = useState(!!currentOrg?.teamsRemindersEnabled);
+  const [teamsTypes, setTeamsTypes] = useState(() => parseTeamsTypes(currentOrg?.teamsReminderTypes));
+  const [teamsSaving, setTeamsSaving] = useState(false);
+  const [teamsSuccess, setTeamsSuccess] = useState(false);
+  const [teamsBotConfigured, setTeamsBotConfigured] = useState(null);
+
   useEffect(() => {
     setMinDate(currentOrg?.minPlanningDate || '');
     setMaxDate(currentOrg?.maxPlanningDate || '');
@@ -129,8 +142,15 @@ export default function SettingsView() {
     setPerfTrendTo(currentOrg?.performanceTrendDefaultTo || '');
     setOneOnOneSched(scheduleFromOrg(currentOrg, 'oneOnOneReminder'));
     setPmLogSched(scheduleFromOrg(currentOrg, 'pmLogReminder'));
+    setTeamsEnabled(!!currentOrg?.teamsRemindersEnabled);
+    setTeamsTypes(parseTeamsTypes(currentOrg?.teamsReminderTypes));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrg]);
+
+  // Is the Teams bot configured on the server? (admin-only endpoint)
+  useEffect(() => {
+    api.getTeamsStatus().then((s) => setTeamsBotConfigured(!!s.botConfigured)).catch(() => setTeamsBotConfigured(false));
+  }, []);
 
   const handleSaveReminders = async () => {
     setReminderSaving(true);
@@ -152,6 +172,22 @@ export default function SettingsView() {
       setError(err.message || 'Failed to save reminder settings');
     }
     setReminderSaving(false);
+  };
+
+  const handleSaveTeams = async () => {
+    setTeamsSaving(true);
+    setTeamsSuccess(false);
+    // All or none selected = "all" (null); a partial pick stores the subset.
+    const keys = ['oneOnOne', 'pmUpdate', 'clientSignal'].filter((k) => teamsTypes[k]);
+    const typesCsv = keys.length === 0 || keys.length === 3 ? null : keys.join(',');
+    try {
+      await updateOrg({ teamsRemindersEnabled: teamsEnabled, teamsReminderTypes: typesCsv });
+      setTeamsSuccess(true);
+      setTimeout(() => setTeamsSuccess(false), 2000);
+    } catch (err) {
+      setError(err.message || 'Failed to save Teams settings');
+    }
+    setTeamsSaving(false);
   };
 
   const handleSaveDates = async () => {
@@ -518,6 +554,7 @@ export default function SettingsView() {
       ? [
           { id: 'planning', label: 'Planning range' },
           { id: 'reminders', label: 'Reminders' },
+          { id: 'msteams', label: 'Microsoft Teams' },
           { id: 'trend', label: 'Performance trend' },
           { id: 'teams', label: 'Teams' },
           { id: 'taxonomy', label: 'Roles taxonomy' },
@@ -693,6 +730,55 @@ export default function SettingsView() {
                 {reminderSaving ? 'Saving...' : reminderSuccess ? 'Saved!' : 'Save'}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div id="msteams" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-3">Microsoft Teams</h3>
+          <p className="text-[10px] text-text-light mb-3">
+            Also deliver the reminders above as private Microsoft Teams messages. Each person is
+            DM'd once a day when they have something open. Requires the Teams bot to be connected on
+            the server.
+          </p>
+          {teamsBotConfigured === false && (
+            <div className="text-[10px] text-warning bg-warning/10 p-2 rounded mb-3">
+              The Teams bot isn't connected on the server yet. You can set your preferences now —
+              messages start sending once an admin finishes the bot setup.
+            </div>
+          )}
+          {teamsBotConfigured === true && (
+            <div className="text-[10px] text-success bg-success-bg p-2 rounded mb-3">Teams bot connected.</div>
+          )}
+          <label className="flex items-center gap-2 text-xs text-text-mid cursor-pointer mb-3">
+            <input type="checkbox" checked={teamsEnabled} onChange={(e) => setTeamsEnabled(e.target.checked)} />
+            Send reminders to Microsoft Teams
+          </label>
+          <div className={teamsEnabled ? '' : 'opacity-50 pointer-events-none'}>
+            <div className="text-[10px] font-semibold text-text-mid mb-1">Which reminders to send</div>
+            <div className="flex flex-wrap gap-4 mb-1">
+              {[
+                { key: 'oneOnOne', label: '1:1 overdue' },
+                { key: 'pmUpdate', label: 'PM update due' },
+                { key: 'clientSignal', label: 'Client signal missing' },
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-1.5 text-xs text-text-mid cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={teamsTypes[key]}
+                    onChange={(e) => setTeamsTypes((t) => ({ ...t, [key]: e.target.checked }))}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <div className="text-[10px] text-text-light">All types are sent unless you pick a subset.</div>
+          </div>
+          <div className="flex justify-end mt-3">
+            <Button onClick={handleSaveTeams} disabled={teamsSaving}>
+              {teamsSaving ? 'Saving...' : teamsSuccess ? 'Saved!' : 'Save'}
+            </Button>
           </div>
         </div>
       )}

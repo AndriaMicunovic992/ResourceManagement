@@ -29,6 +29,9 @@ export const updateOrgSchema = z
     pmLogReminderEvery: z.number().int().min(1).max(365).nullable().optional(),
     pmLogReminderUnit: z.enum(['daily', 'weekly', 'monthly']).nullable().optional(),
     pmLogReminderStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    teamsRemindersEnabled: z.boolean().optional(),
+    // Comma-separated subset of oneOnOne,pmUpdate,clientSignal (empty = all).
+    teamsReminderTypes: z.string().max(200).nullable().optional(),
   })
   .strict();
 

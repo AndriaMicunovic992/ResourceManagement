@@ -87,7 +87,9 @@ export default function PlannerView() {
   }, [handleUndo]);
   const [popover, setPopover] = useState(null);
   const [timeRange, setTimeRange] = useState({ start: currentMonth(), end: addMonths(currentMonth(), 11) });
-  const [aggregation, setAggregation] = useState('M');
+  // Monthly grid. The M/Q/Y aggregation toggle was removed; periods are always
+  // one-per-month (computePeriods(months, 'M')).
+  const aggregation = 'M';
   const [editModal, setEditModal] = useState(null);
   const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
   const [resourceFilterIds, setResourceFilterIds] = useState(() => new Set());
@@ -341,7 +343,6 @@ export default function PlannerView() {
       <div className="flex-1 min-w-0 flex flex-col rounded-2xl bg-white border border-border-light shadow-card overflow-hidden" onClick={() => setPopover(null)}>
         <PlannerToolbar
           timeRange={timeRange} onTimeRangeChange={setTimeRange}
-          aggregation={aggregation} onAggregationChange={setAggregation}
           showUnassignedOnly={showUnassignedOnly}
           onToggleUnassigned={() => setShowUnassignedOnly((v) => !v)}
           customerSort={customerSort} onCustomerSortChange={setCustomerSort}

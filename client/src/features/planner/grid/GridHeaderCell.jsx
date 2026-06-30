@@ -14,7 +14,7 @@ export default function GridHeaderCell({ period, isFullyStaffed, gap = 0 }) {
 
   return (
     <div
-      className="relative flex flex-col items-center justify-center shrink-0"
+      className="relative flex flex-col items-center justify-start shrink-0 pt-2"
       style={{ width, height: 44 }}
     >
       {sub && (

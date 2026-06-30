@@ -6,6 +6,7 @@ export const saveConnectionSchema = z.object({
   baseUrl: z.string().max(300).nullable().optional(),
   jiraEmail: z.string().max(200).nullable().optional(),
   enabled: z.boolean().optional(),
+  autoSyncEnabled: z.boolean().optional(),
   jiraApiToken: z.string().max(2000).nullable().optional(),
   tempoApiToken: z.string().max(2000).nullable().optional(),
 });

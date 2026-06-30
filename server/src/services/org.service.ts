@@ -49,6 +49,8 @@ export const orgService = {
       pmLogReminderEvery?: number | null;
       pmLogReminderUnit?: string | null;
       pmLogReminderStart?: string | null;
+      teamsRemindersEnabled?: boolean;
+      teamsReminderTypes?: string | null;
     }
   ) {
     return prisma.organization.update({ where: { id: orgId }, data });

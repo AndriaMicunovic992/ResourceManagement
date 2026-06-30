@@ -94,13 +94,13 @@ export default function IntegrationsSection() {
 
   // ---- connection ----
   const [conn, setConn] = useState(null);
-  const [form, setForm] = useState({ baseUrl: '', jiraEmail: '', enabled: false });
+  const [form, setForm] = useState({ baseUrl: '', jiraEmail: '', enabled: false, autoSyncEnabled: true });
   const [jiraToken, setJiraToken] = useState('');
   const [tempoToken, setTempoToken] = useState('');
   const [busy, setBusy] = useState('');
   const loadConn = useCallback(async () => {
     const c = await api.getJiraConnection().catch(() => null);
-    if (c) { setConn(c); setForm({ baseUrl: c.baseUrl || '', jiraEmail: c.jiraEmail || '', enabled: !!c.enabled }); }
+    if (c) { setConn(c); setForm({ baseUrl: c.baseUrl || '', jiraEmail: c.jiraEmail || '', enabled: !!c.enabled, autoSyncEnabled: c.autoSyncEnabled !== false }); }
   }, []);
 
   // ---- pulled reference data + mappings ----
@@ -121,6 +121,7 @@ export default function IntegrationsSection() {
   const persist = async () => {
     await api.saveJiraConnection({
       baseUrl: form.baseUrl || null, jiraEmail: form.jiraEmail || null, enabled: form.enabled,
+      autoSyncEnabled: form.autoSyncEnabled,
       ...(jiraToken.trim() ? { jiraApiToken: jiraToken.trim() } : {}),
       ...(tempoToken.trim() ? { tempoApiToken: tempoToken.trim() } : {}),
     });
@@ -248,6 +249,22 @@ export default function IntegrationsSection() {
               <button onClick={syncHours} disabled={!!busy} className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50">{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>
             </div>
           </div>
+
+          {/* Automatic daily sync — runs the delta pull on a schedule; the button above still works anytime. */}
+          <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
+            <label className="flex items-center gap-2 text-xs text-text-mid cursor-pointer">
+              <input type="checkbox" checked={form.autoSyncEnabled} onChange={(e) => setForm((f) => ({ ...f, autoSyncEnabled: e.target.checked }))} /> Automatic daily sync
+            </label>
+            <span className="text-[10px] text-text-light">Runs a delta pull every morning (~05:00 UTC) while the connection is enabled. Use <b>Save connection</b> to apply.</span>
+          </div>
+          {conn?.lastAutoSyncAt && (
+            <div className="mt-1 text-[10px]">
+              <span className={conn.lastAutoSyncStatus === 'error' ? 'text-danger' : 'text-text-mid'}>
+                Last automatic sync {new Date(conn.lastAutoSyncAt).toLocaleString()} · {conn.lastAutoSyncStatus === 'error' ? 'failed' : 'ok'}
+              </span>
+              {conn.lastAutoSyncStatus === 'error' && conn.lastAutoSyncError && <span className="text-danger"> — {conn.lastAutoSyncError}</span>}
+            </div>
+          )}
           {syncResult && (
             <div className="mt-3 text-xs text-text-mid">
               <div className="flex flex-wrap gap-x-4 gap-y-1">

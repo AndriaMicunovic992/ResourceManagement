@@ -197,7 +197,13 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
   };
 
   return (
-    <div className="flex-1 min-h-0 overflow-auto flex">
+    // The scroll container is a plain block; an inner flex wrapper sizes to the
+    // grid's content (w-max) while filling the viewport (min-w-full/min-h-full).
+    // The header's sticky containing block is therefore the *whole* grid, not a
+    // single viewport — without this, align-items:stretch pins the right pane to
+    // the viewport height and the sticky header scrolls away after ~one screen.
+    <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex w-max min-w-full min-h-full">
       <LabelColumn
         rows={rows} canEdit={canEdit} needHeights={needHeights}
         onEditCustomer={onEditCustomer} onDeleteCustomer={onDeleteCustomer}
@@ -248,6 +254,7 @@ export default function PlannerGrid({ heldResource, timeRange, aggregation, show
           onPaintNeed={onPaintNeed} onPaintAssign={onPaintAssign} onUndoable={onUndoable}
         />
         {heldResource && <HeldCapacityFooter resource={heldResource} periods={periods} />}
+      </div>
       </div>
     </div>
   );

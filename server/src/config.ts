@@ -15,6 +15,18 @@ function entraConfig() {
   return { tenantId, clientId, clientSecret, redirectUri, enabled };
 }
 
+function teamsConfig() {
+  // Azure Bot (single-tenant) used to DM reminders into Microsoft Teams. App-wide
+  // credentials — per-org enablement lives on the Organization. Defaults the
+  // tenant to the Entra one so a single SSO+bot registration needs no extra var.
+  const botAppId = process.env.TEAMS_BOT_APP_ID;
+  const botAppPassword = process.env.TEAMS_BOT_APP_PASSWORD;
+  const tenantId = process.env.TEAMS_BOT_TENANT_ID || process.env.ENTRA_TENANT_ID;
+  // Teams reminders light up only when the bot credentials are present.
+  const enabled = Boolean(botAppId && botAppPassword);
+  return { botAppId, botAppPassword, tenantId, enabled };
+}
+
 export const config = {
   isProd,
   // Local email/password login. On by default for seeded test personas and
@@ -34,6 +46,9 @@ export const config = {
   clientUrl: process.env.CLIENT_URL || '',
   get entra() {
     return entraConfig();
+  },
+  get teams() {
+    return teamsConfig();
   },
 };
 

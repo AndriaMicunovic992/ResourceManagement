@@ -56,7 +56,11 @@ export function computeNeedFulfillment(need, assignments) {
   for (const m of Object.keys(needAllocs)) {
     const needed = needAllocs[m] || 0;
     const filled = needAssigns.reduce((sum, a) => sum + ((a.monthAllocations || {})[m] || 0), 0);
-    result[m] = { needed, filled, ok: filled >= needed && needed > 0 };
+    // A month is satisfied when there's no remaining gap. Use the same epsilon
+    // the gap display uses (0.001) so "ok" and the "FTE open" pill never
+    // disagree, and treat a zero-demand month (e.g. one manually edited down to
+    // 0) as trivially filled instead of perpetually "unstaffed".
+    result[m] = { needed, filled, ok: filled >= needed - 0.001 };
   }
   return result;
 }
