@@ -11,9 +11,12 @@ export const saveConnectionSchema = z.object({
   tempoApiToken: z.string().max(2000).nullable().optional(),
 });
 
-// Microsoft Teams bot credentials. Like the Jira tokens, botAppPassword is
-// optional on save: omit to keep the stored (encrypted) secret, "" / null clears.
+// Microsoft Teams bot credentials. appType mirrors Bot Framework's
+// MicrosoftAppType; a managed-identity bot (UserAssignedMSI) has no secret. Like
+// the Jira tokens, botAppPassword is optional on save: omit to keep the stored
+// (encrypted) secret, "" / null clears.
 export const saveTeamsConnectionSchema = z.object({
+  appType: z.enum(['MultiTenant', 'SingleTenant', 'UserAssignedMSI']).optional(),
   botAppId: z.string().max(200).nullable().optional(),
   tenantId: z.string().max(200).nullable().optional(),
   botAppPassword: z.string().max(2000).nullable().optional(),
