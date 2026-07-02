@@ -31,20 +31,25 @@ export default function TeamsSettingsSection() {
 
   // ---- connection ----
   const [conn, setConn] = useState(null);
-  const [form, setForm] = useState({ botAppId: '', tenantId: '' });
+  const [form, setForm] = useState({ appType: 'MultiTenant', botAppId: '', tenantId: '' });
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState('');
   const loadConn = useCallback(async () => {
     const c = await api.getTeamsConnection().catch(() => null);
-    if (c) { setConn(c); setForm({ botAppId: c.botAppId || '', tenantId: c.tenantId || '' }); }
+    if (c) { setConn(c); setForm({ appType: c.appType || 'MultiTenant', botAppId: c.botAppId || '', tenantId: c.tenantId || '' }); }
   }, []);
   useEffect(() => { loadConn(); }, [loadConn]);
 
+  const usesSecret = form.appType !== 'UserAssignedMSI';
+  const needsTenant = form.appType !== 'MultiTenant';
+
   const persistConn = async () => {
     await api.saveTeamsConnection({
+      appType: form.appType,
       botAppId: form.botAppId || null,
       tenantId: form.tenantId || null,
-      ...(password.trim() ? { botAppPassword: password.trim() } : {}),
+      // Managed identity has no secret — never send one for that type.
+      ...(usesSecret && password.trim() ? { botAppPassword: password.trim() } : {}),
     });
     setPassword('');
     await loadConn();
@@ -57,7 +62,7 @@ export default function TeamsSettingsSection() {
   const testConn = async () => {
     setError(''); setStatus(''); setBusy('test');
     // Save first so the test validates exactly what's in the form.
-    try { await persistConn(); await api.testTeamsConnection(); setStatus('Credentials verified with Microsoft.'); }
+    try { await persistConn(); const r = await api.testTeamsConnection(); setStatus(r?.message || 'Verified.'); }
     catch (e) { setError(e.message || 'Could not verify the credentials'); }
     finally { setBusy(''); }
   };
@@ -101,30 +106,50 @@ export default function TeamsSettingsSection() {
 
       {/* Connection credentials */}
       <p className="text-[10px] text-text-light mb-3">
-        Azure Bot credentials for delivering reminders as private Teams messages. The app password
-        is encrypted at rest and never shown again — leave it blank to keep the stored one. See the
-        setup guide for creating the bot and where to find these values.
+        Azure Bot credentials for delivering reminders as private Teams messages. Pick the app type
+        you chose when creating the bot. Secrets are encrypted at rest and never shown again — leave
+        the field blank to keep the stored one.
       </p>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="block text-[10px] font-semibold text-text-mid mb-1">Bot App ID</span>
+          <span className="block text-[10px] font-semibold text-text-mid mb-1">App type</span>
+          <select value={form.appType} onChange={(e) => setForm((f) => ({ ...f, appType: e.target.value }))} className={`w-full ${inputCls}`}>
+            <option value="UserAssignedMSI">User-assigned managed identity</option>
+            <option value="SingleTenant">Single-tenant (client secret)</option>
+            <option value="MultiTenant">Multi-tenant (client secret)</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[10px] font-semibold text-text-mid mb-1">
+            {form.appType === 'UserAssignedMSI' ? 'Managed identity client ID' : 'Bot App ID'}
+          </span>
           <input value={form.botAppId} onChange={(e) => setForm((f) => ({ ...f, botAppId: e.target.value }))}
             placeholder="00000000-0000-0000-0000-000000000000" className={`w-full ${inputCls} font-mono`} />
         </label>
-        <label className="block">
-          <span className="block text-[10px] font-semibold text-text-mid mb-1">Tenant (directory) ID</span>
-          <input value={form.tenantId} onChange={(e) => setForm((f) => ({ ...f, tenantId: e.target.value }))}
-            placeholder="single-tenant directory id" className={`w-full ${inputCls} font-mono`} />
-        </label>
-        <label className="block col-span-2">
-          <span className="block text-[10px] font-semibold text-text-mid mb-1">
-            App password (client secret) {conn?.botAppPasswordSet && <span className="text-success">· set</span>}
-          </span>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password"
-            placeholder={conn?.botAppPasswordSet ? '•••••••••• (leave blank to keep)' : 'Paste the client secret value'}
-            className={`w-full ${inputCls} font-mono`} />
-        </label>
+        {needsTenant && (
+          <label className="block">
+            <span className="block text-[10px] font-semibold text-text-mid mb-1">Tenant (directory) ID</span>
+            <input value={form.tenantId} onChange={(e) => setForm((f) => ({ ...f, tenantId: e.target.value }))}
+              placeholder="directory (Entra) id" className={`w-full ${inputCls} font-mono`} />
+          </label>
+        )}
+        {usesSecret && (
+          <label className="block col-span-2">
+            <span className="block text-[10px] font-semibold text-text-mid mb-1">
+              App password (client secret) {conn?.botAppPasswordSet && <span className="text-success">· set</span>}
+            </span>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password"
+              placeholder={conn?.botAppPasswordSet ? '•••••••••• (leave blank to keep)' : 'Paste the client secret value'}
+              className={`w-full ${inputCls} font-mono`} />
+          </label>
+        )}
       </div>
+      {form.appType === 'UserAssignedMSI' && (
+        <p className="text-[10px] text-text-light mt-2">
+          Managed identity has no secret — the app authenticates via the identity at runtime. Works
+          only when the server runs in Azure with this user-assigned identity attached to its compute.
+        </p>
+      )}
       <div className="flex justify-end gap-2 mt-3">
         <button onClick={testConn} disabled={!!busy}
           className="text-[11px] font-semibold text-text-mid bg-white border border-border-light rounded-lg px-2.5 py-1 cursor-pointer hover:bg-primary-bg disabled:opacity-50">
