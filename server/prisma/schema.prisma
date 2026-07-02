@@ -41,6 +41,7 @@ model Organization {
   jobRoles    JobRole[]
   seniorities Seniority[]
   jiraConnection JiraConnection?
+  teamsConnection TeamsConnection?
   jiraWorkItems  JiraWorkItem[]
   jiraAccounts   JiraAccount[]
   worklogs       Worklog[]
@@ -119,6 +120,21 @@ model TeamsUserLink {
   updatedAt       DateTime  @updatedAt
 
   @@index([aadObjectId])
+}
+
+// Per-org Azure Bot credentials for the Microsoft Teams reminder integration.
+// Configured in Settings (like the Jira/Tempo connection) rather than env vars,
+// so each org brings its own single-tenant bot. The secret is encrypted at rest
+// (AES-256-GCM) and never returned in plaintext.
+model TeamsConnection {
+  id             String   @id @default(cuid())
+  orgId          String   @unique
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  botAppId       String?  // Azure Bot "Microsoft App ID"
+  botAppPassword String?  // client secret — encrypted at rest
+  tenantId       String?  // single-tenant directory (Entra) id
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model OrgMember {
