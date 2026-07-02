@@ -1,11 +1,12 @@
 import { FastifyPluginAsync } from 'fastify';
 import { integrationService } from '../services/integration.service.js';
-import { config } from '../config.js';
+import { teamsService } from '../services/teams.service.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { assertCanViewCustomer, assertCanViewPerson } from '../services/visibility.service.js';
 import { BadRequestError } from '../utils/errors.js';
 import {
   saveConnectionSchema,
+  saveTeamsConnectionSchema,
   createWorkItemSchema,
   updateWorkItemSchema,
   syncHoursSchema,
@@ -44,11 +45,20 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.syncHours(req.orgId, updatedFrom);
   });
 
-  // Whether the Microsoft Teams bot is configured on this deployment (env-level).
-  // The per-org enable toggle + reminder-type filter live on the Organization;
-  // this just tells the settings UI if the bot transport will actually deliver.
-  app.get('/integration/teams/status', { preHandler: requireRole('admin') }, async () => {
-    return { botConfigured: config.teams.enabled };
+  // Microsoft Teams bot credentials (per-org, encrypted at rest). Like the Jira
+  // connection, the secret is never returned — only whether one is stored.
+  app.get('/integration/teams', { preHandler: requireRole('admin') }, async (req) => {
+    return teamsService.getConnection(req.orgId);
+  });
+
+  app.put('/integration/teams', { preHandler: requireRole('admin') }, async (req) => {
+    const data = saveTeamsConnectionSchema.parse(req.body);
+    return teamsService.saveConnection(req.orgId, data);
+  });
+
+  // Validate the stored bot credentials against Microsoft Entra.
+  app.post('/integration/teams/test', { preHandler: requireRole('admin') }, async (req) => {
+    return teamsService.testConnection(req.orgId);
   });
 
   // Actual hours per person for a customer + month (feeds the review cockpit).

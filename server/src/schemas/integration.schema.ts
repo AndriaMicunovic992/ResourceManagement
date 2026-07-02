@@ -11,6 +11,14 @@ export const saveConnectionSchema = z.object({
   tempoApiToken: z.string().max(2000).nullable().optional(),
 });
 
+// Microsoft Teams bot credentials. Like the Jira tokens, botAppPassword is
+// optional on save: omit to keep the stored (encrypted) secret, "" / null clears.
+export const saveTeamsConnectionSchema = z.object({
+  botAppId: z.string().max(200).nullable().optional(),
+  tenantId: z.string().max(200).nullable().optional(),
+  botAppPassword: z.string().max(2000).nullable().optional(),
+});
+
 const kind = z.enum(['project', 'epic', 'issue', 'other']);
 
 export const createWorkItemSchema = z.object({
