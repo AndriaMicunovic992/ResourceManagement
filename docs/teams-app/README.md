@@ -8,9 +8,13 @@ conversation the server needs.
 ## What you need
 - The bot's **Microsoft App ID** (the same value entered in **Settings → Microsoft
   Teams → Bot App ID**).
-- Two PNG icons in this folder:
+- The two PNG icons — **already in this folder** as placeholders (a databob-teal
+  chat bubble):
   - `color.png` — 192×192, full colour.
-  - `outline.png` — 32×32, transparent, single-colour (white on transparent).
+  - `outline.png` — 32×32, transparent, white silhouette.
+
+  Swap them for real databob branding when you have it (keep the same file names
+  and dimensions).
 
 ## Build the package
 1. In `manifest.json`, replace **both** `REPLACE_WITH_BOT_APP_ID` occurrences
