@@ -3,6 +3,7 @@ import {
   parseReminderTypes,
   filterReminders,
   shouldSendDigest,
+  isDailyPushDue,
   formatDigest,
   TEAMS_REMINDER_HOUR_UTC,
   type ReminderLike,
@@ -59,6 +60,22 @@ describe('shouldSendDigest', () => {
   it('treats the push hour boundary as eligible', () => {
     const now = new Date(Date.UTC(2026, 5, 25, TEAMS_REMINDER_HOUR_UTC));
     expect(shouldSendDigest(null, now, 1)).toBe(true);
+  });
+});
+
+describe('isDailyPushDue', () => {
+  const at = (iso: string) => new Date(iso);
+  it('not due before the push hour', () => {
+    expect(isDailyPushDue(null, at('2026-06-25T06:00:00Z'))).toBe(false);
+  });
+  it('due at/after the push hour when never sent', () => {
+    expect(isDailyPushDue(null, at('2026-06-25T07:30:00Z'))).toBe(true);
+  });
+  it('not due again once sent today', () => {
+    expect(isDailyPushDue(at('2026-06-25T07:05:00Z'), at('2026-06-25T09:00:00Z'))).toBe(false);
+  });
+  it('due again the next day', () => {
+    expect(isDailyPushDue(at('2026-06-24T07:05:00Z'), at('2026-06-25T07:05:00Z'))).toBe(true);
   });
 });
 

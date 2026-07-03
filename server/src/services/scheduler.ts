@@ -9,6 +9,7 @@
 import { prisma } from '../db/prisma.js';
 import { integrationService } from './integration.service.js';
 import { computeUpdatedFrom, isDailySyncDue } from './scheduler.helpers.js';
+import { runReminderPush } from './teamsReminderPush.js';
 
 // How often the scheduler wakes to check whether any job is due.
 const TICK_MS = 30 * 60 * 1000; // 30 minutes
@@ -64,13 +65,25 @@ async function runDueAutoSyncs(log: Logger): Promise<void> {
   }
 }
 
+const errMsg = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
 async function tick(log: Logger): Promise<void> {
   if (inFlight) return; // a slow run is still going — skip this wake-up
   inFlight = true;
   try {
-    await runDueAutoSyncs(log);
-  } catch (err) {
-    log.error({ err: err instanceof Error ? err.message : String(err) }, 'scheduler tick failed');
+    try {
+      await runDueAutoSyncs(log);
+    } catch (err) {
+      log.error({ err: errMsg(err) }, 'auto-sync tick failed');
+    }
+    // Daily Teams reminder DMs. isDailyPushDue (per user) makes this a no-op until
+    // the push hour and idempotent for the rest of the day.
+    try {
+      const r = await runReminderPush({ now: new Date(), log });
+      if (r.sent > 0) log.info({ sent: r.sent }, 'teams reminders pushed');
+    } catch (err) {
+      log.error({ err: errMsg(err) }, 'teams reminder push tick failed');
+    }
   } finally {
     inFlight = false;
   }

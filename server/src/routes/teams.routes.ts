@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { requireRole } from '../middleware/requireRole.js';
 import { handleInboundActivity, sendTestMessage } from '../services/teamsTransport.js';
 import { installForAllUsers } from '../services/teamsGraph.js';
+import { runReminderPush } from '../services/teamsReminderPush.js';
 
 export const teamsRoutes: FastifyPluginAsync = async (app) => {
   // The bot's messaging endpoint. Public (see PUBLIC_PATHS in plugins/auth.ts) —
@@ -28,5 +29,11 @@ export const teamsRoutes: FastifyPluginAsync = async (app) => {
   // nobody has to add it themselves (registers each person's conversation).
   app.post('/integration/teams/install-all', { preHandler: requireRole('admin') }, async (req) => {
     return installForAllUsers(req.orgId);
+  });
+
+  // Admin: run the daily reminder push for this org right now (ignores the
+  // time-of-day gate) — real due reminders, so you can verify without waiting.
+  app.post('/integration/teams/push-now', { preHandler: requireRole('admin') }, async (req) => {
+    return runReminderPush({ now: new Date(), orgId: req.orgId, force: true });
   });
 };
