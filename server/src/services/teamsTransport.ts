@@ -79,22 +79,24 @@ type Activity = {
   membersAdded?: Array<{ id?: string; aadObjectId?: string }>;
 };
 
+type CaptureResult = 'linked' | 'unmatched' | 'skipped';
+
 /** Persist a user's conversation reference so we can DM them later. */
-async function captureConversation(activity: Activity): Promise<void> {
+async function captureConversation(activity: Activity): Promise<CaptureResult> {
   const serviceUrl = activity.serviceUrl;
   const conversationId = activity.conversation?.id;
-  if (!serviceUrl || !conversationId) return;
+  if (!serviceUrl || !conversationId) return 'skipped';
   const botId = activity.recipient?.id;
   // The user's Entra object id is usually on `from`, but on the silent install
   // event (the bot being added) it can ride on the added member instead.
   const aadObjectId =
     activity.from?.aadObjectId ||
     activity.membersAdded?.find((m) => m.aadObjectId && m.id !== botId)?.aadObjectId;
-  if (!aadObjectId) return;
+  if (!aadObjectId) return 'skipped';
   // We can only reach people whose account is linked via Entra (SSO) — that's
   // how we map the Teams user (aadObjectId) to our User (microsoftId).
   const user = await prisma.user.findUnique({ where: { microsoftId: aadObjectId } });
-  if (!user) return;
+  if (!user) return 'unmatched';
 
   const conversationRef = {
     serviceUrl,
@@ -108,6 +110,23 @@ async function captureConversation(activity: Activity): Promise<void> {
     create: { userId: user.id, aadObjectId, serviceUrl, conversationRef },
     update: { aadObjectId, serviceUrl, conversationRef },
   });
+  return 'linked';
+}
+
+/** Bot → user reply in the same conversation (uses the inbound serviceUrl). */
+async function sendReply(
+  conn: TeamsConnectionRow,
+  serviceUrl: string,
+  conversationId: string,
+  text: string
+): Promise<void> {
+  const token = await getBotToken(conn);
+  const url = `${serviceUrl.replace(/\/$/, '')}/v3/conversations/${encodeURIComponent(conversationId)}/activities`;
+  await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'message', text }),
+  });
 }
 
 /**
@@ -119,20 +138,40 @@ export async function handleInboundActivity(body: unknown, authHeader: string | 
   const activity = (body ?? {}) as Activity;
   const botAppId = botAppIdOf(activity?.recipient?.id);
   if (!botAppId) return false;
-  // Only accept activities for a bot we actually know (some org configured it).
-  const conn = await prisma.teamsConnection.findFirst({ where: { botAppId } });
+  // Only accept activities for a bot we actually know. Case-insensitive so a
+  // differently-cased stored App ID still matches the recipient.
+  const conn = await prisma.teamsConnection.findFirst({
+    where: { botAppId: { equals: botAppId, mode: 'insensitive' } },
+  });
   if (!conn) return false;
 
   await verifyInbound(authHeader, botAppId); // throws on an invalid token
 
   // Capture on any activity that carries a user + conversation — including the
-  // silent conversationUpdate / installationUpdate fired when an admin installs
-  // the app for someone, so people never have to message the bot first. A
-  // capture hiccup must not fail the webhook (the token was already valid).
+  // silent conversationUpdate / installationUpdate fired when the app is installed
+  // for someone, so people never have to message the bot first.
+  let result: CaptureResult = 'skipped';
   try {
-    await captureConversation(activity);
+    result = await captureConversation(activity);
   } catch {
-    /* non-fatal */
+    /* non-fatal — the token was already valid */
+  }
+
+  // For a direct message, answer with the outcome. Getting *any* reply proves the
+  // messaging endpoint + auth are working; the text says whether we could link
+  // the person — turning "say hi" into a one-glance diagnostic.
+  if (activity.type === 'message' && activity.serviceUrl && activity.conversation?.id) {
+    const text =
+      result === 'linked'
+        ? '✅ You’re connected — databob reminders will arrive here.'
+        : result === 'unmatched'
+        ? '⚠️ I got your message, but couldn’t match you to a databob account. Sign in to databob with this same Microsoft account, then message me again.'
+        : '⚠️ I got your message, but couldn’t read your Teams identity from Teams.';
+    try {
+      await sendReply(conn, activity.serviceUrl, activity.conversation.id, text);
+    } catch {
+      /* non-fatal */
+    }
   }
   return true;
 }
