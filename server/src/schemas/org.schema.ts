@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+/** True for a valid IANA timezone name (or a null/empty value). */
+function isValidTimeZone(tz: string): boolean {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Admins may grant admin/member/viewer — never owner. This is what prevents an
 // admin from minting another owner via the member endpoints.
 export const ROLE_VALUES = ['admin', 'member', 'viewer'] as const;
@@ -34,6 +44,14 @@ export const updateOrgSchema = z
     teamsReminderTypes: z.string().max(200).nullable().optional(),
     // Custom intro line for the Teams reminder DM (empty = built-in default).
     teamsReminderMessage: z.string().max(2000).nullable().optional(),
+    // Daily send time: local hour (0-23) in an IANA timezone (null = UTC).
+    teamsReminderHour: z.number().int().min(0).max(23).optional(),
+    teamsReminderTimezone: z
+      .string()
+      .max(64)
+      .nullable()
+      .optional()
+      .refine((v) => v == null || isValidTimeZone(v), 'Invalid timezone'),
   })
   .strict();
 

@@ -40,22 +40,44 @@ export function filterReminders<T extends { type: string }>(
   return reminders.filter((r) => allow.has(r.type));
 }
 
+/** Local Y-M-D date and hour of an instant in a timezone (DST-safe via Intl). */
+function localDateHour(d: Date, timeZone: string): { date: string; hour: number } {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hour12: false,
+    }).formatToParts(d);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+    let hour = parseInt(get('hour'), 10);
+    if (hour === 24) hour = 0; // some ICU builds render midnight as "24"
+    return { date: `${get('year')}-${get('month')}-${get('day')}`, hour };
+  } catch {
+    // Unknown timezone → fall back to UTC (always valid).
+    return localDateHour(d, 'UTC');
+  }
+}
+
 /**
- * Time gate only: we're at/after today's push hour and haven't sent since it.
- * Idempotent across restarts and the scheduler's 30-min ticks. Cheap to check —
- * call this before computing a user's reminders so we don't do that work on every
- * tick or before the hour.
+ * Time gate only: it's at/after the configured hour in the org's timezone today,
+ * and we haven't sent since. Idempotent across restarts and the scheduler's
+ * 30-min ticks (compares the *local* day of the last send). Cheap to check — call
+ * this before computing a user's reminders so that work is skipped before the
+ * hour and for the rest of the day once sent.
  */
-export function isDailyPushDue(lastSentAt: Date | null | undefined, now: Date): boolean {
-  const runTime = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-    TEAMS_REMINDER_HOUR_UTC
-  );
-  if (now.getTime() < runTime) return false;
+export function isDailyPushDue(
+  lastSentAt: Date | null | undefined,
+  now: Date,
+  hour: number = TEAMS_REMINDER_HOUR_UTC,
+  timeZone: string = 'UTC'
+): boolean {
+  const cur = localDateHour(now, timeZone);
+  if (cur.hour < hour) return false; // before the send hour, local time
   if (!lastSentAt) return true;
-  return lastSentAt.getTime() < runTime;
+  return localDateHour(lastSentAt, timeZone).date !== cur.date; // not already sent today (local)
 }
 
 /**

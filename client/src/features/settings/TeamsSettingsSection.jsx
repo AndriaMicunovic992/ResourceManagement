@@ -19,6 +19,18 @@ function parseTeamsTypes(csv) {
   return { oneOnOne: set.has('oneOnOne'), pmUpdate: set.has('pmUpdate'), clientSignal: set.has('clientSignal') };
 }
 
+const BROWSER_TZ = (() => {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; }
+})();
+const TIMEZONES = (() => {
+  try {
+    const all = Intl.supportedValuesOf('timeZone');
+    return all.includes('UTC') ? all : ['UTC', ...all];
+  } catch {
+    return ['UTC', 'Europe/Zurich', 'Europe/Berlin', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles', 'Asia/Singapore'];
+  }
+})();
+
 /**
  * Settings → Microsoft Teams. Two parts: the per-org Azure Bot connection
  * (credentials, stored encrypted like the Jira/Tempo tokens) and the reminder
@@ -71,12 +83,16 @@ export default function TeamsSettingsSection() {
   const [teamsEnabled, setTeamsEnabled] = useState(!!currentOrg?.teamsRemindersEnabled);
   const [teamsTypes, setTeamsTypes] = useState(() => parseTeamsTypes(currentOrg?.teamsReminderTypes));
   const [teamsMessage, setTeamsMessage] = useState(currentOrg?.teamsReminderMessage || '');
+  const [teamsHour, setTeamsHour] = useState(currentOrg?.teamsReminderHour ?? 7);
+  const [teamsTz, setTeamsTz] = useState(currentOrg?.teamsReminderTimezone || BROWSER_TZ);
   const [teamsSaving, setTeamsSaving] = useState(false);
   const [teamsSuccess, setTeamsSuccess] = useState(false);
   useEffect(() => {
     setTeamsEnabled(!!currentOrg?.teamsRemindersEnabled);
     setTeamsTypes(parseTeamsTypes(currentOrg?.teamsReminderTypes));
     setTeamsMessage(currentOrg?.teamsReminderMessage || '');
+    setTeamsHour(currentOrg?.teamsReminderHour ?? 7);
+    setTeamsTz(currentOrg?.teamsReminderTimezone || BROWSER_TZ);
   }, [currentOrg]);
 
   const saveReminders = async () => {
@@ -89,6 +105,8 @@ export default function TeamsSettingsSection() {
         teamsRemindersEnabled: teamsEnabled,
         teamsReminderTypes: typesCsv,
         teamsReminderMessage: teamsMessage.trim() || null,
+        teamsReminderHour: teamsHour,
+        teamsReminderTimezone: teamsTz || null,
       });
       setTeamsSuccess(true); setTimeout(() => setTeamsSuccess(false), 2000);
     } catch (e) {
@@ -222,6 +240,22 @@ export default function TeamsSettingsSection() {
             ))}
           </div>
           <div className="text-[10px] text-text-light">All types are sent unless you pick a subset.</div>
+          <div className="mt-3">
+            <div className="text-[10px] font-semibold text-text-mid mb-1">Send daily at</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select value={teamsHour} onChange={(e) => setTeamsHour(Number(e.target.value))} className={inputCls}>
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                ))}
+              </select>
+              <span className="text-[11px] text-text-mid">in</span>
+              <select value={teamsTz} onChange={(e) => setTeamsTz(e.target.value)} className={`${inputCls} max-w-[240px]`}>
+                {(TIMEZONES.includes(teamsTz) ? TIMEZONES : [teamsTz, ...TIMEZONES]).map((tz) => (
+                  <option key={tz} value={tz}>{tz}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
         <div className="mt-3">
           <label className="block text-[10px] font-semibold text-text-mid mb-1">

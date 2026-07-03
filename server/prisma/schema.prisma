@@ -33,6 +33,10 @@ model Organization {
   // Customisable intro line shown at the top of the Teams reminder DM (and the
   // "send test message" preview). Null = the built-in default.
   teamsReminderMessage  String?
+  // When the daily Teams reminder push fires: local hour (0-23) in the given IANA
+  // timezone. Null timezone = UTC. Defaults to 07:00 UTC.
+  teamsReminderHour     Int     @default(7)
+  teamsReminderTimezone String?
   performanceTrendDefaultFrom String?
   performanceTrendDefaultTo   String?
   createdAt       DateTime @default(now())

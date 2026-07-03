@@ -35,7 +35,13 @@ export async function runReminderPush(opts: {
       teamsConnection: { is: { botAppId: { not: null }, botAppPassword: { not: null } } },
       ...(orgId ? { id: orgId } : {}),
     },
-    select: { id: true, teamsReminderTypes: true, teamsReminderMessage: true },
+    select: {
+      id: true,
+      teamsReminderTypes: true,
+      teamsReminderMessage: true,
+      teamsReminderHour: true,
+      teamsReminderTimezone: true,
+    },
   });
 
   let sent = 0;
@@ -54,7 +60,10 @@ export async function runReminderPush(opts: {
     for (const m of members) {
       try {
         const lastSentAt = m.user.teamsLink?.lastSentAt ?? null;
-        if (!force && !isDailyPushDue(lastSentAt, now)) continue; // cheap gate before the work
+        // Cheap gate before the work, in the org's configured hour + timezone.
+        if (!force && !isDailyPushDue(lastSentAt, now, org.teamsReminderHour, org.teamsReminderTimezone ?? 'UTC')) {
+          continue;
+        }
 
         const level = roleLevel.get(m.role) ?? systemRoleDef(m.role)?.level ?? LEGACY_ROLE_LEVEL[m.role] ?? 1;
         const scope = await computeVisibility(org.id, m.userId, level);
