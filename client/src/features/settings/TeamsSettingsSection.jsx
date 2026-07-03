@@ -105,6 +105,20 @@ export default function TeamsSettingsSection() {
     finally { setBusy(''); }
   };
 
+  // Install the app for every Microsoft-linked person via Graph (no per-person action).
+  const connectAll = async () => {
+    setError(''); setStatus(''); setBusy('installall');
+    try {
+      const r = await api.installTeamsForAll();
+      const parts = [`${r.installed} installed`, `${r.alreadyConnected} already connected`];
+      if (r.skippedNoMicrosoft) parts.push(`${r.skippedNoMicrosoft} skipped (no Microsoft sign-in)`);
+      if (r.failed) parts.push(`${r.failed} failed`);
+      setStatus(`Connect all: ${parts.join(', ')}.${r.errors?.length ? ` First error: ${r.errors[0]}` : ''}`);
+    } catch (e) {
+      setError(e.message || 'Could not install for everyone');
+    } finally { setBusy(''); }
+  };
+
   return (
     <div id="msteams" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
       <div className="flex items-center gap-2 mb-1">
@@ -206,11 +220,18 @@ export default function TeamsSettingsSection() {
             placeholder="Here are your open items in databob:" className={`w-full ${inputCls} resize-y`} />
         </div>
         <div className="flex justify-between items-center mt-3 gap-2 flex-wrap">
-          <button onClick={sendTest} disabled={!!busy || (conn && !conn.configured)}
-            title={conn && !conn.configured ? 'Configure the bot connection first' : 'Sends a test DM to you'}
-            className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-2.5 py-1 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50">
-            {busy === 'testmsg' ? 'Sending…' : 'Send test message to me'}
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={sendTest} disabled={!!busy || (conn && !conn.configured)}
+              title={conn && !conn.configured ? 'Configure the bot connection first' : 'Sends a test DM to you'}
+              className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-2.5 py-1 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50">
+              {busy === 'testmsg' ? 'Sending…' : 'Send test message to me'}
+            </button>
+            <button onClick={connectAll} disabled={!!busy || (conn && !conn.configured)}
+              title="Installs the databob app for every Microsoft-signed-in person (needs Graph permissions on the bot app)"
+              className="text-[11px] font-semibold text-text-mid bg-white border border-border-light rounded-lg px-2.5 py-1 cursor-pointer hover:bg-primary-bg disabled:opacity-50">
+              {busy === 'installall' ? 'Connecting…' : 'Connect all people'}
+            </button>
+          </div>
           <Button onClick={saveReminders} disabled={teamsSaving}>
             {teamsSaving ? 'Saving...' : teamsSuccess ? 'Saved!' : 'Save'}
           </Button>
