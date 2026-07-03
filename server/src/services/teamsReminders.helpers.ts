@@ -41,15 +41,12 @@ export function filterReminders<T extends { type: string }>(
 }
 
 /**
- * Whether to send a user's digest now: there is at least one due reminder and we
- * haven't already sent today (idempotent across restarts, like the sync guard).
+ * Time gate only: we're at/after today's push hour and haven't sent since it.
+ * Idempotent across restarts and the scheduler's 30-min ticks. Cheap to check —
+ * call this before computing a user's reminders so we don't do that work on every
+ * tick or before the hour.
  */
-export function shouldSendDigest(
-  lastSentAt: Date | null | undefined,
-  now: Date,
-  dueCount: number
-): boolean {
-  if (dueCount <= 0) return false;
+export function isDailyPushDue(lastSentAt: Date | null | undefined, now: Date): boolean {
   const runTime = Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
@@ -59,6 +56,18 @@ export function shouldSendDigest(
   if (now.getTime() < runTime) return false;
   if (!lastSentAt) return true;
   return lastSentAt.getTime() < runTime;
+}
+
+/**
+ * Whether to send a user's digest now: it's due today (time gate) and there is at
+ * least one reminder to send.
+ */
+export function shouldSendDigest(
+  lastSentAt: Date | null | undefined,
+  now: Date,
+  dueCount: number
+): boolean {
+  return dueCount > 0 && isDailyPushDue(lastSentAt, now);
 }
 
 function lineFor(r: ReminderLike): string {

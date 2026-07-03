@@ -119,6 +119,17 @@ export default function TeamsSettingsSection() {
     } finally { setBusy(''); }
   };
 
+  // Run the real daily reminder push now (real due reminders, ignores the time gate).
+  const pushNow = async () => {
+    setError(''); setStatus(''); setBusy('pushnow');
+    try {
+      const r = await api.pushTeamsReminders();
+      setStatus(`Sent ${r.sent} reminder DM${r.sent === 1 ? '' : 's'} to people with something due right now.`);
+    } catch (e) {
+      setError(e.message || 'Could not send reminders');
+    } finally { setBusy(''); }
+  };
+
   return (
     <div id="msteams" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
       <div className="flex items-center gap-2 mb-1">
@@ -230,6 +241,11 @@ export default function TeamsSettingsSection() {
               title="Installs the databob app for every Microsoft-signed-in person (needs Graph permissions on the bot app)"
               className="text-[11px] font-semibold text-text-mid bg-white border border-border-light rounded-lg px-2.5 py-1 cursor-pointer hover:bg-primary-bg disabled:opacity-50">
               {busy === 'installall' ? 'Connecting…' : 'Connect all people'}
+            </button>
+            <button onClick={pushNow} disabled={!!busy || (conn && !conn.configured)}
+              title="Send everyone their real due reminders now (the same push that runs daily)"
+              className="text-[11px] font-semibold text-text-mid bg-white border border-border-light rounded-lg px-2.5 py-1 cursor-pointer hover:bg-primary-bg disabled:opacity-50">
+              {busy === 'pushnow' ? 'Sending…' : 'Send reminders now'}
             </button>
           </div>
           <Button onClick={saveReminders} disabled={teamsSaving}>
