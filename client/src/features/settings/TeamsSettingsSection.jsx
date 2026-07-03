@@ -7,16 +7,19 @@ const inputCls = 'px-2 py-1.5 border border-border rounded-lg text-xs text-text 
 
 const TYPE_DEFS = [
   { key: 'oneOnOne', label: '1:1 overdue' },
-  { key: 'pmUpdate', label: 'PM update due' },
-  { key: 'clientSignal', label: 'Client signal missing' },
+  { key: 'pmReview', label: 'PM review' },
 ];
 
-// Empty type filter = all types.
+// Empty type filter = all groups. Legacy pmUpdate/clientSignal both fold into
+// PM review, so settings saved before the merge keep the right box checked.
 function parseTeamsTypes(csv) {
-  const all = { oneOnOne: true, pmUpdate: true, clientSignal: true };
+  const all = { oneOnOne: true, pmReview: true };
   if (!csv || !csv.trim()) return all;
   const set = new Set(csv.split(',').map((s) => s.trim()));
-  return { oneOnOne: set.has('oneOnOne'), pmUpdate: set.has('pmUpdate'), clientSignal: set.has('clientSignal') };
+  return {
+    oneOnOne: set.has('oneOnOne'),
+    pmReview: set.has('pmReview') || set.has('pmUpdate') || set.has('clientSignal'),
+  };
 }
 
 const BROWSER_TZ = (() => {

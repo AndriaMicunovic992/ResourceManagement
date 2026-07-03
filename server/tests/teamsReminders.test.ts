@@ -15,8 +15,11 @@ describe('parseReminderTypes', () => {
     expect(parseReminderTypes('')).toBeNull();
     expect(parseReminderTypes('   ')).toBeNull();
   });
-  it('parses a known subset and ignores junk', () => {
-    expect(parseReminderTypes('oneOnOne, pmUpdate')).toEqual(new Set(['oneOnOne', 'pmUpdate']));
+  it('parses group keys and folds legacy types into pmReview', () => {
+    expect(parseReminderTypes('oneOnOne, pmReview')).toEqual(new Set(['oneOnOne', 'pmReview']));
+    // Legacy pmUpdate / clientSignal both map to the merged "PM review" group.
+    expect(parseReminderTypes('oneOnOne, pmUpdate')).toEqual(new Set(['oneOnOne', 'pmReview']));
+    expect(parseReminderTypes('clientSignal')).toEqual(new Set(['pmReview']));
     expect(parseReminderTypes('oneOnOne, nonsense')).toEqual(new Set(['oneOnOne']));
   });
   it('returns null when nothing valid remains', () => {
@@ -33,8 +36,11 @@ describe('filterReminders', () => {
   it('keeps everything when no filter is set', () => {
     expect(filterReminders(rs, null)).toHaveLength(3);
   });
-  it('keeps only opted-in types', () => {
-    expect(filterReminders(rs, 'pmUpdate').map((r) => r.type)).toEqual(['pmUpdate']);
+  it('PM review keeps both pmUpdate and clientSignal (the merged group)', () => {
+    expect(filterReminders(rs, 'pmReview').map((r) => r.type)).toEqual(['pmUpdate', 'clientSignal']);
+  });
+  it('1:1 keeps only the 1:1 reminders', () => {
+    expect(filterReminders(rs, 'oneOnOne').map((r) => r.type)).toEqual(['oneOnOne']);
   });
 });
 
@@ -93,7 +99,7 @@ describe('formatDigest', () => {
   it('returns empty string for no reminders', () => {
     expect(formatDigest([])).toBe('');
   });
-  it('renders a header and a line per reminder type', () => {
+  it('renders a header and a line per reminder, with client signals as PM review', () => {
     const reminders: ReminderLike[] = [
       { type: 'oneOnOne', resourceName: 'Sem' },
       { type: 'pmUpdate', resourceName: 'Luka', customerName: 'CH Media' },
@@ -102,8 +108,19 @@ describe('formatDigest', () => {
     const body = formatDigest(reminders);
     expect(body).toContain('3 open reminders');
     expect(body).toContain('1:1 overdue with **Sem**');
-    expect(body).toContain('PM update due for **Luka** on **CH Media**');
-    expect(body).toContain('Client signal missing for **Nikola** on **CH Media**');
+    expect(body).toContain('PM review due for **Luka** on **CH Media**');
+    // The client signal now reads as a PM-review line (same duty, one wording).
+    expect(body).toContain('PM review due for **Nikola** on **CH Media**');
+    expect(body).not.toContain('Client signal missing');
+  });
+  it('collapses a PM update + client signal for the same person into one line', () => {
+    const reminders: ReminderLike[] = [
+      { type: 'pmUpdate', resourceName: 'Luka', customerName: 'CH Media' },
+      { type: 'clientSignal', resourceName: 'Luka', customerName: 'CH Media' },
+    ];
+    const body = formatDigest(reminders);
+    expect(body).toContain('1 open reminder:');
+    expect(body.match(/PM review due for \*\*Luka\*\*/g)).toHaveLength(1);
   });
   it('uses the singular for a single reminder', () => {
     expect(formatDigest([{ type: 'oneOnOne', resourceName: 'Sem' }])).toContain('1 open reminder:');
