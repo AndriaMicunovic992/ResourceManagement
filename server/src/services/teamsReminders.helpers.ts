@@ -10,34 +10,51 @@ export interface ReminderLike {
   customerName?: string | null;
 }
 
-export const REMINDER_TYPES = ['oneOnOne', 'pmUpdate', 'clientSignal'] as const;
+// Teams-facing reminder groups. The engine emits three types, but a client
+// signal and a PM update are the same "PM review" duty for the same person, so
+// Teams collapses them into one group — one toggle in Settings, one digest line.
+export const REMINDER_GROUPS = ['oneOnOne', 'pmReview'] as const;
+export type ReminderGroup = (typeof REMINDER_GROUPS)[number];
+
+/** Map an engine reminder type to its Teams group (null = unknown → dropped). */
+export function groupOf(type: string): ReminderGroup | null {
+  if (type === 'oneOnOne') return 'oneOnOne';
+  if (type === 'pmUpdate' || type === 'clientSignal') return 'pmReview';
+  return null;
+}
 
 // Push the digest once per day, on or after this UTC hour (after the morning
 // auto-sync, so "actuals" context is fresh).
 export const TEAMS_REMINDER_HOUR_UTC = 7;
 
 /**
- * Parse the org's comma-separated reminder-type filter. Null/empty/whitespace
- * means "all types" (returns null). Unknown tokens are ignored.
+ * Parse the org's comma-separated reminder filter into a set of Teams groups.
+ * Null/empty/whitespace means "all groups" (returns null). Accepts both the
+ * group keys (oneOnOne, pmReview) and the legacy engine types (pmUpdate /
+ * clientSignal → pmReview) so settings saved before the merge keep working.
+ * Unknown tokens are ignored.
  */
-export function parseReminderTypes(csv: string | null | undefined): Set<string> | null {
+export function parseReminderTypes(csv: string | null | undefined): Set<ReminderGroup> | null {
   if (!csv || !csv.trim()) return null;
-  const known = new Set<string>(REMINDER_TYPES);
-  const picked = csv
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => known.has(s));
-  return picked.length ? new Set(picked) : null;
+  const picked = new Set<ReminderGroup>();
+  for (const tok of csv.split(',').map((s) => s.trim())) {
+    if (tok === 'oneOnOne') picked.add('oneOnOne');
+    else if (tok === 'pmReview' || tok === 'pmUpdate' || tok === 'clientSignal') picked.add('pmReview');
+  }
+  return picked.size ? picked : null;
 }
 
-/** Keep only reminders whose type the org opted into (null filter = keep all). */
+/** Keep only reminders whose Teams group the org opted into (null = keep all). */
 export function filterReminders<T extends { type: string }>(
   reminders: T[],
   typesCsv: string | null | undefined
 ): T[] {
   const allow = parseReminderTypes(typesCsv);
   if (!allow) return reminders;
-  return reminders.filter((r) => allow.has(r.type));
+  return reminders.filter((r) => {
+    const g = groupOf(r.type);
+    return g !== null && allow.has(g);
+  });
 }
 
 /** Local Y-M-D date and hour of an instant in a timezone (DST-safe via Intl). */
@@ -98,10 +115,10 @@ function lineFor(r: ReminderLike): string {
   switch (r.type) {
     case 'oneOnOne':
       return `• 1:1 overdue with **${who}**`;
+    // A PM update and a client signal are the same PM-review duty — one wording.
     case 'pmUpdate':
-      return `• PM update due for **${who}**${on}`;
     case 'clientSignal':
-      return `• Client signal missing for **${who}**${on}`;
+      return `• PM review due for **${who}**${on}`;
     default:
       return `• Reminder about **${who}**${on}`;
   }
@@ -109,11 +126,20 @@ function lineFor(r: ReminderLike): string {
 
 /**
  * Build the Markdown body of the reminder DM. Returns '' for an empty list so the
- * caller can skip sending.
+ * caller can skip sending. Collapses to one line per (group, person, customer),
+ * so a PM update and a client signal for the same person never both appear.
  */
 export function formatDigest(reminders: ReminderLike[]): string {
-  if (!reminders.length) return '';
-  const n = reminders.length;
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  for (const r of reminders) {
+    const key = `${groupOf(r.type) ?? r.type}|${r.resourceName}|${r.customerName ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    lines.push(lineFor(r));
+  }
+  if (!lines.length) return '';
+  const n = lines.length;
   const header = `**You have ${n} open reminder${n === 1 ? '' : 's'}:**`;
-  return [header, ...reminders.map(lineFor)].join('\n\n');
+  return [header, ...lines].join('\n\n');
 }
