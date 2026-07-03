@@ -31,12 +31,12 @@ export default function TeamsSettingsSection() {
 
   // ---- connection ----
   const [conn, setConn] = useState(null);
-  const [form, setForm] = useState({ appType: 'MultiTenant', botAppId: '', tenantId: '' });
+  const [form, setForm] = useState({ appType: 'SingleTenant', botAppId: '', tenantId: '' });
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState('');
   const loadConn = useCallback(async () => {
     const c = await api.getTeamsConnection().catch(() => null);
-    if (c) { setConn(c); setForm({ appType: c.appType || 'MultiTenant', botAppId: c.botAppId || '', tenantId: c.tenantId || '' }); }
+    if (c) { setConn(c); setForm({ appType: c.appType || 'SingleTenant', botAppId: c.botAppId || '', tenantId: c.tenantId || '' }); }
   }, []);
   useEffect(() => { loadConn(); }, [loadConn]);
 
@@ -114,9 +114,9 @@ export default function TeamsSettingsSection() {
         <label className="block">
           <span className="block text-[10px] font-semibold text-text-mid mb-1">App type</span>
           <select value={form.appType} onChange={(e) => setForm((f) => ({ ...f, appType: e.target.value }))} className={`w-full ${inputCls}`}>
-            <option value="UserAssignedMSI">User-assigned managed identity</option>
             <option value="SingleTenant">Single-tenant (client secret)</option>
             <option value="MultiTenant">Multi-tenant (client secret)</option>
+            <option value="UserAssignedMSI">User-assigned managed identity</option>
           </select>
         </label>
         <label className="block">

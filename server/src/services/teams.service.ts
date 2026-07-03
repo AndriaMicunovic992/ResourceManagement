@@ -40,7 +40,7 @@ function isConfigured(
 function maskConnection(
   c: { appType: string; botAppId: string | null; tenantId: string | null; botAppPassword: string | null } | null
 ) {
-  const appType = c?.appType ?? 'MultiTenant';
+  const appType = c?.appType ?? 'SingleTenant';
   return {
     appType,
     botAppId: c?.botAppId ?? '',
@@ -66,7 +66,7 @@ export const teamsService = {
       where: { orgId },
       create: {
         orgId,
-        appType: appType ?? 'MultiTenant',
+        appType: appType ?? 'SingleTenant',
         ...base,
         botAppPassword: secretWrite ?? null,
       },
@@ -88,7 +88,7 @@ export const teamsService = {
    */
   async testConnection(orgId: string) {
     const c = await prisma.teamsConnection.findUnique({ where: { orgId } });
-    const appType = c?.appType ?? 'MultiTenant';
+    const appType = c?.appType ?? 'SingleTenant';
     if (!c?.botAppId) throw new BadRequestError('Add the bot App ID first.');
 
     if (appType === 'UserAssignedMSI') {
