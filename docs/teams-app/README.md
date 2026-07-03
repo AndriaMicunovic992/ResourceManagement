@@ -42,6 +42,23 @@ and make sure the **Microsoft Teams** channel is enabled.
 2. In **Settings → Microsoft Teams**, click **Send test message to me** → the DM
    should arrive in that chat within a second or two.
 
+## Roll it out without per-person action
+
+You don't need each person to add the bot. Two options:
+
+- **Teams setup policy** (admin, one-time): Teams admin center → **Teams apps →
+  Setup policies → Global** → **Add apps → databob → Save**. Installs it for
+  everyone; each install auto-registers their conversation. (Propagation can take
+  a few hours.)
+- **"Connect all people"** button in **Settings → Microsoft Teams** — installs the
+  app for every Microsoft-linked person immediately via Microsoft Graph. Requires,
+  on the bot's **app registration** (API permissions, **application** type, with
+  **admin consent**):
+  - `TeamsAppInstallation.ReadWriteForUser.All`
+  - `AppCatalog.Read.All`
+  The app must already be **uploaded to your org app catalog** (steps above) so
+  Graph can find it by its App ID.
+
 Notes
 - Only people who sign in with **Microsoft (Entra SSO)** can receive DMs — that's
   how the Teams user is matched to a databob account.

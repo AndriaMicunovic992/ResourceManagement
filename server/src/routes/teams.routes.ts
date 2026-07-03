@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { requireRole } from '../middleware/requireRole.js';
 import { handleInboundActivity, sendTestMessage } from '../services/teamsTransport.js';
+import { installForAllUsers } from '../services/teamsGraph.js';
 
 export const teamsRoutes: FastifyPluginAsync = async (app) => {
   // The bot's messaging endpoint. Public (see PUBLIC_PATHS in plugins/auth.ts) —
@@ -21,5 +22,11 @@ export const teamsRoutes: FastifyPluginAsync = async (app) => {
   // Admin: send a labelled test DM to yourself (proves end-to-end delivery).
   app.post('/integration/teams/test-message', { preHandler: requireRole('admin') }, async (req) => {
     return sendTestMessage(req.orgId, req.userId);
+  });
+
+  // Admin: install the app for every Microsoft-linked member via Graph, so
+  // nobody has to add it themselves (registers each person's conversation).
+  app.post('/integration/teams/install-all', { preHandler: requireRole('admin') }, async (req) => {
+    return installForAllUsers(req.orgId);
   });
 };
