@@ -1,0 +1,35 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "REPLACE_WITH_BOT_APP_ID",
+  "developer": {
+    "name": "databob",
+    "websiteUrl": "https://databob.ch",
+    "privacyUrl": "https://databob.ch/privacy",
+    "termsOfUseUrl": "https://databob.ch/terms"
+  },
+  "name": {
+    "short": "databob",
+    "full": "databob resource manager"
+  },
+  "description": {
+    "short": "Reminders from databob",
+    "full": "Delivers your databob 1:1, PM-update and client-signal reminders as private messages."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#4CBAD4",
+  "bots": [
+    {
+      "botId": "REPLACE_WITH_BOT_APP_ID",
+      "scopes": ["personal"],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": []
+}

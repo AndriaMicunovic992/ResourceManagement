@@ -70,11 +70,13 @@ export default function TeamsSettingsSection() {
   // ---- reminder delivery (per-org) ----
   const [teamsEnabled, setTeamsEnabled] = useState(!!currentOrg?.teamsRemindersEnabled);
   const [teamsTypes, setTeamsTypes] = useState(() => parseTeamsTypes(currentOrg?.teamsReminderTypes));
+  const [teamsMessage, setTeamsMessage] = useState(currentOrg?.teamsReminderMessage || '');
   const [teamsSaving, setTeamsSaving] = useState(false);
   const [teamsSuccess, setTeamsSuccess] = useState(false);
   useEffect(() => {
     setTeamsEnabled(!!currentOrg?.teamsRemindersEnabled);
     setTeamsTypes(parseTeamsTypes(currentOrg?.teamsReminderTypes));
+    setTeamsMessage(currentOrg?.teamsReminderMessage || '');
   }, [currentOrg]);
 
   const saveReminders = async () => {
@@ -83,12 +85,24 @@ export default function TeamsSettingsSection() {
     const keys = TYPE_DEFS.map((t) => t.key).filter((k) => teamsTypes[k]);
     const typesCsv = keys.length === 0 || keys.length === TYPE_DEFS.length ? null : keys.join(',');
     try {
-      await updateOrg({ teamsRemindersEnabled: teamsEnabled, teamsReminderTypes: typesCsv });
+      await updateOrg({
+        teamsRemindersEnabled: teamsEnabled,
+        teamsReminderTypes: typesCsv,
+        teamsReminderMessage: teamsMessage.trim() || null,
+      });
       setTeamsSuccess(true); setTimeout(() => setTeamsSuccess(false), 2000);
     } catch (e) {
       setError(e.message || 'Failed to save reminder settings');
     }
     setTeamsSaving(false);
+  };
+
+  // Send a labelled test DM to yourself — the true "are messages sending?" check.
+  const sendTest = async () => {
+    setError(''); setStatus(''); setBusy('testmsg');
+    try { await api.sendTeamsTestMessage(); setStatus('Test message sent — check your Microsoft Teams chat with the bot.'); }
+    catch (e) { setError(e.message || 'Could not send the test message'); }
+    finally { setBusy(''); }
   };
 
   return (
@@ -184,7 +198,19 @@ export default function TeamsSettingsSection() {
           </div>
           <div className="text-[10px] text-text-light">All types are sent unless you pick a subset.</div>
         </div>
-        <div className="flex justify-end mt-3">
+        <div className="mt-3">
+          <label className="block text-[10px] font-semibold text-text-mid mb-1">
+            Message intro <span className="text-text-light font-normal">(optional — shown above the list of items)</span>
+          </label>
+          <textarea value={teamsMessage} onChange={(e) => setTeamsMessage(e.target.value)} rows={2}
+            placeholder="Here are your open items in databob:" className={`w-full ${inputCls} resize-y`} />
+        </div>
+        <div className="flex justify-between items-center mt-3 gap-2 flex-wrap">
+          <button onClick={sendTest} disabled={!!busy || (conn && !conn.configured)}
+            title={conn && !conn.configured ? 'Configure the bot connection first' : 'Sends a test DM to you'}
+            className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-2.5 py-1 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50">
+            {busy === 'testmsg' ? 'Sending…' : 'Send test message to me'}
+          </button>
           <Button onClick={saveReminders} disabled={teamsSaving}>
             {teamsSaving ? 'Saving...' : teamsSuccess ? 'Saved!' : 'Save'}
           </Button>

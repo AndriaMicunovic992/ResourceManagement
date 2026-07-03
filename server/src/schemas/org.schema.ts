@@ -32,6 +32,8 @@ export const updateOrgSchema = z
     teamsRemindersEnabled: z.boolean().optional(),
     // Comma-separated subset of oneOnOne,pmUpdate,clientSignal (empty = all).
     teamsReminderTypes: z.string().max(200).nullable().optional(),
+    // Custom intro line for the Teams reminder DM (empty = built-in default).
+    teamsReminderMessage: z.string().max(2000).nullable().optional(),
   })
   .strict();
 
