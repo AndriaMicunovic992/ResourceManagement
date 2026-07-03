@@ -66,22 +66,63 @@ async function findCatalogAppId(token: string, botAppId: string): Promise<string
   return id;
 }
 
-/** Install the app for one user (by Entra object id). Idempotent: 409 = already there. */
-async function installForUser(token: string, catalogAppId: string, aadUserId: string): Promise<'installed' | 'already'> {
+/** Install the app for one user (by Entra object id). Idempotent: 409 = already
+ *  installed. Returns the installation id when the POST created it (201). */
+async function installForUser(
+  token: string,
+  catalogAppId: string,
+  aadUserId: string
+): Promise<{ status: 'installed' | 'already'; installId: string | null }> {
   const res = await fetch(`${GRAPH}/users/${encodeURIComponent(aadUserId)}/teamwork/installedApps`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ 'teamsApp@odata.bind': `${GRAPH}/appCatalogs/teamsApps/${catalogAppId}` }),
   });
-  if (res.status === 201) return 'installed';
-  if (res.status === 409) return 'already'; // already installed for this user
+  if (res.status === 201) {
+    const j = (await res.json().catch(() => ({}))) as { id?: string };
+    return { status: 'installed', installId: j.id ?? null };
+  }
+  if (res.status === 409) return { status: 'already', installId: null };
   const d = await res.text().catch(() => '');
   throw new Error(`HTTP ${res.status} ${d.slice(0, 120)}`);
 }
 
+/** The teamsAppInstallation id for this user + app (needed to open the chat). */
+async function findInstallationId(
+  token: string,
+  aadUserId: string,
+  catalogAppId: string,
+  botAppId: string
+): Promise<string | null> {
+  const url = `${GRAPH}/users/${encodeURIComponent(aadUserId)}/teamwork/installedApps?$expand=teamsApp`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return null;
+  const j = (await res.json().catch(() => ({}))) as {
+    value?: Array<{ id: string; teamsApp?: { id?: string; externalId?: string } }>;
+  };
+  const match = j.value?.find((a) => a.teamsApp?.id === catalogAppId || a.teamsApp?.externalId === botAppId);
+  return match?.id ?? null;
+}
+
 /**
- * Install the app for every org member with a Microsoft-linked account. The
- * install fires the bot's install event, which registers each person's
+ * Open the 1:1 chat between the user and the app. This creates the chat thread if
+ * it doesn't exist yet — which is what makes the bot receive its install event
+ * (captured by teamsTransport) and surfaces the chat in the user's Teams. Merely
+ * installing the app does neither. Returns an error string on failure, else null.
+ */
+async function openChat(token: string, aadUserId: string, installationId: string): Promise<string | null> {
+  const res = await fetch(
+    `${GRAPH}/users/${encodeURIComponent(aadUserId)}/teamwork/installedApps/${installationId}/chat`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (res.ok) return null;
+  const d = await res.text().catch(() => '');
+  return `chat HTTP ${res.status} ${d.slice(0, 100)}`;
+}
+
+/**
+ * Install the app for every org member with a Microsoft-linked account, then open
+ * each person's chat so the bot receives its install event and registers the
  * conversation (see teamsTransport.captureConversation) — so DMs work afterwards.
  */
 export async function installForAllUsers(orgId: string) {
@@ -107,7 +148,14 @@ export async function installForAllUsers(orgId: string) {
   for (const aadId of targets) {
     try {
       const r = await installForUser(token, catalogAppId, aadId);
-      if (r === 'installed') installed++;
+      // Opening the chat (for a new OR already-installed app) is what registers
+      // the conversation with the bot; installing alone does not.
+      const installId = r.installId ?? (await findInstallationId(token, aadId, catalogAppId, conn.botAppId));
+      if (installId) {
+        const chatErr = await openChat(token, aadId, installId);
+        if (chatErr && errors.length < 3) errors.push(chatErr);
+      }
+      if (r.status === 'installed') installed++;
       else alreadyConnected++;
     } catch (e) {
       failed++;
