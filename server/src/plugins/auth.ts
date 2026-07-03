@@ -16,6 +16,9 @@ const PUBLIC_PATHS = [
   '/api/auth/config',
   '/api/auth/microsoft/login',
   '/api/auth/microsoft/callback',
+  // The Teams bot messaging endpoint — authenticated by Bot Framework's own
+  // bearer token (verified in teamsTransport), not our session JWT.
+  '/api/teams/messages',
 ];
 
 function isPublic(url: string): boolean {

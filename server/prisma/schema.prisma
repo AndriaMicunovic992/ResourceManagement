@@ -30,6 +30,9 @@ model Organization {
   // Comma-separated subset of reminder types to push (oneOnOne,pmUpdate,clientSignal).
   // Null/empty = all types.
   teamsReminderTypes    String?
+  // Customisable intro line shown at the top of the Teams reminder DM (and the
+  // "send test message" preview). Null = the built-in default.
+  teamsReminderMessage  String?
   performanceTrendDefaultFrom String?
   performanceTrendDefaultTo   String?
   createdAt       DateTime @default(now())

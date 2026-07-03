@@ -127,6 +127,7 @@ export const api = {
   getTeamsConnection: () => apiFetch('/integration/teams'),
   saveTeamsConnection: (data) => apiFetch('/integration/teams', { method: 'PUT', body: JSON.stringify(data) }),
   testTeamsConnection: () => apiFetch('/integration/teams/test', { method: 'POST', body: '{}' }),
+  sendTeamsTestMessage: () => apiFetch('/integration/teams/test-message', { method: 'POST', body: '{}' }),
   getActualHours: (customerId, month) => apiFetch(`/integration/tempo/actuals?customerId=${encodeURIComponent(customerId)}&month=${encodeURIComponent(month)}`),
   getMonthlyActuals: (from, to) => apiFetch(`/integration/tempo/actuals/monthly?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getMonthlyActualsByCustomer: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-by-customer?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),

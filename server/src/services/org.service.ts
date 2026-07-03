@@ -51,6 +51,7 @@ export const orgService = {
       pmLogReminderStart?: string | null;
       teamsRemindersEnabled?: boolean;
       teamsReminderTypes?: string | null;
+      teamsReminderMessage?: string | null;
     }
   ) {
     return prisma.organization.update({ where: { id: orgId }, data });
