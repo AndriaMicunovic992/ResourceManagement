@@ -76,14 +76,21 @@ type Activity = {
   conversation?: { id?: string };
   from?: { id?: string; name?: string; aadObjectId?: string };
   recipient?: { id?: string };
+  membersAdded?: Array<{ id?: string; aadObjectId?: string }>;
 };
 
 /** Persist a user's conversation reference so we can DM them later. */
 async function captureConversation(activity: Activity): Promise<void> {
-  const aadObjectId = activity.from?.aadObjectId;
   const serviceUrl = activity.serviceUrl;
   const conversationId = activity.conversation?.id;
-  if (!aadObjectId || !serviceUrl || !conversationId) return;
+  if (!serviceUrl || !conversationId) return;
+  const botId = activity.recipient?.id;
+  // The user's Entra object id is usually on `from`, but on the silent install
+  // event (the bot being added) it can ride on the added member instead.
+  const aadObjectId =
+    activity.from?.aadObjectId ||
+    activity.membersAdded?.find((m) => m.aadObjectId && m.id !== botId)?.aadObjectId;
+  if (!aadObjectId) return;
   // We can only reach people whose account is linked via Entra (SSO) — that's
   // how we map the Teams user (aadObjectId) to our User (microsoftId).
   const user = await prisma.user.findUnique({ where: { microsoftId: aadObjectId } });
@@ -92,7 +99,7 @@ async function captureConversation(activity: Activity): Promise<void> {
   const conversationRef = {
     serviceUrl,
     conversationId,
-    botId: activity.recipient?.id ?? null,
+    botId: botId ?? null,
     userId: activity.from?.id ?? null,
     userName: activity.from?.name ?? null,
   };
@@ -118,14 +125,14 @@ export async function handleInboundActivity(body: unknown, authHeader: string | 
 
   await verifyInbound(authHeader, botAppId); // throws on an invalid token
 
-  const t = activity.type;
-  if (t === 'message' || t === 'conversationUpdate' || t === 'installationUpdate') {
-    // A capture hiccup must not fail the webhook (the token was already valid).
-    try {
-      await captureConversation(activity);
-    } catch {
-      /* logged by the caller via the returned success */
-    }
+  // Capture on any activity that carries a user + conversation — including the
+  // silent conversationUpdate / installationUpdate fired when an admin installs
+  // the app for someone, so people never have to message the bot first. A
+  // capture hiccup must not fail the webhook (the token was already valid).
+  try {
+    await captureConversation(activity);
+  } catch {
+    /* non-fatal */
   }
   return true;
 }
