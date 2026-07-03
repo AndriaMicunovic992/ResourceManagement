@@ -52,6 +52,8 @@ export const orgService = {
       teamsRemindersEnabled?: boolean;
       teamsReminderTypes?: string | null;
       teamsReminderMessage?: string | null;
+      teamsReminderHour?: number;
+      teamsReminderTimezone?: string | null;
     }
   ) {
     return prisma.organization.update({ where: { id: orgId }, data });

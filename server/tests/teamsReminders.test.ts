@@ -77,6 +77,16 @@ describe('isDailyPushDue', () => {
   it('due again the next day', () => {
     expect(isDailyPushDue(at('2026-06-24T07:05:00Z'), at('2026-06-25T07:05:00Z'))).toBe(true);
   });
+  it('respects a custom hour + timezone (08:00 Europe/Zurich, summer = UTC+2)', () => {
+    // 05:30Z = 07:30 in Zurich → before 08:00
+    expect(isDailyPushDue(null, at('2026-06-25T05:30:00Z'), 8, 'Europe/Zurich')).toBe(false);
+    // 06:30Z = 08:30 in Zurich → at/after 08:00
+    expect(isDailyPushDue(null, at('2026-06-25T06:30:00Z'), 8, 'Europe/Zurich')).toBe(true);
+    // already sent earlier the same Zurich day
+    expect(
+      isDailyPushDue(at('2026-06-25T06:35:00Z'), at('2026-06-25T09:00:00Z'), 8, 'Europe/Zurich')
+    ).toBe(false);
+  });
 });
 
 describe('formatDigest', () => {
