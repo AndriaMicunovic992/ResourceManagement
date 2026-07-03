@@ -130,10 +130,12 @@ model TeamsConnection {
   id             String   @id @default(cuid())
   orgId          String   @unique
   org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  // Bot Framework "MicrosoftAppType": MultiTenant | SingleTenant | UserAssignedMSI.
-  // A managed-identity bot (UserAssignedMSI) has no secret — it authenticates via
-  // the identity at runtime — so botAppPassword stays null for that type.
-  appType        String   @default("MultiTenant")
+  // Bot Framework "MicrosoftAppType": SingleTenant | MultiTenant | UserAssignedMSI.
+  // Defaults to SingleTenant — the norm for an internal, single-directory bot, and
+  // the type that authenticates against the org's own tenant. A managed-identity
+  // bot (UserAssignedMSI) has no secret — it authenticates via the identity at
+  // runtime — so botAppPassword stays null for that type.
+  appType        String   @default("SingleTenant")
   botAppId       String?  // Azure Bot "Microsoft App ID" (or the MSI client id)
   botAppPassword String?  // client secret — encrypted at rest; null for managed identity
   tenantId       String?  // directory (Entra) id — required for single-tenant & MSI
