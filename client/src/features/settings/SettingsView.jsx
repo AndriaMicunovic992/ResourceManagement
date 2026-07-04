@@ -645,12 +645,11 @@ export default function SettingsView() {
             In-app reminders shown to managers and responsible people on the People page. A
             reminder fires on every Nth day/week/month from the start date; it clears once the
             1:1 / update happens. Leave "every" or the start date empty to turn a reminder off.
-            Monthly client signals are always flagged when missing for the current month.
           </p>
           <div className="space-y-3">
             {[
               { label: '1:1 reminder', sched: oneOnOneSched, set: setOneOnOneSched },
-              { label: 'PM update reminder', sched: pmLogSched, set: setPmLogSched },
+              { label: 'PM review reminder', sched: pmLogSched, set: setPmLogSched },
             ].map(({ label, sched, set }) => (
               <div key={label} className="flex gap-3 items-end flex-wrap">
                 <div className="w-[140px]">
