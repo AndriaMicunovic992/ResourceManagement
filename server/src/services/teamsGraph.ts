@@ -11,7 +11,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 type Conn = { appType: string; botAppId: string | null; botAppPassword: string | null; tenantId: string | null };
 
 /** App-only Graph token via client credentials (the bot's secret). */
-async function getGraphToken(c: Conn): Promise<string> {
+export async function getGraphToken(c: Conn): Promise<string> {
   if (c.appType === 'UserAssignedMSI') {
     throw new BadRequestError('A managed-identity bot can only call Graph from inside Azure — use a client-secret bot for auto-install.');
   }
@@ -40,7 +40,7 @@ async function getGraphToken(c: Conn): Promise<string> {
 }
 
 /** The app's catalog id (needed to install it). */
-async function findCatalogAppId(token: string, botAppId: string): Promise<string> {
+export async function findCatalogAppId(token: string, botAppId: string): Promise<string> {
   const query = async (filter: string): Promise<string | undefined> => {
     const url = `${GRAPH}/appCatalogs/teamsApps?$filter=${encodeURIComponent(filter)}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -120,6 +120,47 @@ async function openChat(token: string, aadUserId: string, installationId: string
   return `chat HTTP ${res.status} ${d.slice(0, 100)}`;
 }
 
+/** Resolve an email to a user in the bot's Entra tenant. Needs the
+ *  User.ReadBasic.All application permission (admin consent). Returns null when
+ *  nobody in the tenant matches. */
+export async function findTenantUserByEmail(
+  token: string,
+  email: string
+): Promise<{ aadId: string; displayName: string; mail: string | null } | null> {
+  const esc = email.replace(/'/g, "''");
+  const filter = `mail eq '${esc}' or userPrincipalName eq '${esc}'`;
+  const url = `${GRAPH}/users?$filter=${encodeURIComponent(filter)}&$select=id,displayName,mail,userPrincipalName&$top=1`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const d = await res.text().catch(() => '');
+    throw new BadRequestError(
+      `Could not look up the person in Microsoft Entra (the bot app likely needs the User.ReadBasic.All permission with admin consent). ${d.slice(0, 160)}`
+    );
+  }
+  const j = (await res.json()) as {
+    value?: Array<{ id: string; displayName?: string; mail?: string | null }>;
+  };
+  const u = j.value?.[0];
+  if (!u) return null;
+  return { aadId: u.id, displayName: u.displayName || email, mail: u.mail ?? null };
+}
+
+/** Install the app for one user and open their 1:1 chat — the open is what fires
+ *  the bot's install event so the conversation gets registered (installing alone
+ *  does not). Returns the install status and any chat-open error. */
+export async function installAndOpen(
+  token: string,
+  catalogAppId: string,
+  botAppId: string,
+  aadUserId: string
+): Promise<{ status: 'installed' | 'already'; chatErr: string | null }> {
+  const r = await installForUser(token, catalogAppId, aadUserId);
+  const installId = r.installId ?? (await findInstallationId(token, aadUserId, catalogAppId, botAppId));
+  let chatErr: string | null = null;
+  if (installId) chatErr = await openChat(token, aadUserId, installId);
+  return { status: r.status, chatErr };
+}
+
 /**
  * Install the app for every org member with a Microsoft-linked account, then open
  * each person's chat so the bot receives its install event and registers the
@@ -147,15 +188,9 @@ export async function installForAllUsers(orgId: string) {
   const errors: string[] = [];
   for (const aadId of targets) {
     try {
-      const r = await installForUser(token, catalogAppId, aadId);
-      // Opening the chat (for a new OR already-installed app) is what registers
-      // the conversation with the bot; installing alone does not.
-      const installId = r.installId ?? (await findInstallationId(token, aadId, catalogAppId, conn.botAppId));
-      if (installId) {
-        const chatErr = await openChat(token, aadId, installId);
-        if (chatErr && errors.length < 3) errors.push(chatErr);
-      }
-      if (r.status === 'installed') installed++;
+      const { status, chatErr } = await installAndOpen(token, catalogAppId, conn.botAppId, aadId);
+      if (chatErr && errors.length < 3) errors.push(chatErr);
+      if (status === 'installed') installed++;
       else alreadyConnected++;
     } catch (e) {
       failed++;

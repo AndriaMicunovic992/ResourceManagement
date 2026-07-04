@@ -2,7 +2,9 @@ import { FastifyPluginAsync } from 'fastify';
 import { requireRole } from '../middleware/requireRole.js';
 import { handleInboundActivity, sendTestMessage } from '../services/teamsTransport.js';
 import { installForAllUsers } from '../services/teamsGraph.js';
+import { inviteOverTeams } from '../services/teamsInvite.service.js';
 import { runReminderPush } from '../services/teamsReminderPush.js';
+import { inviteSchema } from '../schemas/org.schema.js';
 
 export const teamsRoutes: FastifyPluginAsync = async (app) => {
   // The bot's messaging endpoint. Public (see PUBLIC_PATHS in plugins/auth.ts) —
@@ -35,5 +37,13 @@ export const teamsRoutes: FastifyPluginAsync = async (app) => {
   // time-of-day gate) — real due reminders, so you can verify without waiting.
   app.post('/integration/teams/push-now', { preHandler: requireRole('admin') }, async (req) => {
     return runReminderPush({ now: new Date(), orgId: req.orgId, force: true });
+  });
+
+  // Admin: onboard someone over Teams — create the pending invite, install the
+  // databob app for them via Graph, and DM them a sign-in link. Reaches people
+  // in the Microsoft tenant who haven't signed in yet.
+  app.post('/integration/teams/invite', { preHandler: requireRole('admin') }, async (req) => {
+    const { email, role } = inviteSchema.parse(req.body);
+    return inviteOverTeams(req.orgId, email, role || 'member', req.userId);
   });
 };
