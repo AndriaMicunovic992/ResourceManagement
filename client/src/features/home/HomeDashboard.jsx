@@ -358,9 +358,7 @@ export default function HomeDashboard() {
           .sort((a, b) => b - a)[0];
         reviewDays = Math.max(0, Math.round((Date.now() - last.getTime()) / 86400000));
       }
-      const due = reminders.some(
-        (i) => (i.type === 'pmUpdate' || i.type === 'clientSignal') && i.customerId === c.id
-      );
+      const due = reminders.some((i) => i.type === 'pmUpdate' && i.customerId === c.id);
       return {
         customer: c,
         projects: projIds.size,

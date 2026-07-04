@@ -188,8 +188,11 @@ export const reminderService = {
       }
     }
 
-    // --- PM duties: per (responsible project → its customer) × person
-    // allocated to those projects this month ---
+    // --- PM review duties: for each (responsible project → its customer) ×
+    // person allocated this month, remind the PM when they haven't logged an
+    // update since the latest cadence tick. Client signals are recorded in the
+    // cockpit but are optional — they no longer raise a reminder of their own,
+    // so a missing signal alone never nags. ---
     const projects = await prisma.project.findMany({
       where: {
         orgId,
@@ -201,7 +204,7 @@ export const reminderService = {
       select: { id: true, customerId: true },
     });
     const responsibleCustomerIds = Array.from(new Set(projects.map((p) => p.customerId)));
-    if (projects.length > 0) {
+    if (projects.length > 0 && pmLogTick) {
       const month = currentMonthKey();
       const customers = await prisma.customer.findMany({
         where: { orgId, id: { in: responsibleCustomerIds } },
@@ -242,26 +245,17 @@ export const reminderService = {
         const personName = new Map(people.map((p) => [p.id, p.name]));
         const customerName = new Map(customers.map((c) => [c.id, c.name]));
 
-        // Existing signals for the current month.
-        const signals = await prisma.clientSignal.findMany({
-          where: { orgId, month, customerId: { in: responsibleCustomerIds } },
-          select: { customerId: true, resourceId: true },
-        });
-        const signalSet = new Set(signals.map((s) => `${s.customerId}|${s.resourceId}`));
-
         // Latest update the user logged per (customer, person).
-        const sinceLogs = pmLogTick
-          ? await prisma.log.findMany({
-              where: {
-                orgId,
-                authorUserId: userId,
-                customerId: { in: responsibleCustomerIds },
-                resourceId: { in: allResourceIds },
-              },
-              select: { customerId: true, resourceId: true, createdAt: true },
-              orderBy: { createdAt: 'desc' },
-            })
-          : [];
+        const sinceLogs = await prisma.log.findMany({
+          where: {
+            orgId,
+            authorUserId: userId,
+            customerId: { in: responsibleCustomerIds },
+            resourceId: { in: allResourceIds },
+          },
+          select: { customerId: true, resourceId: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        });
         const latestLog = new Map<string, Date>();
         for (const l of sinceLogs) {
           const key = `${l.customerId}|${l.resourceId}`;
@@ -269,39 +263,24 @@ export const reminderService = {
         }
 
         // Exclude self: a PM never logs structured updates about themselves.
+        // Due = no update (and no dismissal) since the latest scheduled tick.
         for (const [customerId, resourceIds] of allocated) {
           for (const resourceId of resourceIds) {
             if (resourceId === scope.selfResourceId) continue;
             const key = `${customerId}|${resourceId}`;
-            const signalDismissed = (() => {
-              const at = latestDismissal.get(`clientSignal|${resourceId}|${customerId}`);
-              return !!at && at.toISOString().slice(0, 7) === month;
-            })();
-            if (!signalSet.has(key) && !signalDismissed) {
+            const last = maxDate(
+              latestLog.get(key) ?? null,
+              latestDismissal.get(`pmUpdate|${resourceId}|${customerId}`)
+            );
+            if (!last || last < pmLogTick) {
               items.push({
-                type: 'clientSignal',
+                type: 'pmUpdate',
                 resourceId,
                 resourceName: personName.get(resourceId) || '?',
                 customerId,
                 customerName: customerName.get(customerId) || '?',
+                lastAt: latestLog.get(key)?.toISOString() ?? null,
               });
-            }
-            // Due = no update (and no dismissal) since the latest scheduled tick.
-            if (pmLogTick) {
-              const last = maxDate(
-                latestLog.get(key) ?? null,
-                latestDismissal.get(`pmUpdate|${resourceId}|${customerId}`)
-              );
-              if (!last || last < pmLogTick) {
-                items.push({
-                  type: 'pmUpdate',
-                  resourceId,
-                  resourceName: personName.get(resourceId) || '?',
-                  customerId,
-                  customerName: customerName.get(customerId) || '?',
-                  lastAt: latestLog.get(key)?.toISOString() ?? null,
-                });
-              }
             }
           }
         }

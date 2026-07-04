@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { ChatIcon, PencilIcon, SignalIcon, XIcon } from '../../components/ui/icons';
+import { ChatIcon, PencilIcon, XIcon } from '../../components/ui/icons';
 
 const TYPE_META = {
   oneOnOne: { Icon: ChatIcon, iconClass: 'text-primary', badge: 'bg-primary-light text-primary', label: '1:1 due' },
-  pmUpdate: { Icon: PencilIcon, iconClass: 'text-warning', badge: 'bg-warning-bg text-warning', label: 'Update due' },
-  clientSignal: { Icon: SignalIcon, iconClass: 'text-danger', badge: 'bg-danger-bg text-danger', label: 'Signal missing' },
+  pmUpdate: { Icon: PencilIcon, iconClass: 'text-warning', badge: 'bg-warning-bg text-warning', label: 'PM review' },
 };
 
 function daysAgo(iso) {
@@ -19,12 +18,10 @@ function describe(item) {
       ? `last 1:1 was ${daysAgo(item.lastAt)} days ago`
       : 'no 1:1 recorded yet';
   }
-  if (item.type === 'pmUpdate') {
-    return item.lastAt
-      ? `your last update was ${daysAgo(item.lastAt)} days ago · ${item.customerName}`
-      : `no updates from you yet · ${item.customerName}`;
-  }
-  return `no rating for this month yet · ${item.customerName}`;
+  // pmUpdate — the PM review nudge.
+  return item.lastAt
+    ? `your last update was ${daysAgo(item.lastAt)} days ago · ${item.customerName}`
+    : `no updates from you yet · ${item.customerName}`;
 }
 
 function linkFor(item) {
@@ -120,7 +117,7 @@ export default function RemindersPanel() {
         })}
       </div>
       <p className="text-[10px] text-text-light mt-2 mb-0">
-        1:1s: people you manage · updates &amp; signals: customers you're responsible for.
+        1:1s: people you manage · PM reviews: customers you're responsible for.
         Configure cadences in Settings → Reminders.
       </p>
     </div>

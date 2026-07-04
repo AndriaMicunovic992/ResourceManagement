@@ -70,9 +70,7 @@ export default function NotificationBell() {
   const reminderText = (r) =>
     r.type === 'oneOnOne'
       ? `1:1 with ${firstName(r.resourceName)} is due`
-      : r.type === 'pmUpdate'
-        ? `PM update due · ${r.customerName}`
-        : `Client signal missing · ${r.customerName}`;
+      : `PM review due · ${r.customerName}`;
 
   return (
     <div className="relative" ref={ref}>

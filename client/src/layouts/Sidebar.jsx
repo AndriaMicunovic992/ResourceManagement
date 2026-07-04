@@ -57,14 +57,10 @@ function reminderCopy(item) {
     sub: item.lastAt ? `Last one ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago` : 'No 1:1 on record yet',
     to: `/people/${item.resourceId}/oneonones`,
   };
-  if (item.type === 'pmUpdate') return {
-    title: `PM update due · ${item.customerName}`,
-    sub: item.lastAt ? `Last review ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago` : 'No review yet',
-    to: `/customers/${item.customerId}/review`,
-  };
+  // pmUpdate — the PM review nudge.
   return {
-    title: `Signal missing · ${item.customerName}`,
-    sub: 'No signal logged this month',
+    title: `PM review due · ${item.customerName}`,
+    sub: item.lastAt ? `Last review ${Math.round((Date.now() - new Date(item.lastAt)) / 86400000)} days ago` : 'No review yet',
     to: `/customers/${item.customerId}/review`,
   };
 }
