@@ -130,6 +130,7 @@ export const api = {
   sendTeamsTestMessage: () => apiFetch('/integration/teams/test-message', { method: 'POST', body: '{}' }),
   installTeamsForAll: () => apiFetch('/integration/teams/install-all', { method: 'POST', body: '{}' }),
   pushTeamsReminders: () => apiFetch('/integration/teams/push-now', { method: 'POST', body: '{}' }),
+  inviteTeams: (email, role) => apiFetch('/integration/teams/invite', { method: 'POST', body: JSON.stringify({ email, role }) }),
   getActualHours: (customerId, month) => apiFetch(`/integration/tempo/actuals?customerId=${encodeURIComponent(customerId)}&month=${encodeURIComponent(month)}`),
   getMonthlyActuals: (from, to) => apiFetch(`/integration/tempo/actuals/monthly?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getMonthlyActualsByCustomer: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-by-customer?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),

@@ -30,6 +30,7 @@ export default function SettingsView() {
   );
   const [email, setEmail] = useState('');
   const [newRole, setNewRole] = useState('member');
+  const [teamsInviting, setTeamsInviting] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState('account');
@@ -265,6 +266,31 @@ export default function SettingsView() {
       setError(err.message || 'Failed to add member');
     }
     setLoading(false);
+  };
+
+  // Onboard over Teams: create the invite AND ping the person in Teams with a
+  // sign-in link (installs the databob app for them). Microsoft tenant only.
+  const handleTeamsInvite = async () => {
+    if (!email.trim()) { setError('Enter an email first'); return; }
+    setError('');
+    setMemberNotice('');
+    setTeamsInviting(true);
+    try {
+      const r = await api.inviteTeams(email.trim(), newRole);
+      const who = r.microsoftName || email.trim();
+      const lead = r.status === 'already_member' ? `${who} is already a member` : `Invited ${who}`;
+      const app = r.installed === 'installed' ? 'installed the databob app' : 'app already installed';
+      const dm = r.welcomed
+        ? 'and DMed them a sign-in link'
+        : 'the Teams welcome will arrive once Teams finishes provisioning';
+      setMemberNotice(`${lead}, ${app}, ${dm}.`);
+      setEmail('');
+      setNewRole('member');
+      await loadInvites();
+    } catch (err) {
+      setError(err.message || 'Could not invite over Teams');
+    }
+    setTeamsInviting(false);
   };
 
   const handleViewAs = async (userId) => {
@@ -1329,10 +1355,24 @@ export default function SettingsView() {
                 ))}
               </select>
             </div>
+            <button
+              type="button" onClick={handleTeamsInvite} disabled={teamsInviting || loading}
+              title="Create the invite, install the databob app for them, and DM a sign-in link over Teams (Microsoft tenant only)"
+              className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50 whitespace-nowrap"
+            >
+              {teamsInviting ? 'Inviting…' : 'Invite over Teams'}
+            </button>
             <Button type="submit" disabled={loading}>
               {loading ? 'Adding...' : 'Add'}
             </Button>
           </form>
+        )}
+        {isAdmin && (
+          <p className="text-[10px] text-text-light mt-2">
+            <b>Add</b> creates the invite (they get access on first Microsoft sign-in).
+            <b> Invite over Teams</b> also installs the databob app for them and sends a
+            sign-in link as a Teams DM — for people in your Microsoft tenant.
+          </p>
         )}
       </div>
 
