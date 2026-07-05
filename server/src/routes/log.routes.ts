@@ -15,6 +15,7 @@ import {
   deleteLogComment,
 } from '../services/log.service.js';
 import { assertCanViewPerson } from '../services/visibility.service.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 
 export const logRoutes: FastifyPluginAsync = async (app) => {
   app.get('/people/:personId/logs', async (req) => {
@@ -30,7 +31,7 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
     return getLog(req.orgId, personId, id, req.userId, req.role);
   });
 
-  app.post('/people/:personId/logs', async (req, reply) => {
+  app.post('/people/:personId/logs', { preHandler: requirePermission('activity', 'create') }, async (req, reply) => {
     const { personId } = req.params as { personId: string };
     assertCanViewPerson(req.visibility, personId);
     const body = createLogSchema.parse(req.body);
@@ -38,14 +39,14 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
     return reply.status(201).send(created);
   });
 
-  app.patch('/people/:personId/logs/:id', async (req) => {
+  app.patch('/people/:personId/logs/:id', { preHandler: requirePermission('activity', 'edit') }, async (req) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     const body = updateLogSchema.parse(req.body);
     return updateLog(req.orgId, personId, id, req.userId, req.role, body);
   });
 
-  app.delete('/people/:personId/logs/:id', async (req, reply) => {
+  app.delete('/people/:personId/logs/:id', { preHandler: requirePermission('activity', 'delete') }, async (req, reply) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     await deleteLog(req.orgId, personId, id, req.userId, req.role);
@@ -54,7 +55,7 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
 
   // --- Thread comments (PM ↔ manager ↔ admins; never the subject in v1) ---
 
-  app.post('/people/:personId/logs/:id/comments', async (req, reply) => {
+  app.post('/people/:personId/logs/:id/comments', { preHandler: requirePermission('activity', 'create') }, async (req, reply) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     const body = createLogCommentSchema.parse(req.body);
@@ -62,7 +63,7 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
     return reply.status(201).send(created);
   });
 
-  app.delete('/people/:personId/logs/:id/comments/:commentId', async (req, reply) => {
+  app.delete('/people/:personId/logs/:id/comments/:commentId', { preHandler: requirePermission('activity', 'delete') }, async (req, reply) => {
     const { personId, id, commentId } = req.params as {
       personId: string;
       id: string;

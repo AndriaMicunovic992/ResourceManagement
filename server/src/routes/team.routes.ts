@@ -1,12 +1,15 @@
 import { FastifyPluginAsync } from 'fastify';
 import { teamService } from '../services/team.service.js';
 import { createTeamSchema, updateTeamSchema } from '../schemas/team.schema.js';
-import { requireRole } from '../middleware/requireRole.js';
 import { requirePermission } from '../middleware/requirePermission.js';
+import { canView } from '../lib/permissions.js';
 import { assertManagerUsersAllowed } from '../services/visibility.service.js';
 
 export const teamRoutes: FastifyPluginAsync = async (app) => {
   app.get('/teams', async (req) => {
+    // Mirror the other list endpoints: no view permission → empty list, rather
+    // than leaking the whole team roster + manager identities to any token.
+    if (!canView(req.permissions, 'teams')) return [];
     return teamService.list(req.orgId);
   });
 

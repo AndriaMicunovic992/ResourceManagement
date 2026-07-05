@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { assertCanViewPerson, assertCanViewCustomer, isSelf } from '../services/visibility.service.js';
+import { requirePermission } from '../middleware/requirePermission.js';
 import { ForbiddenError } from '../utils/errors.js';
 import { followUpService } from '../services/followUp.service.js';
 import { careerEntryService } from '../services/careerEntry.service.js';
@@ -41,7 +42,7 @@ export const peopleOpsRoutes: FastifyPluginAsync = async (app) => {
     return followUpService.list(req.orgId, personId, status);
   });
 
-  app.post('/people/:personId/followups', async (req, reply) => {
+  app.post('/people/:personId/followups', { preHandler: requirePermission('activity', 'create') }, async (req, reply) => {
     const { personId } = req.params as { personId: string };
     assertCanViewPerson(req.visibility, personId);
     assertNotSelfWrite(req, personId, 'create follow-ups');
@@ -50,7 +51,7 @@ export const peopleOpsRoutes: FastifyPluginAsync = async (app) => {
     return reply.status(201).send(created);
   });
 
-  app.patch('/people/:personId/followups/:id', async (req) => {
+  app.patch('/people/:personId/followups/:id', { preHandler: requirePermission('activity', 'edit') }, async (req) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     assertNotSelfWrite(req, personId, 'edit follow-ups');
@@ -58,7 +59,7 @@ export const peopleOpsRoutes: FastifyPluginAsync = async (app) => {
     return followUpService.update(req.orgId, personId, id, body);
   });
 
-  app.delete('/people/:personId/followups/:id', async (req, reply) => {
+  app.delete('/people/:personId/followups/:id', { preHandler: requirePermission('activity', 'delete') }, async (req, reply) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     assertNotSelfWrite(req, personId, 'delete follow-ups');
@@ -74,7 +75,7 @@ export const peopleOpsRoutes: FastifyPluginAsync = async (app) => {
     return careerEntryService.list(req.orgId, personId);
   });
 
-  app.post('/people/:personId/career', async (req, reply) => {
+  app.post('/people/:personId/career', { preHandler: requirePermission('activity', 'create') }, async (req, reply) => {
     const { personId } = req.params as { personId: string };
     assertCanViewPerson(req.visibility, personId);
     assertNotSelfWrite(req, personId, 'add career entries');
@@ -83,7 +84,7 @@ export const peopleOpsRoutes: FastifyPluginAsync = async (app) => {
     return reply.status(201).send(created);
   });
 
-  app.patch('/people/:personId/career/:id', async (req) => {
+  app.patch('/people/:personId/career/:id', { preHandler: requirePermission('activity', 'edit') }, async (req) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     assertNotSelfWrite(req, personId, 'edit career entries');
@@ -91,7 +92,7 @@ export const peopleOpsRoutes: FastifyPluginAsync = async (app) => {
     return careerEntryService.update(req.orgId, personId, id, req.userId, req.role, body);
   });
 
-  app.delete('/people/:personId/career/:id', async (req, reply) => {
+  app.delete('/people/:personId/career/:id', { preHandler: requirePermission('activity', 'delete') }, async (req, reply) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     assertNotSelfWrite(req, personId, 'delete career entries');
