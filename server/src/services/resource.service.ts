@@ -195,6 +195,18 @@ export const resourceService = {
 
   async delete(orgId: string, id: string) {
     await this.getById(orgId, id);
-    return prisma.resource.delete({ where: { id } });
+    try {
+      return await prisma.resource.delete({ where: { id } });
+    } catch (err) {
+      // A person with protected history (evaluations, 1:1s, logs, career or
+      // follow-up entries) can't be hard-deleted — that would destroy the
+      // record of their reviews. Direct the caller to archive instead.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+        throw new ConflictError(
+          'This person has history (evaluations, 1:1s, logs, career or follow-up entries). Archive them instead of deleting.'
+        );
+      }
+      throw err;
+    }
   },
 };

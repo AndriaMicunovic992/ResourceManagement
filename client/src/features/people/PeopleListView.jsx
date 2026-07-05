@@ -31,7 +31,10 @@ export default function PeopleListView() {
   const [search, setSearch] = useState('');
   const [teamId, setTeamId] = useState('');
   const [adding, setAdding] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [overdueIds, setOverdueIds] = useState(() => new Set());
+  const archivedCount = resources.filter((r) => r.archived).length;
+  const activeCount = resources.length - archivedCount;
 
   const m0 = currentMonth();
   const monthShort = MONTHS[parseInt(m0.slice(5), 10) - 1];
@@ -51,13 +54,14 @@ export default function PeopleListView() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return resources
+      .filter((r) => showArchived || !r.archived)
       .filter((r) => !teamId || (r.teams || []).some((t) => t.id === teamId))
       .filter((r) => !q || r.name.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [resources, search, teamId]);
+  }, [resources, search, teamId, showArchived]);
 
   const pctFor = (r) => Math.round(((rU[r.id]?.[m0] || 0) / (r.capacity || 1)) * 100);
-  const overCount = resources.filter((r) => pctFor(r) > 100).length;
+  const overCount = resources.filter((r) => !r.archived && pctFor(r) > 100).length;
 
   const handleCreate = async (data) => {
     const created = await addResource(data);
@@ -72,7 +76,7 @@ export default function PeopleListView() {
       <RemindersPanel />
       <PageHeader
         title="People"
-        subtitle={`${resources.length} ${resources.length === 1 ? 'person' : 'people'} · ${
+        subtitle={`${activeCount} ${activeCount === 1 ? 'person' : 'people'} · ${
           overCount > 0 ? `${overCount} over capacity in ${monthShort}` : `all within capacity in ${monthShort}`
         }`}
       >
@@ -110,6 +114,18 @@ export default function PeopleListView() {
             {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         ) : null}
+        {archivedCount > 0 && (
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className={`text-[10.5px] font-bold px-3 py-2 rounded-xl border transition-colors ${
+              showArchived
+                ? 'border-primary bg-primary-light text-primary'
+                : 'border-border-light bg-white text-text-mid hover:text-text'
+            }`}
+          >
+            {showArchived ? 'Hide' : 'Show'} archived ({archivedCount})
+          </button>
+        )}
         {canEdit && <Button onClick={() => setAdding(true)}>＋ Person</Button>}
       </PageHeader>
 
@@ -134,7 +150,12 @@ export default function PeopleListView() {
               >
                 <Avatar name={r.name} color={color} size={34} />
                 <span className="w-[220px] min-w-0 shrink-0">
-                  <span className="block text-[12.5px] font-bold text-text truncate">{r.name}</span>
+                  <span className="block text-[12.5px] font-bold text-text truncate">
+                    {r.name}
+                    {r.archived && (
+                      <span className="ml-2 text-[9px] font-bold uppercase tracking-wide text-text-light bg-[#EEF1F5] rounded px-1.5 py-0.5 align-middle">Archived</span>
+                    )}
+                  </span>
                   <span className="block text-[9.5px] font-mono text-text-light truncate mt-0.5">
                     {(r.roles || []).map((role) => `${role.domain.slice(0, 3)} ${role.role}·${seniorityShort(role.seniority)}`).join(' · ') || '—'}
                   </span>
