@@ -52,19 +52,25 @@ async function ensureMembersInOrg(orgId: string, userIds: string[]): Promise<voi
 async function setDirectManagers(orgId: string, personId: string, managerUserIds: string[]): Promise<void> {
   const unique = [...new Set(managerUserIds)];
   await ensureMembersInOrg(orgId, unique);
-  await prisma.personManager.deleteMany({ where: { personId } });
-  if (unique.length === 0) return;
   // A person can't manage themselves (via their own login user).
   const self = await prisma.resource.findUnique({
     where: { id: personId },
     select: { userId: true },
   });
   const filtered = unique.filter((uid) => uid !== self?.userId);
-  if (filtered.length === 0) return;
-  await prisma.personManager.createMany({
-    data: filtered.map((managerUserId) => ({ personId, managerUserId, orgId })),
-    skipDuplicates: true,
-  });
+  // Replace the manager set atomically so a failure can't drop all managers.
+  const ops: Prisma.PrismaPromise<unknown>[] = [
+    prisma.personManager.deleteMany({ where: { personId } }),
+  ];
+  if (filtered.length > 0) {
+    ops.push(
+      prisma.personManager.createMany({
+        data: filtered.map((managerUserId) => ({ personId, managerUserId, orgId })),
+        skipDuplicates: true,
+      })
+    );
+  }
+  await prisma.$transaction(ops);
 }
 
 export const resourceService = {
@@ -127,10 +133,15 @@ export const resourceService = {
     if (teamIds) await ensureTeamsInOrg(orgId, teamIds);
 
     if (roles) {
-      await prisma.resourceRole.deleteMany({ where: { resourceId: id } });
-      await prisma.resourceRole.createMany({
-        data: roles.map((r) => ({ ...r, resourceId: id })),
-      });
+      // Replace atomically — a failure between delete and create would leave the
+      // person with no roles.
+      const ops: Prisma.PrismaPromise<unknown>[] = [
+        prisma.resourceRole.deleteMany({ where: { resourceId: id } }),
+      ];
+      if (roles.length > 0) {
+        ops.push(prisma.resourceRole.createMany({ data: roles.map((r) => ({ ...r, resourceId: id })) }));
+      }
+      await prisma.$transaction(ops);
     }
 
     const patch: Prisma.ResourceUpdateInput = { ...rest };

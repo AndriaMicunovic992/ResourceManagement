@@ -159,7 +159,7 @@ async function tieLogs(evaluation: {
   projectId: string | null;
   periodStart: Date;
   periodEnd: Date;
-}): Promise<void> {
+}, client: Prisma.TransactionClient = prisma): Promise<void> {
   const where: Prisma.LogWhereInput = {
     orgId: evaluation.orgId,
     resourceId: evaluation.resourceId,
@@ -179,7 +179,7 @@ async function tieLogs(evaluation: {
     };
     where.AND = [...(Array.isArray(where.AND) ? where.AND : []), projectClause];
   }
-  await prisma.log.updateMany({ where, data: { evaluationId: evaluation.id } });
+  await client.log.updateMany({ where, data: { evaluationId: evaluation.id } });
 }
 
 /**
@@ -668,19 +668,23 @@ export const evaluationService = {
       throw new BadRequestError('This evaluation has no computed score; provide an override to finalize');
     }
 
-    const updated = await prisma.evaluation.update({
-      where: { id },
-      data: {
-        state: 'finalized',
-        finalizedAt: new Date(),
-        finalizedByUserId: requestingUserId,
-        overrideFinal: data.overrideFinal ?? null,
-        overrideReason: data.overrideFinal != null ? data.overrideReason ?? null : null,
-      },
-      include: evaluationInclude,
+    // Flip to finalized and tie the evidence logs in one transaction, so a
+    // failure can't leave a finalized evaluation with its logs still untied.
+    const updated = await prisma.$transaction(async (tx) => {
+      const ev = await tx.evaluation.update({
+        where: { id },
+        data: {
+          state: 'finalized',
+          finalizedAt: new Date(),
+          finalizedByUserId: requestingUserId,
+          overrideFinal: data.overrideFinal ?? null,
+          overrideReason: data.overrideFinal != null ? data.overrideReason ?? null : null,
+        },
+        include: evaluationInclude,
+      });
+      await tieLogs(ev, tx);
+      return ev;
     });
-
-    await tieLogs(updated);
 
     return updated;
   },

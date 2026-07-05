@@ -22,11 +22,16 @@ export const orgService = {
 
   async createOrg(userId: string, name: string) {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const org = await prisma.organization.create({
-      data: { name, slug: slug + '-' + Date.now().toString(36) },
-    });
-    await prisma.orgMember.create({
-      data: { userId, orgId: org.id, role: 'owner' },
+    // Org + owner membership must commit together — a failure between them would
+    // leave an org that nobody can access.
+    const org = await prisma.$transaction(async (tx) => {
+      const created = await tx.organization.create({
+        data: { name, slug: slug + '-' + Date.now().toString(36) },
+      });
+      await tx.orgMember.create({
+        data: { userId, orgId: created.id, role: 'owner' },
+      });
+      return created;
     });
     await seedDefaultRoles(org.id);
     await ensureTaxonomy(org.id);

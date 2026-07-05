@@ -57,17 +57,22 @@ export const inviteService = {
 
     const memberships = [];
     for (const invite of pending) {
-      const existing = await prisma.orgMember.findUnique({
-        where: { userId_orgId: { userId, orgId: invite.orgId } },
-      });
-      const membership =
-        existing ??
-        (await prisma.orgMember.create({
-          data: { userId, orgId: invite.orgId, role: invite.role },
-        }));
-      await prisma.invite.update({
-        where: { id: invite.id },
-        data: { acceptedAt: new Date() },
+      // Create the membership and mark the invite accepted atomically, so a
+      // failure can't consume the invite without granting access (or vice versa).
+      const membership = await prisma.$transaction(async (tx) => {
+        const existing = await tx.orgMember.findUnique({
+          where: { userId_orgId: { userId, orgId: invite.orgId } },
+        });
+        const m =
+          existing ??
+          (await tx.orgMember.create({
+            data: { userId, orgId: invite.orgId, role: invite.role },
+          }));
+        await tx.invite.update({
+          where: { id: invite.id },
+          data: { acceptedAt: new Date() },
+        });
+        return m;
       });
       memberships.push(membership);
     }
