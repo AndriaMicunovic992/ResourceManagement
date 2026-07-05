@@ -154,6 +154,15 @@ export default function HomeDashboard() {
     const capacity = resources.reduce((s, r) => s + (r.capacity || 1), 0) || 1;
     const realisedPct = [], plannedPct = [], gapFte = [], activeCount = [];
     const projectById = new Map(projects.map((p) => [p.id, p]));
+    const customerById = new Map(customers.map((c) => [c.id, c]));
+    // Only realised need→project→customer chains count as "unfilled"; potential
+    // demand is speculative and excluded from the gap.
+    const isRealisedNeed = (n) => {
+      if (n.status !== 'realised') return false;
+      const proj = projectById.get(n.projectId);
+      if (proj?.status !== 'realised') return false;
+      return customerById.get(proj?.customerId)?.status === 'realised';
+    };
 
     for (const m of windowMonths) {
       let realised = 0, planned = 0;
@@ -170,6 +179,7 @@ export default function HomeDashboard() {
         const needed = (n.monthAllocations || {})[m] || 0;
         if (needed > 0) active.add(n.projectId);
         if (needed <= 0) continue;
+        if (!isRealisedNeed(n)) continue; // exclude potential needs
         const filled = assignments
           .filter((a) => a.needId === n.id)
           .reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
@@ -179,25 +189,30 @@ export default function HomeDashboard() {
       activeCount.push([...active].filter((id) => projectById.get(id)?.status === 'realised').length);
     }
     return { realisedPct, plannedPct, gapFte, activeCount, capacity };
-  }, [windowMonths, resources, needs, assignments, projects, rU, rURealised]);
+  }, [windowMonths, resources, needs, assignments, projects, customers, rU, rURealised]);
 
   /* ----- headline insight ----- */
   const insight = useMemo(() => {
     let gap = 0; const openCustomers = new Set(); let openNeeds = 0;
     const projectById = new Map(projects.map((p) => [p.id, p]));
+    const customerById = new Map(customers.map((c) => [c.id, c]));
     for (const n of needs) {
       const needed = (n.monthAllocations || {})[m0] || 0;
       if (needed <= 0) continue;
+      // Match the Unfilled KPI — realised demand only, skip potential.
+      if (n.status !== 'realised') continue;
+      const proj = projectById.get(n.projectId);
+      if (proj?.status !== 'realised') continue;
+      if (customerById.get(proj?.customerId)?.status !== 'realised') continue;
       const filled = assignments.filter((a) => a.needId === n.id).reduce((s, a) => s + ((a.monthAllocations || {})[m0] || 0), 0);
       const g = needed - filled;
       if (g > 0.005) {
         gap += g; openNeeds += 1;
-        const cid = projectById.get(n.projectId)?.customerId;
-        if (cid) openCustomers.add(cid);
+        openCustomers.add(proj.customerId);
       }
     }
     return { gap, openNeeds, customers: openCustomers.size };
-  }, [needs, assignments, projects, m0]);
+  }, [needs, assignments, projects, customers, m0]);
 
   /* ----- KPIs ----- */
   const activeProjects = projects.filter((p) => p.status === 'realised').length;
@@ -441,7 +456,7 @@ export default function HomeDashboard() {
               </Kpi>
             )}
             <Kpi label={`Unfilled (${MONTHS[today.getMonth()]})`} chip="◌" chipBg="#FDE8EA" chipColor="#E8636F" spark={series.gapFte} sparkColor="#E8636F"
-              info="Open demand this month across every need: Σ max(0, needed − filled) FTE. The chip is the change vs last month (down is good).">
+              info="Open demand this month across realised needs only — potential needs are excluded: Σ max(0, needed − filled) FTE. The chip is the change vs last month (down is good).">
               {Math.round(gapNow * 10) / 10} <span className="text-[11px] font-medium text-text-light">FTE</span>
               <Delta value={gapPrev == null ? null : gapNow - gapPrev} goodWhenDown />
             </Kpi>
