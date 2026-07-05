@@ -110,6 +110,13 @@ export default function SettingsView() {
   const [perfTrendTo, setPerfTrendTo] = useState(currentOrg?.performanceTrendDefaultTo || '');
   const [perfTrendSaving, setPerfTrendSaving] = useState(false);
   const [perfTrendSuccess, setPerfTrendSuccess] = useState(false);
+
+  const [insightsKind, setInsightsKind] = useState(currentOrg?.insightsDefaultKind || 'rolling');
+  const [insightsMonths, setInsightsMonths] = useState(String(currentOrg?.insightsDefaultMonths ?? 12));
+  const [insightsStart, setInsightsStart] = useState(currentOrg?.insightsDefaultStart || '');
+  const [insightsEnd, setInsightsEnd] = useState(currentOrg?.insightsDefaultEnd || '');
+  const [insightsSaving, setInsightsSaving] = useState(false);
+  const [insightsSuccess, setInsightsSuccess] = useState(false);
   const scheduleFromOrg = (org, prefix) => ({
     every: org?.[`${prefix}Every`] != null ? String(org[`${prefix}Every`]) : '',
     unit: org?.[`${prefix}Unit`] || 'weekly',
@@ -129,6 +136,10 @@ export default function SettingsView() {
     setPerfTrendMonths(String(currentOrg?.performanceTrendDefaultMonths ?? 12));
     setPerfTrendFrom(currentOrg?.performanceTrendDefaultFrom || '');
     setPerfTrendTo(currentOrg?.performanceTrendDefaultTo || '');
+    setInsightsKind(currentOrg?.insightsDefaultKind || 'rolling');
+    setInsightsMonths(String(currentOrg?.insightsDefaultMonths ?? 12));
+    setInsightsStart(currentOrg?.insightsDefaultStart || '');
+    setInsightsEnd(currentOrg?.insightsDefaultEnd || '');
     setOneOnOneSched(scheduleFromOrg(currentOrg, 'oneOnOneReminder'));
     setPmLogSched(scheduleFromOrg(currentOrg, 'pmLogReminder'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -204,6 +215,40 @@ export default function SettingsView() {
       setError(err.message || 'Failed to save performance trend default');
     }
     setPerfTrendSaving(false);
+  };
+
+  const handleSaveInsights = async () => {
+    const update = { insightsDefaultKind: insightsKind };
+    if (insightsKind === 'rolling') {
+      const n = parseInt(insightsMonths, 10);
+      if (!Number.isFinite(n) || n < 1 || n > 120) {
+        setError('Insights window months must be between 1 and 120');
+        return;
+      }
+      update.insightsDefaultMonths = n;
+    }
+    if (insightsKind === 'custom') {
+      if (!insightsStart || !insightsEnd) {
+        setError('A custom Insights range needs both a "From" and "To" month');
+        return;
+      }
+      if (insightsEnd < insightsStart) {
+        setError('"To" month must be after "From" month');
+        return;
+      }
+      update.insightsDefaultStart = insightsStart;
+      update.insightsDefaultEnd = insightsEnd;
+    }
+    setInsightsSaving(true);
+    setInsightsSuccess(false);
+    try {
+      await updateOrg(update);
+      setInsightsSuccess(true);
+      setTimeout(() => setInsightsSuccess(false), 2000);
+    } catch (err) {
+      setError(err.message || 'Failed to save the Insights default range');
+    }
+    setInsightsSaving(false);
   };
 
   const loadMembers = useCallback(async () => {
@@ -552,6 +597,7 @@ export default function SettingsView() {
         { id: 'organization', label: 'General' },
         { id: 'planning', label: 'Planning range', admin: true },
         { id: 'trend', label: 'Performance trend', admin: true },
+        { id: 'insights-range', label: 'Insights range', admin: true },
       ],
     },
     {
@@ -800,6 +846,67 @@ export default function SettingsView() {
             )}
             <Button onClick={handleSavePerfTrend} disabled={perfTrendSaving}>
               {perfTrendSaving ? 'Saving...' : perfTrendSuccess ? 'Saved!' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div id="insights-range" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-3">Insights default range</h3>
+          <p className="text-[10px] text-text-light mb-3">
+            The month window the Insights → Planning tab opens with. Pick a rolling window (N months from the current month) or a fixed range. Anyone can still change it on the page.
+          </p>
+          <div className="flex gap-3 items-end flex-wrap">
+            <div className="flex-1 min-w-[180px] max-w-[240px]">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Default type</label>
+              <select
+                value={insightsKind}
+                onChange={(e) => setInsightsKind(e.target.value)}
+                className="w-full px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
+              >
+                <option value="rolling">Rolling months (from now)</option>
+                <option value="custom">Custom (from / to)</option>
+              </select>
+            </div>
+            {insightsKind === 'rolling' && (
+              <div className="flex-1 max-w-[140px]">
+                <label className="block text-[10px] font-semibold text-text-mid mb-1">Months</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={insightsMonths}
+                  onChange={(e) => setInsightsMonths(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                />
+              </div>
+            )}
+            {insightsKind === 'custom' && (
+              <>
+                <div className="flex-1 max-w-[170px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">From</label>
+                  <input
+                    type="month"
+                    value={insightsStart}
+                    onChange={(e) => setInsightsStart(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="flex-1 max-w-[170px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">To</label>
+                  <input
+                    type="month"
+                    value={insightsEnd}
+                    min={insightsStart || undefined}
+                    onChange={(e) => setInsightsEnd(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                  />
+                </div>
+              </>
+            )}
+            <Button onClick={handleSaveInsights} disabled={insightsSaving}>
+              {insightsSaving ? 'Saving...' : insightsSuccess ? 'Saved!' : 'Save'}
             </Button>
           </div>
         </div>

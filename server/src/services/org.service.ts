@@ -43,6 +43,10 @@ export const orgService = {
       performanceTrendDefaultKind?: string;
       performanceTrendDefaultFrom?: string | null;
       performanceTrendDefaultTo?: string | null;
+      insightsDefaultKind?: string;
+      insightsDefaultMonths?: number;
+      insightsDefaultStart?: string | null;
+      insightsDefaultEnd?: string | null;
       oneOnOneReminderEvery?: number | null;
       oneOnOneReminderUnit?: string | null;
       oneOnOneReminderStart?: string | null;

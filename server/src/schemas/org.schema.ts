@@ -33,6 +33,12 @@ export const updateOrgSchema = z
     performanceTrendDefaultKind: z.string().max(50).optional(),
     performanceTrendDefaultFrom: z.string().nullable().optional(),
     performanceTrendDefaultTo: z.string().nullable().optional(),
+    // Default month window for the Insights → Planning tab. "rolling" spans N
+    // months from the current month; "custom" uses the "YYYY-MM" start/end.
+    insightsDefaultKind: z.enum(['rolling', 'custom']).optional(),
+    insightsDefaultMonths: z.number().int().positive().max(120).optional(),
+    insightsDefaultStart: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
+    insightsDefaultEnd: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
     oneOnOneReminderEvery: z.number().int().min(1).max(365).nullable().optional(),
     oneOnOneReminderUnit: z.enum(['daily', 'weekly', 'monthly']).nullable().optional(),
     oneOnOneReminderStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),

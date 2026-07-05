@@ -39,6 +39,13 @@ model Organization {
   teamsReminderTimezone String?
   performanceTrendDefaultFrom String?
   performanceTrendDefaultTo   String?
+  // Default month window shown on the Insights → Planning tab. Kind "rolling"
+  // spans insightsDefaultMonths from the current month; "custom" uses the
+  // insightsDefaultStart/End "YYYY-MM" months.
+  insightsDefaultKind   String  @default("rolling")
+  insightsDefaultMonths Int     @default(12)
+  insightsDefaultStart  String?
+  insightsDefaultEnd    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
