@@ -156,6 +156,12 @@ export const performanceService = {
     // For each evaluation, compute its FTE allocation share over its window.
     const rawShares: { e: typeof evaluations[number]; share: number; finalNumber: number }[] = [];
     for (const e of evaluations) {
+      // A finalized evaluation whose computedFinal is null (e.g. no weighted
+      // categories) has no score — skip it rather than counting a phantom 0,
+      // which would drag the weighted average below the 1–5 scale. This matches
+      // the org-level aggregations, which already skip null finals.
+      const finalNumber = e.overrideFinal ?? e.computedFinal;
+      if (finalNumber == null) continue;
       const share = await allocationForScope(
         resourceId,
         e.customerId,
@@ -163,8 +169,10 @@ export const performanceService = {
         e.periodStart,
         e.periodEnd
       );
-      const finalNumber = e.overrideFinal ?? e.computedFinal ?? 0;
       rawShares.push({ e, share, finalNumber });
+    }
+    if (rawShares.length === 0) {
+      return { overall: null, evaluations: [] };
     }
 
     const allocSum = rawShares.reduce((acc, r) => acc + r.share, 0);
@@ -369,12 +377,15 @@ export const performanceService = {
     for (const [key, evs] of groups.entries()) {
       // For each bucket, compute the per-bucket overall using just those evals
       // (equal weighting; the per-evaluation allocation rollup applies to the
-      // combined endpoint, not to small buckets).
-      const sum = evs.reduce((acc, e) => acc + (e.overrideFinal ?? e.computedFinal ?? 0), 0);
+      // combined endpoint, not to small buckets). Skip null finals so an
+      // unscored evaluation doesn't count as a phantom 0.
+      const scored = evs.filter((e) => (e.overrideFinal ?? e.computedFinal) != null);
+      if (scored.length === 0) continue;
+      const sum = scored.reduce((acc, e) => acc + (e.overrideFinal ?? e.computedFinal ?? 0), 0);
       out.push({
         bucketStart: key,
-        overall: round1(sum / evs.length),
-        evaluationCount: evs.length,
+        overall: round1(sum / scored.length),
+        evaluationCount: scored.length,
       });
     }
     return out;

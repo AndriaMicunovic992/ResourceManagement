@@ -75,6 +75,9 @@ export const customerPerformanceService = {
     const peopleSet = new Set<string>();
     const rawShares: { finalNumber: number; share: number }[] = [];
     for (const e of evaluations) {
+      // Skip null finals (unscored evaluations) so they don't count as 0.
+      const finalNumber = e.overrideFinal ?? e.computedFinal;
+      if (finalNumber == null) continue;
       peopleSet.add(e.resourceId);
       const share = await allocationForScope(
         e.resourceId,
@@ -83,8 +86,11 @@ export const customerPerformanceService = {
         e.periodStart,
         e.periodEnd
       );
-      const finalNumber = e.overrideFinal ?? e.computedFinal ?? 0;
       rawShares.push({ finalNumber, share });
+    }
+
+    if (rawShares.length === 0) {
+      return { overall: null, evaluationsIncluded: 0, peopleIncluded: 0 };
     }
 
     const allocSum = rawShares.reduce((acc, r) => acc + r.share, 0);
@@ -102,7 +108,7 @@ export const customerPerformanceService = {
 
     return {
       overall: round1(overallSum),
-      evaluationsIncluded: evaluations.length,
+      evaluationsIncluded: rawShares.length,
       peopleIncluded: peopleSet.size,
     };
   },

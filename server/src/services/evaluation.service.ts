@@ -196,6 +196,13 @@ async function viewerKindFor(
   role: string
 ): Promise<ViewerKind> {
   if (isAdminRole(role)) return 'admin';
+  // Subject takes precedence over manager/responsible: someone who is both the
+  // evaluated person AND the customer/project-responsible must not get the
+  // responsible view of their own review (which exposes manager/responsible
+  // comments and the activity-log list hidden from subjects) or be able to
+  // score themselves. Separation of duties.
+  const meId = await getRequestingResourceId(orgId, userId);
+  if (meId && meId === evaluation.resourceId) return 'subject';
   if (await userIsManagerOf(orgId, userId, evaluation.resourceId)) return 'manager';
   if (
     await userIsResponsibleFor(
@@ -206,9 +213,6 @@ async function viewerKindFor(
     )
   )
     return 'responsible';
-  // Subject: the person themselves.
-  const meId = await getRequestingResourceId(orgId, userId);
-  if (meId && meId === evaluation.resourceId) return 'subject';
   return null;
 }
 
@@ -444,10 +448,12 @@ export const evaluationService = {
     // Build a patch of allowed fields based on (state, role).
     const patch: Prisma.EvaluationScoreUpdateInput = {};
     const allowEmployee = evaluation.state === 'draft' && isSubject;
+    // A subject can never enter responsible/manager scores on their own
+    // evaluation (separation of duties); an admin remains the escalation path.
     const allowResponsible =
-      evaluation.state === 'employee_submitted' && (isResponsible || admin);
+      evaluation.state === 'employee_submitted' && ((isResponsible && !isSubject) || admin);
     const allowManager =
-      evaluation.state === 'responsible_submitted' && (isManager || admin);
+      evaluation.state === 'responsible_submitted' && ((isManager && !isSubject) || admin);
 
     if (data.employeeScore !== undefined) {
       if (!allowEmployee) throw new ForbiddenError('Cannot edit employee score now');
@@ -557,7 +563,17 @@ export const evaluationService = {
     const meId = await getRequestingResourceId(orgId, requestingUserId);
     const isSubject = meId === evaluation.resourceId;
     if (!isSubject) {
-      throw new ForbiddenError('Only the target person can submit their self-assessment');
+      // A staffed person may have no login account, so nobody can self-submit
+      // on their behalf. Let an admin advance the self-assessment for a subject
+      // that has no linked user — otherwise the evaluation deadlocks in draft.
+      const subject = await prisma.resource.findFirst({
+        where: { id: evaluation.resourceId, orgId },
+        select: { userId: true },
+      });
+      const subjectHasLogin = !!subject?.userId;
+      if (!(isAdminRole(requestingUserRole) && !subjectHasLogin)) {
+        throw new ForbiddenError('Only the target person can submit their self-assessment');
+      }
     }
     return prisma.evaluation.update({
       where: { id },
@@ -581,14 +597,25 @@ export const evaluationService = {
       throw new ForbiddenError('Evaluation is not awaiting responsible submission');
     }
     const admin = isAdminRole(requestingUserRole);
+    const meId = await getRequestingResourceId(orgId, requestingUserId);
+    const isSubject = !!meId && meId === evaluation.resourceId;
     const isResponsible = await userIsResponsibleFor(
       orgId,
       requestingUserId,
       evaluation.customerId,
       evaluation.projectId
     );
-    if (!admin && !isResponsible) {
+    // A non-admin must be the responsible person and not the subject of the
+    // evaluation (separation of duties — you can't score your own review).
+    if (!admin && (!isResponsible || isSubject)) {
       throw new ForbiddenError('Only the responsible person can submit scores');
+    }
+
+    // An evaluation with no scoring categories can't be meaningfully scored;
+    // submitting it would finalize a null computedFinal that then pollutes
+    // every rollup. Reject rather than silently completing an empty review.
+    if (evaluation.categorySnapshots.length === 0) {
+      throw new BadRequestError('This evaluation has no scoring categories');
     }
 
     // Every snapshot must have a non-null responsibleScore.
@@ -635,6 +662,10 @@ export const evaluationService = {
       if (!data.overrideReason || !data.overrideReason.trim()) {
         throw new ForbiddenError('Override requires a reason');
       }
+    } else if (evaluation.computedFinal == null) {
+      // Never finalize a scoreless evaluation as a phantom 0 — require an
+      // explicit override final instead.
+      throw new BadRequestError('This evaluation has no computed score; provide an override to finalize');
     }
 
     const updated = await prisma.evaluation.update({
