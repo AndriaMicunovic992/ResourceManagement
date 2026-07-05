@@ -10,7 +10,15 @@ export const MICROSOFT_LOGIN_URL = API + '/auth/microsoft/login';
 // this, an expired token leaves the user stuck on silent "Request failed".
 // `path` rides along in the redirect so a bounce is never anonymous — the login
 // URL shows which request killed the session.
+// Guard so a burst of concurrent 401s (e.g. DataProvider fires ~11 requests at
+// once and a short-lived impersonation token expires) is handled exactly once.
+// Without this, the second handler runs after stopImpersonation() has already
+// cleared the stash, falls through to removeToken(), and logs the admin fully
+// out instead of restoring their session.
+let handlingUnauthorized = false;
 function handleUnauthorized(path) {
+  if (handlingUnauthorized) return;
+  handlingUnauthorized = true;
   if (isImpersonating()) {
     const restored = stopImpersonation();
     if (restored) {
