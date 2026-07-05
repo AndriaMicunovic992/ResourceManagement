@@ -119,6 +119,10 @@ export const resourceService = {
       return this.getById(orgId, created.id);
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[] | undefined) ?? [];
+        if (target.includes('externalWorkId')) {
+          throw new ConflictError('That Jira account is already mapped to another person');
+        }
         throw new ConflictError('This user is already linked to another resource');
       }
       throw err;
@@ -159,6 +163,10 @@ export const resourceService = {
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[] | undefined) ?? [];
+        if (target.includes('externalWorkId')) {
+          throw new ConflictError('That Jira account is already mapped to another person');
+        }
         throw new ConflictError('This user is already linked to another resource');
       }
       throw err;

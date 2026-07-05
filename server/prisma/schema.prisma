@@ -298,6 +298,11 @@ model Resource {
   worklogs      Worklog[]
 
   @@unique([orgId, userId])
+  // A Jira account may map to at most one person per org. Postgres treats NULLs
+  // as distinct, so unmatched people (externalWorkId null) are unaffected; only
+  // duplicate non-null mappings are rejected (they silently mis-attributed all
+  // of an account's synced hours to one arbitrary person).
+  @@unique([orgId, externalWorkId])
   @@index([orgId])
   @@index([userId])
 }

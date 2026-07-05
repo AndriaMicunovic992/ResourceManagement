@@ -137,6 +137,27 @@ export const orgService = {
     if (member.role === 'owner') throw new ForbiddenError('Cannot remove the owner');
     if (member.userId === requesterId) throw new ForbiddenError('Cannot remove yourself');
 
-    await prisma.orgMember.delete({ where: { id: memberId } });
+    const userId = member.userId;
+    // Detach the user-keyed authority this member held before removing them, all
+    // in one transaction. Otherwise it dangles: customers/projects they owned
+    // become invisible to non-admins and their reminders fire for nobody, and if
+    // the user is ever re-added they'd silently regain the old scope. Their
+    // responsibilities and team/person management must be explicitly reassigned.
+    await prisma.$transaction([
+      prisma.customer.updateMany({
+        where: { orgId, responsibleUserId: userId },
+        data: { responsibleUserId: null },
+      }),
+      prisma.project.updateMany({
+        where: { orgId, responsibleUserId: userId },
+        data: { responsibleUserId: null },
+      }),
+      prisma.team.updateMany({
+        where: { orgId, managerUserId: userId },
+        data: { managerUserId: null },
+      }),
+      prisma.personManager.deleteMany({ where: { orgId, managerUserId: userId } }),
+      prisma.orgMember.delete({ where: { id: memberId } }),
+    ]);
   },
 };

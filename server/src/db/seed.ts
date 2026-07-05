@@ -2,6 +2,7 @@ import { prisma } from './prisma.js';
 import { hashPassword } from '../utils/password.js';
 import { monthRange } from '../utils/months.js';
 import { ensureTaxonomy } from '../services/taxonomy.service.js';
+import { seedDefaultRoles } from '../services/role.service.js';
 
 async function seed() {
   // This wipes every table before inserting demo data. Guard against running it
@@ -37,6 +38,11 @@ async function seed() {
   await prisma.orgMember.create({
     data: { userId: user.id, orgId: org.id, role: 'owner' },
   });
+
+  // Seed the per-org RBAC roles (owner/admin/member/viewer). Without this,
+  // adding or inviting anyone as member/viewer fails with "Unknown role" on a
+  // freshly seeded database, since member management checks the Role table.
+  await seedDefaultRoles(org.id);
 
   // Seed the default role taxonomy (domains, roles, seniorities).
   await ensureTaxonomy(org.id);
