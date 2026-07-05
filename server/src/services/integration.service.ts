@@ -306,11 +306,23 @@ export const integrationService = {
     };
   },
 
-  /** Actual hours (from synced worklogs) for a customer in a month, per person. */
-  async actualsForCustomerMonth(orgId: string, customerId: string, month: string) {
+  /**
+   * Actual hours (from synced worklogs) for a customer in a month, per person.
+   * `visibleResourceIds` (null = admin/all) limits the per-person breakdown to
+   * people the caller may see — worklog authors are resolved via Jira mapping,
+   * not planner assignments, so they aren't otherwise scope-bound.
+   */
+  async actualsForCustomerMonth(
+    orgId: string,
+    customerId: string,
+    month: string,
+    visibleResourceIds: string[] | null
+  ) {
+    const where: any = { orgId, customerId, month, resourceId: { not: null } };
+    if (visibleResourceIds) where.resourceId = { in: visibleResourceIds };
     const rows = await prisma.worklog.groupBy({
       by: ['resourceId'],
-      where: { orgId, customerId, month, resourceId: { not: null } },
+      where,
       _sum: { seconds: true },
     });
     const out: Record<string, number> = {};
@@ -368,10 +380,18 @@ export const integrationService = {
    * 1:1 cockpit chart when a project (→ customer) is focused.
    * Returned as { [customerId]: { [month]: hours } }.
    */
-  async actualsForResourceByCustomer(orgId: string, resourceId: string, fromMonth: string, toMonth: string) {
+  async actualsForResourceByCustomer(
+    orgId: string,
+    resourceId: string,
+    fromMonth: string,
+    toMonth: string,
+    visibleCustomerIds: string[] | null
+  ) {
+    const where: any = { orgId, resourceId, month: { gte: fromMonth, lte: toMonth }, customerId: { not: null } };
+    if (visibleCustomerIds) where.customerId = { in: visibleCustomerIds };
     const rows = await prisma.worklog.groupBy({
       by: ['customerId', 'month'],
-      where: { orgId, resourceId, month: { gte: fromMonth, lte: toMonth }, customerId: { not: null } },
+      where,
       _sum: { seconds: true },
     });
     const out: Record<string, Record<string, number>> = {};
@@ -387,10 +407,18 @@ export const integrationService = {
    * PM-review chart when a person is focused.
    * Returned as { [resourceId]: { [month]: hours } }.
    */
-  async actualsForCustomerByResource(orgId: string, customerId: string, fromMonth: string, toMonth: string) {
+  async actualsForCustomerByResource(
+    orgId: string,
+    customerId: string,
+    fromMonth: string,
+    toMonth: string,
+    visibleResourceIds: string[] | null
+  ) {
+    const where: any = { orgId, customerId, month: { gte: fromMonth, lte: toMonth }, resourceId: { not: null } };
+    if (visibleResourceIds) where.resourceId = { in: visibleResourceIds };
     const rows = await prisma.worklog.groupBy({
       by: ['resourceId', 'month'],
-      where: { orgId, customerId, month: { gte: fromMonth, lte: toMonth }, resourceId: { not: null } },
+      where,
       _sum: { seconds: true },
     });
     const out: Record<string, Record<string, number>> = {};

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
+import { isHttpUrl } from '../../lib/url';
 import { useData } from '../../contexts/DataContext';
 import EmptyState from '../../components/ui/EmptyState';
 import {
@@ -186,7 +187,7 @@ function LogCard({ log, onEdit, onDelete }) {
             📁 {log.project.name}
           </span>
         )}
-        {log.jiraUrl && (
+        {isHttpUrl(log.jiraUrl) && (
           <a
             href={log.jiraUrl}
             target="_blank"

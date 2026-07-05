@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../../../lib/api';
 import { LOG_KIND_COLORS, LOG_KIND_LABELS } from '../../../../lib/constants';
+import { isHttpUrl } from '../../../../lib/url';
 import { CategoryChips } from '../../../../components/forms/CategoryMultiPicker';
 import { ReplyToggle } from '../../../../components/ui/MiniThread';
 import {
@@ -98,7 +99,7 @@ export default function LogCard({
             <FolderIcon size={11} /> {log.project.name}
           </span>
         )}
-        {log.jiraUrl && (
+        {isHttpUrl(log.jiraUrl) && (
           <a
             href={log.jiraUrl}
             target="_blank"

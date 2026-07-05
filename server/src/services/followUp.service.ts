@@ -59,8 +59,10 @@ export const followUpService = {
     });
   },
 
-  async update(orgId: string, id: string, data: UpdateFollowUpInput) {
-    const existing = await prisma.followUp.findFirst({ where: { id, orgId } });
+  async update(orgId: string, resourceId: string, id: string, data: UpdateFollowUpInput) {
+    // Bind the follow-up to the person in the URL: editing a follow-up that
+    // belongs to a person outside the caller's asserted scope 404s.
+    const existing = await prisma.followUp.findFirst({ where: { id, orgId, resourceId } });
     if (!existing) throw new NotFoundError('Follow-up not found');
 
     if (data.resolvedInOneOnOneId) {
@@ -86,8 +88,8 @@ export const followUpService = {
     return prisma.followUp.update({ where: { id }, data: patch, include: followUpInclude });
   },
 
-  async remove(orgId: string, id: string, requesterId: string, requesterRole: string) {
-    const existing = await prisma.followUp.findFirst({ where: { id, orgId } });
+  async remove(orgId: string, resourceId: string, id: string, requesterId: string, requesterRole: string) {
+    const existing = await prisma.followUp.findFirst({ where: { id, orgId, resourceId } });
     if (!existing) throw new NotFoundError('Follow-up not found');
     if (existing.createdByUserId !== requesterId && !isAdminRole(requesterRole)) {
       throw new ForbiddenError('You cannot delete this follow-up');

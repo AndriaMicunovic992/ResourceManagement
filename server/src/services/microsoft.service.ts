@@ -143,10 +143,21 @@ export const microsoftService = {
       email: { equals: e, mode: 'insensitive' as const },
     }));
 
-    // Single-tenant + IdP-verified email: linking an existing local account by
-    // email is safe here (the email is asserted by our own Entra tenant).
+    // Auto-link by email ONLY to a passwordless (invite- / SSO-provisioned)
+    // account. Silently stapling an SSO identity onto a password-bearing account
+    // by unverified email enables account pre-hijacking: anyone can open-signup a
+    // victim's corporate email with a known password, then keep local-login
+    // access after the victim signs in via Microsoft. A password account must
+    // link Microsoft explicitly from an authenticated session ("connect") — the
+    // IdP-verified SSO email does not prove ownership of that pre-existing local
+    // record.
     const byEmail = await prisma.user.findFirst({ where: { OR: emailFilters } });
     if (byEmail) {
+      if (byEmail.password) {
+        throw new ForbiddenError(
+          'An account with this email already exists. Sign in with your password, then connect Microsoft from your settings.'
+        );
+      }
       await prisma.user.update({ where: { id: byEmail.id }, data: { microsoftId: oid } });
       return byEmail.id;
     }

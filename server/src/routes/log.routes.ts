@@ -27,7 +27,7 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
   app.get('/people/:personId/logs/:id', async (req) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
-    return getLog(req.orgId, id, req.userId, req.role);
+    return getLog(req.orgId, personId, id, req.userId, req.role);
   });
 
   app.post('/people/:personId/logs', async (req, reply) => {
@@ -42,13 +42,13 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     const body = updateLogSchema.parse(req.body);
-    return updateLog(req.orgId, id, req.userId, req.role, body);
+    return updateLog(req.orgId, personId, id, req.userId, req.role, body);
   });
 
   app.delete('/people/:personId/logs/:id', async (req, reply) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
-    await deleteLog(req.orgId, id, req.userId, req.role);
+    await deleteLog(req.orgId, personId, id, req.userId, req.role);
     return reply.status(204).send();
   });
 
@@ -58,7 +58,7 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
     const { personId, id } = req.params as { personId: string; id: string };
     assertCanViewPerson(req.visibility, personId);
     const body = createLogCommentSchema.parse(req.body);
-    const created = await addLogComment(req.orgId, id, req.userId, req.role, body.content);
+    const created = await addLogComment(req.orgId, personId, id, req.userId, req.role, body.content);
     return reply.status(201).send(created);
   });
 
@@ -69,7 +69,7 @@ export const logRoutes: FastifyPluginAsync = async (app) => {
       commentId: string;
     };
     assertCanViewPerson(req.visibility, personId);
-    await deleteLogComment(req.orgId, id, commentId, req.userId, req.role);
+    await deleteLogComment(req.orgId, personId, id, commentId, req.userId, req.role);
     return reply.status(204).send();
   });
 };

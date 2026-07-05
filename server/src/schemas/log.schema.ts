@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { httpUrl } from './common.js';
 
 // Entry types: polarity is inherent in the type (no good/bad labels).
 //   strength        — what the person did well, with context
@@ -30,7 +31,7 @@ export const createLogSchema = z.object({
   categoryIds: z.array(z.string()).max(20).optional(),
   customerId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
-  jiraUrl: z.string().url().max(500).optional().nullable(),
+  jiraUrl: httpUrl(500).optional().nullable(),
   oneOnOneId: z.string().optional().nullable(),
   customerReviewId: z.string().optional().nullable(),
 });
@@ -41,7 +42,7 @@ export const updateLogSchema = z.object({
   categoryIds: z.array(z.string()).max(20).optional(),
   customerId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
-  jiraUrl: z.string().url().max(500).optional().nullable(),
+  jiraUrl: httpUrl(500).optional().nullable(),
 });
 
 export const listLogsQuerySchema = z.object({

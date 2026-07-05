@@ -66,11 +66,15 @@ export async function listOneOnOnes(
 
 export async function getOneOnOne(
   orgId: string,
+  resourceId: string,
   id: string,
   requestingUserId: string
 ): Promise<OneOnOneRecord> {
+  // Bind the record to the person in the URL: a 1:1 that belongs to a different
+  // person is treated as non-existent (visibility == existence), even though
+  // the caller can see `resourceId`.
   const record = await prisma.oneOnOne.findFirst({
-    where: { id, orgId },
+    where: { id, orgId, resourceId },
     include: { authorUser: { select: authorSelect } },
   });
   if (!record) throw new NotFoundError('1:1 meeting not found');
@@ -106,12 +110,13 @@ export async function createOneOnOne(
 
 export async function updateOneOnOne(
   orgId: string,
+  resourceId: string,
   id: string,
   requestingUserId: string,
   requestingUserRole: string,
   data: UpdateOneOnOneInput
 ): Promise<OneOnOneRecord> {
-  const existing = await prisma.oneOnOne.findFirst({ where: { id, orgId } });
+  const existing = await prisma.oneOnOne.findFirst({ where: { id, orgId, resourceId } });
   if (!existing) throw new NotFoundError('1:1 meeting not found');
   const isAuthor = existing.authorUserId === requestingUserId;
   const admin = isAdminRole(requestingUserRole);
@@ -143,11 +148,12 @@ export async function updateOneOnOne(
 
 export async function deleteOneOnOne(
   orgId: string,
+  resourceId: string,
   id: string,
   requestingUserId: string,
   requestingUserRole: string
 ): Promise<void> {
-  const existing = await prisma.oneOnOne.findFirst({ where: { id, orgId } });
+  const existing = await prisma.oneOnOne.findFirst({ where: { id, orgId, resourceId } });
   if (!existing) throw new NotFoundError('1:1 meeting not found');
   const isAuthor = existing.authorUserId === requestingUserId;
   const isAdmin = isAdminRole(requestingUserRole);

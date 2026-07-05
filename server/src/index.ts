@@ -16,7 +16,10 @@ import { startScheduler } from './services/scheduler.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function start() {
-  const app = Fastify({ logger: true });
+  // trustProxy: the app runs behind the platform's edge proxy (e.g. Railway),
+  // so req.ip must come from X-Forwarded-For — otherwise every client collapses
+  // to the proxy's IP and per-IP login/signup rate-limiting protects nothing.
+  const app = Fastify({ logger: true, trustProxy: true });
 
   // Register plugins
   await app.register(corsPlugin);

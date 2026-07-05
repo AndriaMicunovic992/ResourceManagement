@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma.js';
-import { NotFoundError, ForbiddenError } from '../utils/errors.js';
+import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors.js';
 import {
   isAdminRole,
   userIsManagerOf,
@@ -471,10 +471,10 @@ export const evaluationService = {
     }
 
     if (Object.keys(patch).length === 0) {
-      // No-op
-      return prisma.evaluationScore.findFirst({
-        where: { evaluationId, categorySnapshotId: snapshotId },
-      });
+      // An empty patch would otherwise fall through and return the full score
+      // row (including responsible/manager comments) without any per-field
+      // authorization ever running — reject it instead of leaking hidden fields.
+      throw new BadRequestError('No editable fields provided');
     }
 
     const createData: Prisma.EvaluationScoreUncheckedCreateInput = {
