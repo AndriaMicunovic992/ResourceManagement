@@ -74,7 +74,7 @@ export default function TaxonomySection() {
       )}
 
       {/* Domains & roles */}
-      <div className="bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+      <div id="taxonomy-domains" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-1">Domains &amp; roles</h3>
         <p className="text-[10px] text-text-light mb-3">
           Domains group the roles people and needs can use. Each domain has a color used on the planner bars. Renaming a domain or role updates everyone already using it.
@@ -149,7 +149,7 @@ export default function TaxonomySection() {
       </div>
 
       {/* Seniorities */}
-      <div className="bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+      <div id="taxonomy-seniority" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-1">Seniority levels</h3>
         <p className="text-[10px] text-text-light mb-3">
           Listed from most junior to most senior. The order is the seniority rank — a person can fill a need at their level or below.

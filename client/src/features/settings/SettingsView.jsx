@@ -538,29 +538,93 @@ export default function SettingsView() {
     }
   };
 
-  const NAV_SECTIONS = [
-    { id: 'account', label: 'Your account' },
-    { id: 'organization', label: 'Organization' },
-    ...(isAdmin
-      ? [
-          { id: 'planning', label: 'Planning range' },
-          { id: 'reminders', label: 'Reminders' },
-          { id: 'msteams', label: 'Microsoft Teams' },
-          { id: 'trend', label: 'Performance trend' },
-          { id: 'teams', label: 'Teams' },
-          { id: 'taxonomy', label: 'Roles taxonomy' },
-          { id: 'skills', label: 'Skills' },
-          { id: 'categories', label: 'Log categories' },
-        ]
-      : []),
-    { id: 'members', label: 'Members' },
-    ...(isAdmin ? [{ id: 'roles', label: 'Roles & permissions' }] : []),
-    ...(isAdmin ? [{ id: 'integrations', label: 'Integrations' }] : []),
+  // Grouped settings nav. Items may be admin-only and may expose deep-link
+  // sub-sections (rendered as indented children). The page sections below are
+  // laid out in this same order so the menu and the scroll stay in sync.
+  const NAV_GROUPS = [
+    {
+      label: 'Account',
+      items: [{ id: 'account', label: 'Your account' }],
+    },
+    {
+      label: 'Organization',
+      items: [
+        { id: 'organization', label: 'General' },
+        { id: 'planning', label: 'Planning range', admin: true },
+        { id: 'trend', label: 'Performance trend', admin: true },
+      ],
+    },
+    {
+      label: 'Notifications',
+      items: [
+        { id: 'reminders', label: 'Reminder schedules', admin: true },
+        {
+          id: 'msteams',
+          label: 'Microsoft Teams',
+          admin: true,
+          children: [
+            { id: 'msteams-connection', label: 'Bot connection' },
+            { id: 'msteams-delivery', label: 'Reminder delivery' },
+          ],
+        },
+      ],
+    },
+    {
+      label: 'Catalog',
+      items: [
+        {
+          id: 'taxonomy',
+          label: 'Roles taxonomy',
+          admin: true,
+          children: [
+            { id: 'taxonomy-domains', label: 'Domains & roles' },
+            { id: 'taxonomy-seniority', label: 'Seniority levels' },
+          ],
+        },
+        { id: 'skills', label: 'Skills', admin: true },
+        { id: 'categories', label: 'Log categories', admin: true },
+      ],
+    },
+    {
+      label: 'People & access',
+      items: [
+        { id: 'teams', label: 'Teams', admin: true },
+        { id: 'members', label: 'Members' },
+        { id: 'roles', label: 'Roles & permissions', admin: true },
+      ],
+    },
+    {
+      label: 'Integrations',
+      items: [
+        {
+          id: 'integrations',
+          label: 'Jira & Tempo',
+          admin: true,
+          children: [
+            { id: 'integrations-connection', label: 'Connection' },
+            { id: 'integrations-people', label: 'People mapping' },
+            { id: 'integrations-mapping', label: 'Customer & project mapping' },
+          ],
+        },
+      ],
+    },
   ];
+
+  // Expand to the visible rows per group (respecting isAdmin), flattening each
+  // item's children into indented sub-rows. Groups with nothing visible drop out.
+  const navGroups = NAV_GROUPS.map((g) => {
+    const rows = [];
+    for (const it of g.items) {
+      if (it.admin && !isAdmin) continue;
+      rows.push({ id: it.id, label: it.label, sub: false });
+      for (const c of it.children || []) rows.push({ id: c.id, label: c.label, sub: true });
+    }
+    return { label: g.label, rows };
+  }).filter((g) => g.rows.length > 0);
 
   // Scroll-spy: highlight the section currently near the top of the viewport.
   useEffect(() => {
-    const ids = NAV_SECTIONS.map((s) => s.id);
+    const ids = navGroups.flatMap((g) => g.rows.map((r) => r.id));
     const els = ids.map((id) => document.getElementById(id)).filter(Boolean);
     if (els.length === 0) return;
     const seen = {};
@@ -581,19 +645,30 @@ export default function SettingsView() {
     <div className="max-w-[920px] mx-auto px-5 py-6">
       <PageHeader title="Settings" subtitle={`${currentOrg?.name || ''} · organization`} />
       <div className="flex gap-6 items-start">
-        {/* section anchor nav */}
-        <nav className="hidden md:flex flex-col gap-0.5 w-[150px] shrink-0 sticky top-4">
-          {NAV_SECTIONS.map((sec) => (
-            <a
-              key={sec.id}
-              href={`#${sec.id}`}
-              onClick={() => setActiveSection(sec.id)}
-              className={`text-[11px] font-bold rounded-lg px-3 py-2 no-underline transition-colors ${
-                activeSection === sec.id ? 'text-primary bg-primary-light' : 'text-text-mid hover:bg-white'
-              }`}
-            >
-              {sec.label}
-            </a>
+        {/* grouped section anchor nav */}
+        <nav className="hidden md:flex flex-col gap-3 w-[176px] shrink-0 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto pr-1 -mr-1">
+          {navGroups.map((g) => (
+            <div key={g.label} className="flex flex-col gap-0.5">
+              <div className="text-[9px] font-extrabold uppercase tracking-wider text-text-light px-3 mb-0.5">
+                {g.label}
+              </div>
+              {g.rows.map((r) => (
+                <a
+                  key={r.id}
+                  href={`#${r.id}`}
+                  onClick={() => setActiveSection(r.id)}
+                  className={
+                    (r.sub ? 'text-[10.5px] font-semibold pl-6 pr-3 py-1 ' : 'text-[11px] font-bold px-3 py-1.5 ') +
+                    'rounded-lg no-underline transition-colors ' +
+                    (activeSection === r.id
+                      ? 'text-primary bg-primary-light'
+                      : `${r.sub ? 'text-text-light' : 'text-text-mid'} hover:bg-white`)
+                  }
+                >
+                  {r.label}
+                </a>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -665,68 +740,6 @@ export default function SettingsView() {
       )}
 
       {isAdmin && (
-        <div id="reminders" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
-          <h3 className="text-sm font-bold text-text mb-3">Reminders</h3>
-          <p className="text-[10px] text-text-light mb-3">
-            In-app reminders shown to managers and responsible people on the People page. A
-            reminder fires on every Nth day/week/month from the start date; it clears once the
-            1:1 / update happens. Leave "every" or the start date empty to turn a reminder off.
-          </p>
-          <div className="space-y-3">
-            {[
-              { label: '1:1 reminder', sched: oneOnOneSched, set: setOneOnOneSched },
-              { label: 'PM review reminder', sched: pmLogSched, set: setPmLogSched },
-            ].map(({ label, sched, set }) => (
-              <div key={label} className="flex gap-3 items-end flex-wrap">
-                <div className="w-[140px]">
-                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
-                    {label}: every
-                  </label>
-                  <input
-                    type="number" min="1" max="365" value={sched.every}
-                    onChange={(e) => set((s) => ({ ...s, every: e.target.value }))}
-                    placeholder="N"
-                    className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
-                  />
-                </div>
-                <div className="w-[120px]">
-                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
-                    Frequency
-                  </label>
-                  <select
-                    value={sched.unit}
-                    onChange={(e) => set((s) => ({ ...s, unit: e.target.value }))}
-                    className="w-full px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
-                  >
-                    <option value="daily">days</option>
-                    <option value="weekly">weeks</option>
-                    <option value="monthly">months</option>
-                  </select>
-                </div>
-                <div className="w-[160px]">
-                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
-                    Starting on
-                  </label>
-                  <input
-                    type="date" value={sched.start}
-                    onChange={(e) => set((s) => ({ ...s, start: e.target.value }))}
-                    className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
-                  />
-                </div>
-              </div>
-            ))}
-            <div className="flex justify-end">
-              <Button onClick={handleSaveReminders} disabled={reminderSaving}>
-                {reminderSaving ? 'Saving...' : reminderSuccess ? 'Saved!' : 'Save'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isAdmin && <TeamsSettingsSection />}
-
-      {isAdmin && (
         <div id="trend" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Performance Trend</h3>
           <p className="text-[10px] text-text-light mb-3">
@@ -793,114 +806,66 @@ export default function SettingsView() {
       )}
 
       {isAdmin && (
-        <div id="teams" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
-          <h3 className="text-sm font-bold text-text mb-3">Teams</h3>
+        <div id="reminders" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-3">Reminders</h3>
           <p className="text-[10px] text-text-light mb-3">
-            Group people into teams. A person can belong to multiple teams. Each team can have a manager whose ownership is inherited by all team members.
+            In-app reminders shown to managers and responsible people on the People page. A
+            reminder fires on every Nth day/week/month from the start date; it clears once the
+            1:1 / update happens. Leave "every" or the start date empty to turn a reminder off.
           </p>
-
-          {teamError && (
-            <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{teamError}</div>
-          )}
-
-          <div className="space-y-1 mb-3">
-            {teams.map((t) => {
-              const count = resources.filter((r) => (r.teams || []).some((rt) => rt.id === t.id)).length;
-              const isEditing = editingTeamId === t.id;
-              const managerName = t.managerUser?.name || members.find((m) => m.user.id === t.managerUserId)?.user.name;
-              return (
-                <div key={t.id} className="py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
-                  {isEditing ? (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <input
-                        type="text"
-                        value={editingTeamName}
-                        onChange={(e) => setEditingTeamName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveEditTeam();
-                          if (e.key === 'Escape') handleCancelEditTeam();
-                        }}
-                        autoFocus
-                        className="flex-1 min-w-[120px] px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
-                      />
-                      <select
-                        value={editingTeamManagerId}
-                        onChange={(e) => setEditingTeamManagerId(e.target.value)}
-                        className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
-                      >
-                        <option value="">No manager</option>
-                        {members.filter((m) => m.role !== 'viewer').map((m) => (
-                          <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={handleSaveEditTeam}
-                        className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:underline px-1"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelEditTeam}
-                        className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-text-mid px-1"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="flex-1 text-xs font-semibold text-text">{t.name}</span>
-                      {managerName && (
-                        <span className="text-[10px] text-text-light">Manager: {managerName}</span>
-                      )}
-                      <span className="text-[10px] text-text-light">{count === 1 ? '1 person' : `${count} people`}</span>
-                      <button
-                        onClick={() => handleStartEditTeam(t)}
-                        className="text-[10px] text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary px-1"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTeam(t)}
-                        className="text-[10px] text-danger bg-transparent border-0 cursor-pointer hover:text-danger/80 px-1"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
+          <div className="space-y-3">
+            {[
+              { label: '1:1 reminder', sched: oneOnOneSched, set: setOneOnOneSched },
+              { label: 'PM review reminder', sched: pmLogSched, set: setPmLogSched },
+            ].map(({ label, sched, set }) => (
+              <div key={label} className="flex gap-3 items-end flex-wrap">
+                <div className="w-[140px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
+                    {label}: every
+                  </label>
+                  <input
+                    type="number" min="1" max="365" value={sched.every}
+                    onChange={(e) => set((s) => ({ ...s, every: e.target.value }))}
+                    placeholder="N"
+                    className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                  />
                 </div>
-              );
-            })}
-            {teams.length === 0 && (
-              <p className="text-xs text-text-light py-2">No teams yet.</p>
-            )}
+                <div className="w-[120px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
+                    Frequency
+                  </label>
+                  <select
+                    value={sched.unit}
+                    onChange={(e) => set((s) => ({ ...s, unit: e.target.value }))}
+                    className="w-full px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
+                  >
+                    <option value="daily">days</option>
+                    <option value="weekly">weeks</option>
+                    <option value="monthly">months</option>
+                  </select>
+                </div>
+                <div className="w-[160px]">
+                  <label className="block text-[10px] font-semibold text-text-mid mb-1">
+                    Starting on
+                  </label>
+                  <input
+                    type="date" value={sched.start}
+                    onChange={(e) => set((s) => ({ ...s, start: e.target.value }))}
+                    className="w-full px-3 py-1.5 border border-border rounded-lg text-xs font-mono text-text outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-end">
+              <Button onClick={handleSaveReminders} disabled={reminderSaving}>
+                {reminderSaving ? 'Saving...' : reminderSuccess ? 'Saved!' : 'Save'}
+              </Button>
+            </div>
           </div>
-
-          <form onSubmit={handleAddTeam} className="flex gap-2 items-end pt-3 border-t border-border-light flex-wrap">
-            <div className="flex-1 min-w-[140px]">
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">Team name</label>
-              <input
-                type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)}
-                placeholder="e.g. Data Platform" required
-                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-text-mid mb-1">Manager</label>
-              <select
-                value={teamManagerId}
-                onChange={(e) => setTeamManagerId(e.target.value)}
-                className="px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
-              >
-                <option value="">No manager</option>
-                {members.filter((m) => m.role !== 'viewer').map((m) => (
-                  <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
-                ))}
-              </select>
-            </div>
-            <Button type="submit">Add Team</Button>
-          </form>
         </div>
       )}
+
+      {isAdmin && <TeamsSettingsSection />}
 
       {isAdmin && <TaxonomySection />}
 
@@ -1248,6 +1213,116 @@ export default function SettingsView() {
                 className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
               />
             </div>
+          </form>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div id="teams" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+          <h3 className="text-sm font-bold text-text mb-3">Teams</h3>
+          <p className="text-[10px] text-text-light mb-3">
+            Group people into teams. A person can belong to multiple teams. Each team can have a manager whose ownership is inherited by all team members.
+          </p>
+
+          {teamError && (
+            <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{teamError}</div>
+          )}
+
+          <div className="space-y-1 mb-3">
+            {teams.map((t) => {
+              const count = resources.filter((r) => (r.teams || []).some((rt) => rt.id === t.id)).length;
+              const isEditing = editingTeamId === t.id;
+              const managerName = t.managerUser?.name || members.find((m) => m.user.id === t.managerUserId)?.user.name;
+              return (
+                <div key={t.id} className="py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
+                  {isEditing ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        type="text"
+                        value={editingTeamName}
+                        onChange={(e) => setEditingTeamName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEditTeam();
+                          if (e.key === 'Escape') handleCancelEditTeam();
+                        }}
+                        autoFocus
+                        className="flex-1 min-w-[120px] px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary"
+                      />
+                      <select
+                        value={editingTeamManagerId}
+                        onChange={(e) => setEditingTeamManagerId(e.target.value)}
+                        className="px-2 py-1 border border-border rounded text-xs text-text outline-none focus:border-primary bg-white"
+                      >
+                        <option value="">No manager</option>
+                        {members.filter((m) => m.role !== 'viewer').map((m) => (
+                          <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleSaveEditTeam}
+                        className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:underline px-1"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancelEditTeam}
+                        className="text-[10px] text-text-light bg-transparent border-0 cursor-pointer hover:text-text-mid px-1"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="flex-1 text-xs font-semibold text-text">{t.name}</span>
+                      {managerName && (
+                        <span className="text-[10px] text-text-light">Manager: {managerName}</span>
+                      )}
+                      <span className="text-[10px] text-text-light">{count === 1 ? '1 person' : `${count} people`}</span>
+                      <button
+                        onClick={() => handleStartEditTeam(t)}
+                        className="text-[10px] text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary px-1"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTeam(t)}
+                        className="text-[10px] text-danger bg-transparent border-0 cursor-pointer hover:text-danger/80 px-1"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {teams.length === 0 && (
+              <p className="text-xs text-text-light py-2">No teams yet.</p>
+            )}
+          </div>
+
+          <form onSubmit={handleAddTeam} className="flex gap-2 items-end pt-3 border-t border-border-light flex-wrap">
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Team name</label>
+              <input
+                type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)}
+                placeholder="e.g. Data Platform" required
+                className="w-full px-3 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-text-mid mb-1">Manager</label>
+              <select
+                value={teamManagerId}
+                onChange={(e) => setTeamManagerId(e.target.value)}
+                className="px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
+              >
+                <option value="">No manager</option>
+                {members.filter((m) => m.role !== 'viewer').map((m) => (
+                  <option key={m.user.id} value={m.user.id}>{m.user.name}</option>
+                ))}
+              </select>
+            </div>
+            <Button type="submit">Add Team</Button>
           </form>
         </div>
       )}

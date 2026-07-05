@@ -197,7 +197,7 @@ export default function IntegrationsSection() {
       {status && !error && <div className="text-xs text-success bg-success-bg p-2 rounded mb-3">{status}</div>}
 
       {/* Connection */}
-      <div className="bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+      <div id="integrations-connection" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-1">Jira / Tempo connection</h3>
         <p className="text-[10px] text-text-light mb-3">
           Credentials for the actual-hours source. API tokens are encrypted at rest and never shown again — leave a token field blank to keep the stored one. Jira (email + token) powers the mapping dropdowns; Tempo powers the hours.
@@ -304,7 +304,7 @@ export default function IntegrationsSection() {
       </div>
 
       {/* People mapping */}
-      <div className="bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+      <div id="integrations-people" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-1">People mapping</h3>
         <p className="text-[10px] text-text-light mb-3">
           Connect each person to their login account and their Jira account. {accounts.length === 0 && <span className="text-warning">Refresh from Jira to load accounts.</span>}
@@ -331,7 +331,7 @@ export default function IntegrationsSection() {
       </div>
 
       {/* Customer / project mapping — a table; expand a customer to its projects */}
-      <div className="bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+      <div id="integrations-mapping" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-1">Customer / project mapping</h3>
         <p className="text-[10px] text-text-light mb-3">
           Pick one or more Jira projects/epics for each customer or project. A Jira project pulls in everything under it (epics &amp; issues); a customer covers all its projects. {items.length === 0 && <span className="text-warning">Refresh from Jira to load projects &amp; epics.</span>}
