@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { scoreColor } from '../../../lib/statusUtils';
+import InfoDot from '../../../components/ui/InfoDot';
 
 export default function CategoryAverages({ filters }) {
   const [data, setData] = useState([]);
@@ -28,7 +29,10 @@ export default function CategoryAverages({ filters }) {
 
   return (
     <div className="bg-white rounded-2xl border border-border-light p-4">
-      <div className="text-[13px] font-bold text-text mb-3">Category averages</div>
+      <div className="text-[13px] font-bold text-text mb-3">
+        Category averages{' '}
+        <InfoDot text="Per category: the equal-weighted mean of its scores across the filtered finalized evaluations. n = number of scored instances." />
+      </div>
       {loading ? (
         <div className="text-[11px] text-text-light italic py-6 text-center">Loading…</div>
       ) : error ? (

@@ -3,6 +3,7 @@ import { formatMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { domainColor, seniorityShort } from '../../../lib/taxonomy';
+import InfoDot from '../../../components/ui/InfoDot';
 
 export default function FreeCapacity({ months, includePotential, teamId }) {
   const { resources: allResources, needs, projects, customers } = useData();
@@ -113,7 +114,10 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
 
   return (
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
-      <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">Free Capacity (FTE)</h3>
+      <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">
+        Free Capacity (FTE){' '}
+        <InfoDot text="Each cell = spare FTE for the group that month: Σ max(0, capacity − realised allocation) over its people. With Include potential on, potential demand at that domain/role/seniority is subtracted. The “Total Free” footer is the same across everyone." />
+      </h3>
       <div className="flex items-center border-b-2 border-border sticky top-0 bg-white z-10">
         <div className="w-[270px] shrink-0 px-3 py-2">
           <span className="text-xs font-semibold text-text-mid">Domain / Role / Seniority</span>

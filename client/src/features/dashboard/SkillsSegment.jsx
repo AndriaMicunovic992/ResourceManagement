@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useData } from '../../contexts/DataContext';
 import CompanySkills from '../skills/company/CompanySkills';
 import SkillsMatrix from '../skills/matrix/SkillsMatrix';
+import InfoDot from '../../components/ui/InfoDot';
 
 export default function SkillsSegment() {
   const { resources, skills } = useData();
@@ -40,6 +41,13 @@ export default function SkillsSegment() {
             </button>
           ))}
         </div>
+        <InfoDot
+          text={
+            mode === 'company'
+              ? 'Company coverage: for each skill, how many people have it at any level. The “Risk” flag marks skills held by nobody (red) or just one person (orange).'
+              : 'Individual matrix: each person’s level for each skill (— means they don’t have it).'
+          }
+        />
       </div>
       {mode === 'company' && <CompanySkills resources={sortedResources} skills={sortedSkills} />}
       {mode === 'individual' && <SkillsMatrix resources={sortedResources} skills={sortedSkills} />}

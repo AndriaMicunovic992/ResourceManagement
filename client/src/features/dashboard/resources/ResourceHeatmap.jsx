@@ -4,6 +4,7 @@ import { formatMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { utilColor } from '../../../lib/statusUtils';
+import InfoDot from '../../../components/ui/InfoDot';
 
 export default function ResourceHeatmap({ months, onResourceClick, includePotential, teamId }) {
   const { resources } = useData();
@@ -31,7 +32,10 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
 
   return (
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
-      <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">Capacity Heatmap</h3>
+      <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">
+        Capacity Heatmap{' '}
+        <InfoDot text="Each cell = a person’s realised allocation ÷ their capacity that month; the “+Xp” is extra potential (all-plan minus realised). Row “% avg” averages the months they’re allocated. Footer “Avg Utilization” = Σ used ÷ Σ capacity per month." />
+      </h3>
       <div className="flex items-center border-b-2 border-border sticky top-0 bg-white z-10">
         <div className="w-[270px] shrink-0 px-3 py-2">
           <span className="text-xs font-semibold text-text-mid">Name</span>

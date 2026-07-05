@@ -3,6 +3,7 @@ import { domainColor } from '../../../lib/taxonomy';
 import { utilColor } from '../../../lib/statusUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
+import InfoDot from '../../../components/ui/InfoDot';
 
 export default function DomainCard({ domain, months, includePotential, teamId }) {
   const { resources } = useData();
@@ -40,6 +41,7 @@ export default function DomainCard({ domain, months, includePotential, teamId })
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded" style={{ backgroundColor: domainColor(domain) }} />
           <span className="text-[13px] font-bold text-text">{domain}</span>
+          <InfoDot text="Average utilization of this domain’s people over the selected months: mean used FTE ÷ mean capacity per month. “Used” is realised allocation, or all planned with Include potential on. The number on the right is how many people hold a role in this domain." />
         </div>
         <span className="text-xs font-mono text-text-mid">{count}</span>
       </div>

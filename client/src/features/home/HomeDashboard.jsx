@@ -6,6 +6,7 @@ import { useData } from '../../contexts/DataContext';
 import { useComputed } from '../../hooks/useComputed';
 import { api } from '../../lib/api';
 import Avatar from '../../components/ui/Avatar';
+import InfoDot from '../../components/ui/InfoDot';
 import { MONTHS, MONTHLY_HOURS_PER_FTE } from '../../lib/constants';
 import { seniorityShort } from '../../lib/taxonomy';
 import { currentMonth, addMonths, monthRange, formatMonth } from '../../lib/dateUtils';
@@ -64,7 +65,7 @@ function Delta({ value, suffix = '', goodWhenDown = false }) {
 
 /* ---------- KPI card ---------- */
 
-function Kpi({ label, chip, chipBg, chipColor, children, spark, sparkColor, donut }) {
+function Kpi({ label, chip, chipBg, chipColor, children, spark, sparkColor, donut, info }) {
   return (
     <div className="relative overflow-hidden bg-white border border-border-light rounded-2xl px-4 pt-3.5 pb-9 shadow-card">
       <div className="flex items-center gap-2 text-[11px] font-semibold text-text-mid">
@@ -72,6 +73,7 @@ function Kpi({ label, chip, chipBg, chipColor, children, spark, sparkColor, donu
           {chip}
         </span>
         {label}
+        {info && <InfoDot text={info} className="ml-1" />}
       </div>
       <div className="mt-2 text-[22px] font-extrabold tracking-tight text-text leading-none">{children}</div>
       {spark && <Spark values={spark} color={sparkColor} />}
@@ -420,26 +422,32 @@ export default function HomeDashboard() {
         <div className="min-w-0">
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
-            <Kpi label="Active projects" chip="▦" chipBg="#E7F6FA" chipColor="#4CBAD4" spark={series.activeCount} sparkColor="#4CBAD4">
+            <Kpi label="Active projects" chip="▦" chipBg="#E7F6FA" chipColor="#4CBAD4" spark={series.activeCount} sparkColor="#4CBAD4"
+              info="Projects active now (status “realised”), out of all projects. Sparkline: per month this year, the realised projects that have any staffing need that month.">
               {activeProjects} <span className="text-[11px] font-medium text-text-light">of {projects.length}</span>
             </Kpi>
             {showActualKpi ? (
-              <Kpi label="Actual vs potential" chip="◔" chipBg="#EAFAF0" chipColor="#34C98E" spark={actualPct} sparkColor="#34C98E">
+              <Kpi label="Actual vs potential" chip="◔" chipBg="#EAFAF0" chipColor="#34C98E" spark={actualPct} sparkColor="#34C98E"
+                info="Actual utilization of matched people this month: logged Tempo hours ÷ 173.33 (hours per FTE) ÷ the capacity of people linked to a Jira account. The chip compares actual vs their planned (potential) utilization.">
                 {Math.round(actualNow)}<span className="text-[11px] font-medium text-text-light">%</span>
                 <Delta value={actualNow - potentialMatchedNow} suffix="%" />
               </Kpi>
             ) : (
-              <Kpi label="Realised utilization" chip="◔" chipBg="#EAFAF0" chipColor="#34C98E" spark={series.realisedPct} sparkColor="#34C98E">
+              <Kpi label="Realised utilization" chip="◔" chipBg="#EAFAF0" chipColor="#34C98E" spark={series.realisedPct} sparkColor="#34C98E"
+                info="This month’s realised allocation ÷ total team capacity. Counts only assignments on realised needs/projects/customers. The chip is the change vs last month.">
+
                 {Math.round(utilNow)}<span className="text-[11px] font-medium text-text-light">%</span>
                 <Delta value={utilPrev == null ? null : utilNow - utilPrev} suffix="%" />
               </Kpi>
             )}
-            <Kpi label={`Unfilled (${MONTHS[today.getMonth()]})`} chip="◌" chipBg="#FDE8EA" chipColor="#E8636F" spark={series.gapFte} sparkColor="#E8636F">
+            <Kpi label={`Unfilled (${MONTHS[today.getMonth()]})`} chip="◌" chipBg="#FDE8EA" chipColor="#E8636F" spark={series.gapFte} sparkColor="#E8636F"
+              info="Open demand this month across every need: Σ max(0, needed − filled) FTE. The chip is the change vs last month (down is good).">
               {Math.round(gapNow * 10) / 10} <span className="text-[11px] font-medium text-text-light">FTE</span>
               <Delta value={gapPrev == null ? null : gapNow - gapPrev} goodWhenDown />
             </Kpi>
             <Kpi
               label="By domain" chip="◑" chipBg="#F1ECFE" chipColor="#8B5CF6"
+              info="Total headcount. The donut splits people by their primary domain (their first role’s domain)."
               donut={
                 <>
                   <svg className="absolute right-3 top-4" width="44" height="44" viewBox="0 0 44 44">
@@ -462,6 +470,7 @@ export default function HomeDashboard() {
           <div className="relative bg-white border border-border-light rounded-2xl shadow-card p-4 mb-5">
             <div className="flex items-baseline gap-2 mb-2">
               <h3 className="text-[13px] font-bold text-text m-0">Utilization</h3>
+              <InfoDot text="Monthly % over the year. Blue = realised allocation ÷ team capacity. Green = actual logged Tempo hours (matched people, hours→FTE) ÷ capacity. Orange dashed = all planned allocation ÷ capacity." />
               <span className="text-[10.5px] text-text-light">planned · actual · potential</span>
               <span className="flex-1" />
               <span className="text-[10.5px] font-semibold text-text-mid bg-primary-bg border border-border-light rounded-full px-2.5 py-1">Jan – Dec {year}</span>
