@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
@@ -315,17 +315,24 @@ export default function PersonPerformance() {
     calendarYear,
   ]);
 
+  // Per-reload sequence counters: when scope/period changes fire overlapping
+  // requests, only the newest response for each series is applied, so a slow
+  // earlier response can't overwrite the current scope's data.
+  const seqRef = useRef({ evals: 0, trend: 0, overall: 0, cats: 0 });
+
   const reloadEvaluations = useCallback(async () => {
     if (!canView) return;
+    const s = ++seqRef.current.evals;
     setLoading(true);
     setError('');
     try {
       const list = await api.listEvaluations({ resourceId: resource.id });
+      if (s !== seqRef.current.evals) return;
       setEvaluations(Array.isArray(list) ? list : []);
     } catch (err) {
-      setError(err.message || 'Failed to load evaluations');
+      if (s === seqRef.current.evals) setError(err.message || 'Failed to load evaluations');
     }
-    setLoading(false);
+    if (s === seqRef.current.evals) setLoading(false);
   }, [canView, resource.id]);
 
   // Shared scope params applied to all performance endpoints.
@@ -337,6 +344,7 @@ export default function PersonPerformance() {
 
   const reloadTrend = useCallback(async () => {
     if (!canView) return;
+    const s = ++seqRef.current.trend;
     try {
       const data = await api.getPerformanceTrend(resource.id, {
         bucket: trendBucket,
@@ -344,28 +352,30 @@ export default function PersonPerformance() {
         to: periodWindow.to,
         ...scopeParams,
       });
-      setTrend(Array.isArray(data) ? data : []);
+      if (s === seqRef.current.trend) setTrend(Array.isArray(data) ? data : []);
     } catch {
-      setTrend([]);
+      if (s === seqRef.current.trend) setTrend([]);
     }
   }, [canView, resource.id, trendBucket, periodWindow.from, periodWindow.to, scopeParams]);
 
   const reloadOverall = useCallback(async () => {
     if (!canView) return;
+    const s = ++seqRef.current.overall;
     try {
       const data = await api.getPerformanceOverall(resource.id, {
         from: periodWindow.from,
         to: periodWindow.to,
         ...scopeParams,
       });
-      setOverall(data);
+      if (s === seqRef.current.overall) setOverall(data);
     } catch {
-      setOverall(null);
+      if (s === seqRef.current.overall) setOverall(null);
     }
   }, [canView, resource.id, periodWindow.from, periodWindow.to, scopeParams]);
 
   const reloadCategories = useCallback(async () => {
     if (!canView) return;
+    const s = ++seqRef.current.cats;
     const params = {
       from: periodWindow.from,
       to: periodWindow.to,
@@ -373,9 +383,9 @@ export default function PersonPerformance() {
     };
     try {
       const data = await api.getPerformanceCategories(resource.id, params);
-      setCategories(Array.isArray(data) ? data : []);
+      if (s === seqRef.current.cats) setCategories(Array.isArray(data) ? data : []);
     } catch {
-      setCategories([]);
+      if (s === seqRef.current.cats) setCategories([]);
     }
   }, [canView, resource.id, scopeParams, periodWindow.from, periodWindow.to]);
 

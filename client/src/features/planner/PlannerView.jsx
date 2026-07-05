@@ -50,6 +50,16 @@ export default function PlannerView() {
   const historyRef = useRef([]);
   const toastTimerRef = useRef(null);
   const [undoToast, setUndoToast] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const errorTimerRef = useRef(null);
+
+  // Surface a failed write instead of swallowing the rejection — the planner
+  // used to fail silently (a click that did nothing, or a stuck popover).
+  const notifyError = useCallback((e) => {
+    setErrorMsg((e && e.message) || 'That change could not be saved');
+    clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setErrorMsg(null), 5000);
+  }, []);
 
   const pushUndo = useCallback((label, undoFn) => {
     historyRef.current.push({ label, undoFn });
@@ -166,7 +176,7 @@ export default function PlannerView() {
           pushUndo(`Assigned ${heldName}`, () =>
             upsertAssignment({ needId: need.id, resourceId: heldResource.id, monthAllocations: undoAllocs })
           );
-        });
+        }).catch(notifyError);
         return;
       }
 
@@ -176,7 +186,7 @@ export default function PlannerView() {
         if (created?.id) {
           pushUndo(`Assigned ${heldName}`, () => deleteAssignment(created.id));
         }
-      });
+      }).catch(notifyError);
       return;
     }
 
@@ -190,7 +200,7 @@ export default function PlannerView() {
       maxFte: 2.0,
       type: 'editNeed',
     });
-  }, [heldResource, assignments, upsertAssignment]);
+  }, [heldResource, assignments, upsertAssignment, notifyError]);
 
   const handleBarClick = useCallback((assignment, segment, clickedMonth, e) => {
     const need = needs.find((n) => n.id === assignment.needId);
@@ -222,6 +232,16 @@ export default function PlannerView() {
 
   const handleFteSave = async (fte) => {
     if (!popover) return;
+    try {
+      await handleFteSaveInner(fte);
+    } catch (e) {
+      notifyError(e);
+    } finally {
+      setPopover(null);
+    }
+  };
+
+  const handleFteSaveInner = async (fte) => {
     if (popover.type === 'edit') {
       // Snapshot the previous value so the change is undoable.
       const prev = assignments.find((a) => a.id === popover.assignmentId);
@@ -277,13 +297,17 @@ export default function PlannerView() {
         updateNeed(needId, { monthAllocations: prevAllocs })
       );
     }
-    setPopover(null);
   };
 
   const handleNeedFteSave = async (fte) => {
     if (!popover) return;
-    await updateNeed(popover.needId, { monthAllocations: { [popover.month]: fte } });
-    setPopover(null);
+    try {
+      await updateNeed(popover.needId, { monthAllocations: { [popover.month]: fte } });
+    } catch (e) {
+      notifyError(e);
+    } finally {
+      setPopover(null);
+    }
   };
 
   // Paint-fill: a drag across months opens the popover once for the range.
@@ -324,13 +348,17 @@ export default function PlannerView() {
     const alloc = buildAutoFill(suggest.need, resource, assignments);
     setSuggest(null);
     if (!alloc) return;
-    const created = await upsertAssignment({
-      needId: suggest.need.id,
-      resourceId: resource.id,
-      monthAllocations: alloc,
-    });
-    if (created?.id) {
-      pushUndo(`Assigned ${resource.name}`, () => deleteAssignment(created.id));
+    try {
+      const created = await upsertAssignment({
+        needId: suggest.need.id,
+        resourceId: resource.id,
+        monthAllocations: alloc,
+      });
+      if (created?.id) {
+        pushUndo(`Assigned ${resource.name}`, () => deleteAssignment(created.id));
+      }
+    } catch (e) {
+      notifyError(e);
     }
   };
 
@@ -409,6 +437,18 @@ export default function PlannerView() {
             className="inline-flex items-center gap-1 text-xs font-bold text-primary-light bg-white/10 border border-white/20 rounded-lg px-2.5 py-1 cursor-pointer hover:bg-white/20"
           >
             <UndoIcon size={12} /> Undo
+          </button>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[9600] flex items-center gap-3 bg-danger text-white rounded-xl px-4 py-2.5 shadow-2xl">
+          <span className="text-xs font-semibold">{errorMsg}</span>
+          <button
+            onClick={() => setErrorMsg(null)}
+            className="text-xs font-bold text-white/90 bg-white/10 border border-white/20 rounded-lg px-2 py-1 cursor-pointer hover:bg-white/20"
+          >
+            Dismiss
           </button>
         </div>
       )}
