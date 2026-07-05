@@ -11,15 +11,33 @@ import { useOrg } from '../../contexts/OrgContext';
 import { useData } from '../../contexts/DataContext';
 
 // The month window Insights opens with, from the org's saved default (Settings →
-// Insights range). "custom" uses the fixed start/end; otherwise a rolling window
-// of N months from the current month (default 12 — the previous hardcoded value).
+// Insights range). Same option set as the Performance-trend default, but as a
+// forward planning window of "YYYY-MM" months:
+//  - calendar_quarter / _half / _year: the current calendar period
+//  - custom: the fixed start/end months
+//  - rolling_months (default): N months from the current month (default 12 —
+//    the previous hardcoded value).
 export function insightsDefaultRange(org) {
-  if (org?.insightsDefaultKind === 'custom' && org?.insightsDefaultStart && org?.insightsDefaultEnd) {
+  const kind = org?.insightsDefaultKind || 'rolling_months';
+  const cur = currentMonth(); // "YYYY-MM"
+  const [y, m] = cur.split('-').map(Number); // m: 1-12
+  const monthStr = (yr, mo) => `${yr}-${String(mo).padStart(2, '0')}`;
+  if (kind === 'calendar_quarter') {
+    const start = monthStr(y, Math.floor((m - 1) / 3) * 3 + 1);
+    return { start, end: addMonths(start, 2) };
+  }
+  if (kind === 'calendar_half') {
+    const start = monthStr(y, m <= 6 ? 1 : 7);
+    return { start, end: addMonths(start, 5) };
+  }
+  if (kind === 'calendar_year') {
+    return { start: monthStr(y, 1), end: monthStr(y, 12) };
+  }
+  if (kind === 'custom' && org?.insightsDefaultStart && org?.insightsDefaultEnd) {
     return { start: org.insightsDefaultStart, end: org.insightsDefaultEnd };
   }
   const months = Math.min(120, Math.max(1, org?.insightsDefaultMonths ?? 12));
-  const start = currentMonth();
-  return { start, end: addMonths(start, months - 1) };
+  return { start: cur, end: addMonths(cur, months - 1) };
 }
 
 export default function PlanningSegment() {

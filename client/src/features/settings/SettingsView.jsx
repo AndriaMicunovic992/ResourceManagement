@@ -111,7 +111,7 @@ export default function SettingsView() {
   const [perfTrendSaving, setPerfTrendSaving] = useState(false);
   const [perfTrendSuccess, setPerfTrendSuccess] = useState(false);
 
-  const [insightsKind, setInsightsKind] = useState(currentOrg?.insightsDefaultKind || 'rolling');
+  const [insightsKind, setInsightsKind] = useState(currentOrg?.insightsDefaultKind || 'rolling_months');
   const [insightsMonths, setInsightsMonths] = useState(String(currentOrg?.insightsDefaultMonths ?? 12));
   const [insightsStart, setInsightsStart] = useState(currentOrg?.insightsDefaultStart || '');
   const [insightsEnd, setInsightsEnd] = useState(currentOrg?.insightsDefaultEnd || '');
@@ -136,7 +136,7 @@ export default function SettingsView() {
     setPerfTrendMonths(String(currentOrg?.performanceTrendDefaultMonths ?? 12));
     setPerfTrendFrom(currentOrg?.performanceTrendDefaultFrom || '');
     setPerfTrendTo(currentOrg?.performanceTrendDefaultTo || '');
-    setInsightsKind(currentOrg?.insightsDefaultKind || 'rolling');
+    setInsightsKind(currentOrg?.insightsDefaultKind || 'rolling_months');
     setInsightsMonths(String(currentOrg?.insightsDefaultMonths ?? 12));
     setInsightsStart(currentOrg?.insightsDefaultStart || '');
     setInsightsEnd(currentOrg?.insightsDefaultEnd || '');
@@ -219,7 +219,7 @@ export default function SettingsView() {
 
   const handleSaveInsights = async () => {
     const update = { insightsDefaultKind: insightsKind };
-    if (insightsKind === 'rolling') {
+    if (insightsKind === 'rolling_months') {
       const n = parseInt(insightsMonths, 10);
       if (!Number.isFinite(n) || n < 1 || n > 120) {
         setError('Insights window months must be between 1 and 120');
@@ -855,7 +855,7 @@ export default function SettingsView() {
         <div id="insights-range" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Insights default range</h3>
           <p className="text-[10px] text-text-light mb-3">
-            The month window the Insights → Planning tab opens with. Pick a rolling window (N months from the current month) or a fixed range. Anyone can still change it on the page.
+            The month window the Insights → Planning tab opens with. Choose a rolling window (N months from the current month), a calendar-aligned period, or a fixed range. Anyone can still change it on the page.
           </p>
           <div className="flex gap-3 items-end flex-wrap">
             <div className="flex-1 min-w-[180px] max-w-[240px]">
@@ -865,11 +865,14 @@ export default function SettingsView() {
                 onChange={(e) => setInsightsKind(e.target.value)}
                 className="w-full px-2 py-1.5 border border-border rounded-lg text-xs text-text outline-none focus:border-primary bg-white"
               >
-                <option value="rolling">Rolling months (from now)</option>
+                <option value="rolling_months">Rolling months</option>
+                <option value="calendar_quarter">Current calendar quarter</option>
+                <option value="calendar_half">Current calendar half-year</option>
+                <option value="calendar_year">Current calendar year</option>
                 <option value="custom">Custom (from / to)</option>
               </select>
             </div>
-            {insightsKind === 'rolling' && (
+            {insightsKind === 'rolling_months' && (
               <div className="flex-1 max-w-[140px]">
                 <label className="block text-[10px] font-semibold text-text-mid mb-1">Months</label>
                 <input
