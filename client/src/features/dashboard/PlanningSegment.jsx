@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatsCards from './stats/StatsCards';
 import DashboardTabs from './tabs/DashboardTabs';
@@ -10,12 +10,35 @@ import { currentMonth, addMonths, monthRange } from '../../lib/dateUtils';
 import { useOrg } from '../../contexts/OrgContext';
 import { useData } from '../../contexts/DataContext';
 
+// The month window Insights opens with, from the org's saved default (Settings →
+// Insights range). "custom" uses the fixed start/end; otherwise a rolling window
+// of N months from the current month (default 12 — the previous hardcoded value).
+export function insightsDefaultRange(org) {
+  if (org?.insightsDefaultKind === 'custom' && org?.insightsDefaultStart && org?.insightsDefaultEnd) {
+    return { start: org.insightsDefaultStart, end: org.insightsDefaultEnd };
+  }
+  const months = Math.min(120, Math.max(1, org?.insightsDefaultMonths ?? 12));
+  const start = currentMonth();
+  return { start, end: addMonths(start, months - 1) };
+}
+
 export default function PlanningSegment() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('clients');
   const { currentOrg } = useOrg();
   const { teams } = useData();
-  const [timeRange, setTimeRange] = useState({ start: currentMonth(), end: addMonths(currentMonth(), 11) });
+  const [timeRange, setTimeRange] = useState(() => insightsDefaultRange(currentOrg));
+  // currentOrg may still be loading at first mount, so the initializer above can
+  // miss the saved default; apply it once the org resolves — but never clobber a
+  // range the user has already picked.
+  const rangeTouched = useRef(false);
+  const defaultApplied = useRef(!!currentOrg);
+  useEffect(() => {
+    if (defaultApplied.current || rangeTouched.current || !currentOrg) return;
+    defaultApplied.current = true;
+    setTimeRange(insightsDefaultRange(currentOrg));
+  }, [currentOrg]);
+  const changeTimeRange = (r) => { rangeTouched.current = true; setTimeRange(r); };
   const months = useMemo(() => monthRange(timeRange.start, timeRange.end), [timeRange]);
   const [includePotential, setIncludePotential] = useState(false);
   const [teamId, setTeamId] = useState('');
@@ -47,7 +70,7 @@ export default function PlanningSegment() {
             <span className={`w-2 h-2 rounded-full ${includePotential ? 'bg-[#9CA3AF]' : 'bg-border'}`} />
             Include Potential
           </button>
-          <TimeRangePicker timeRange={timeRange} onChange={setTimeRange}
+          <TimeRangePicker timeRange={timeRange} onChange={changeTimeRange}
             minDate={currentOrg?.minPlanningDate} maxDate={currentOrg?.maxPlanningDate} />
         </div>
       </div>
