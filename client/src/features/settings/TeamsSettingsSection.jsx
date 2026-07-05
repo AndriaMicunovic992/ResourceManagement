@@ -165,7 +165,7 @@ export default function TeamsSettingsSection() {
       {status && !error && <div className="text-xs text-success bg-success-bg p-2 rounded my-2">{status}</div>}
 
       {/* Connection credentials */}
-      <p className="text-[10px] text-text-light mb-3">
+      <p id="msteams-connection" className="scroll-mt-4 text-[10px] text-text-light mb-3">
         Azure Bot credentials for delivering reminders as private Teams messages. Pick the app type
         you chose when creating the bot. Secrets are encrypted at rest and never shown again — leave
         the field blank to keep the stored one.
@@ -219,7 +219,7 @@ export default function TeamsSettingsSection() {
       </div>
 
       {/* Reminder delivery */}
-      <div className="mt-4 pt-3 border-t border-border-light">
+      <div id="msteams-delivery" className="scroll-mt-4 mt-4 pt-3 border-t border-border-light">
         <h4 className="text-xs font-bold text-text mb-1">Reminder delivery</h4>
         <p className="text-[10px] text-text-light mb-3">
           Deliver the in-app reminders as private Teams DMs — each person is messaged once a day when
