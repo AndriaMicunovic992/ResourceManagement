@@ -21,6 +21,24 @@ async function start() {
   // to the proxy's IP and per-IP login/signup rate-limiting protects nothing.
   const app = Fastify({ logger: true, trustProxy: true });
 
+  // Security headers on every response (the SPA is served from this process in
+  // production). CSP allows same-origin assets, inline styles (React style
+  // attributes) and https/data images (avatars); scripts are same-origin only.
+  app.addHook('onSend', async (_req, reply, payload) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    reply.header(
+      'Content-Security-Policy',
+      "default-src 'self'; img-src 'self' data: https:; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "font-src 'self' data: https://fonts.gstatic.com; " +
+        "script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    );
+    return payload;
+  });
+
   // Register plugins
   await app.register(corsPlugin);
   // Rate limiting is opt-in per route (global: false); auth endpoints set their
