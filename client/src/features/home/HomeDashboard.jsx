@@ -470,7 +470,7 @@ export default function HomeDashboard() {
           <div className="relative bg-white border border-border-light rounded-2xl shadow-card p-4 mb-5">
             <div className="flex items-baseline gap-2 mb-2">
               <h3 className="text-[13px] font-bold text-text m-0">Utilization</h3>
-              <InfoDot text="Monthly % over the year. Blue = realised allocation ÷ team capacity. Green = actual logged Tempo hours (matched people, hours→FTE) ÷ capacity. Orange dashed = all planned allocation ÷ capacity." />
+              <InfoDot text="Monthly % over the year. Blue = realised allocation and orange dashed = all planned allocation — both ÷ the whole team’s capacity. Green = actual logged Tempo hours ÷ 173.33 (hours per FTE), but only for “matched” people (linked to Jira) and ÷ only their capacity — so the actual rate isn’t diluted by people you don’t track yet. That’s why blue/orange span everyone while green covers matched people only." />
               <span className="text-[10.5px] text-text-light">planned · actual · potential</span>
               <span className="flex-1" />
               <span className="text-[10.5px] font-semibold text-text-mid bg-primary-bg border border-border-light rounded-full px-2.5 py-1">Jan – Dec {year}</span>
