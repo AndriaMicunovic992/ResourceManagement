@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { scoreBg, scoreColor } from '../../../lib/statusUtils';
+import InfoDot from '../../../components/ui/InfoDot';
 
 export default function CategoryHeatmap({ filters }) {
   const [data, setData] = useState({ domains: [], categories: [], cells: [] });
@@ -33,7 +34,10 @@ export default function CategoryHeatmap({ filters }) {
 
   return (
     <div className="bg-white rounded-2xl border border-border-light p-4">
-      <div className="text-[13px] font-bold text-text mb-3">Domain × category heatmap</div>
+      <div className="text-[13px] font-bold text-text mb-3">
+        Domain × category heatmap{' '}
+        <InfoDot text="For each domain × category: the mean category score across finalized evaluations. Someone with multiple role-domains counts in each of theirs." />
+      </div>
       {loading ? (
         <div className="text-[11px] text-text-light italic py-6 text-center">Loading…</div>
       ) : error ? (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import TrendChart from '../../people/tabs/performance/TrendChart';
+import InfoDot from '../../../components/ui/InfoDot';
 
 export default function CompanyTrend({ filters }) {
   const [data, setData] = useState([]);
@@ -30,7 +31,10 @@ export default function CompanyTrend({ filters }) {
   return (
     <div className="bg-white rounded-2xl border border-border-light shadow-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-[13px] font-bold text-text">Company trend</div>
+        <div className="text-[13px] font-bold text-text">
+          Company trend{' '}
+          <InfoDot text="Per time bucket (month or quarter): the equal-weighted mean final score across finalized evaluations, with the count of evaluations." />
+        </div>
         <span className="flex bg-[#EEF1F5] rounded-[11px] p-[3px]">
           {['month', 'quarter'].map((b) => (
             <button

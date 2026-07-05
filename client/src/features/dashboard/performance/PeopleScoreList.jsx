@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../../lib/api';
 import { scoreBg, scoreColor } from '../../../lib/statusUtils';
+import InfoDot from '../../../components/ui/InfoDot';
 
 export default function PeopleScoreList({ filters }) {
   const [data, setData] = useState([]);
@@ -29,7 +30,10 @@ export default function PeopleScoreList({ filters }) {
 
   return (
     <div className="bg-white rounded-2xl border border-border-light p-4">
-      <div className="text-[13px] font-bold text-text mb-3">People ranked by mean score</div>
+      <div className="text-[13px] font-bold text-text mb-3">
+        People ranked by mean score{' '}
+        <InfoDot text="Each person’s equal-weighted mean final score across their filtered finalized evaluations, highest first. n = their evaluation count." />
+      </div>
       {loading ? (
         <div className="text-[11px] text-text-light italic py-6 text-center">Loading…</div>
       ) : error ? (

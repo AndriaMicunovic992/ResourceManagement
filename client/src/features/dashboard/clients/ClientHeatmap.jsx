@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import ClientHeatmapHeader from './ClientHeatmapHeader';
 import CustomerHeatmapRow from './CustomerHeatmapRow';
 import EmptyState from '../../../components/ui/EmptyState';
+import InfoDot from '../../../components/ui/InfoDot';
 import { useData } from '../../../contexts/DataContext';
 
 export default function ClientHeatmap({ months, includePotential }) {
@@ -38,7 +39,10 @@ export default function ClientHeatmap({ months, includePotential }) {
 
   return (
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
-      <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">Client Staffing</h3>
+      <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">
+        Client Staffing{' '}
+        <InfoDot text="Each cell = filled ÷ needed FTE for that customer/project that month (summed over its needs). The “Total FTE” footer sums filled assignment FTE across all shown needs per month. Realised-only unless Include potential is on." />
+      </h3>
       <ClientHeatmapHeader months={months} />
       {filtered.map((c, i) => (
         <CustomerHeatmapRow key={c.id} customer={c} index={i} months={months} includePotential={includePotential} />

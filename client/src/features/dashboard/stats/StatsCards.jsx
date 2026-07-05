@@ -58,10 +58,14 @@ export default function StatsCards({ months, includePotential, teamId }) {
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
-      <StatCard icon="▦" value={stats.activeProjects} label="Projects" color="#3B82F6" />
-      <StatCard icon="◑" value={stats.teamSize} label="People" color="#5BC68A" />
-      <StatCard icon="◔" value={`${stats.utilPct}%`} label="Utilization" color="#F5A623" />
-      <StatCard icon="◌" value={stats.unfilled} label="Unfilled" color="#E8636F" />
+      <StatCard icon="▦" value={stats.activeProjects} label="Projects" color="#3B82F6"
+        info="Projects overlapping the selected months. With “Include potential” off, only realised projects count." />
+      <StatCard icon="◑" value={stats.teamSize} label="People" color="#5BC68A"
+        info="People in scope — the whole org, or the selected team." />
+      <StatCard icon="◔" value={`${stats.utilPct}%`} label="Utilization" color="#F5A623"
+        info="Averaged over the selected months: Σ used FTE ÷ Σ capacity. “Used” is realised allocation, or all planned allocation when “Include potential” is on." />
+      <StatCard icon="◌" value={stats.unfilled} label="Unfilled" color="#E8636F"
+        info="Needs with at least one selected month where filled < needed. “Include potential” off limits it to realised needs/projects/customers." />
     </div>
   );
 }
