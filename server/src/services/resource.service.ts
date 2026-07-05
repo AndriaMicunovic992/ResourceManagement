@@ -157,6 +157,20 @@ export const resourceService = {
       await setDirectManagers(orgId, id, directManagerUserIds);
     }
 
+    // If the Jira account mapping changed, re-attribute already-synced worklogs
+    // so the fix applies to history too — otherwise a person matched after a
+    // sync stays invisible in actuals until a full re-pull. Detach this person
+    // from any worklog first, then claim the ones for the new account id.
+    if (data.externalWorkId !== undefined) {
+      await prisma.worklog.updateMany({ where: { orgId, resourceId: id }, data: { resourceId: null } });
+      if (data.externalWorkId) {
+        await prisma.worklog.updateMany({
+          where: { orgId, accountId: data.externalWorkId },
+          data: { resourceId: id },
+        });
+      }
+    }
+
     return this.getById(orgId, id);
   },
 

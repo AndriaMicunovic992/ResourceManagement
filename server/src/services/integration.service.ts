@@ -212,7 +212,15 @@ export const integrationService = {
     assertJiraReady(conn);
     if (!conn?.tempoApiToken) throw new BadRequestError('Add the Tempo API token first');
 
-    const worklogs = await callTempo(() => tempoClient.fetchWorklogs(conn.tempoApiToken, updatedFrom));
+    const connRow = await prisma.jiraConnection.findUnique({
+      where: { orgId },
+      select: { worklogSyncedAt: true },
+    });
+    const prevCursor = connRow?.worklogSyncedAt ?? null;
+
+    const { worklogs, truncated } = await callTempo(() =>
+      tempoClient.fetchWorklogs(conn.tempoApiToken, updatedFrom)
+    );
 
     // Resolve the worklogs' Jira issues → project/epic keys.
     const issueIds = [...new Set(worklogs.map((w) => w.issueId).filter(Boolean))];
@@ -247,8 +255,10 @@ export const integrationService = {
     const unmatchedAccounts = new Set<string>();
     const secondsByResource = new Map<string, number>();
     const secondsByCustomer = new Map<string, number>();
+    const seenWorklogIds = new Set<string>();
 
     for (const w of worklogs) {
+      seenWorklogIds.add(w.tempoWorklogId);
       const resourceId = resourceByAccount.get(w.accountId) ?? null;
       if (resourceId) { matchedResourceIds.add(resourceId); secondsByResource.set(resourceId, (secondsByResource.get(resourceId) || 0) + w.seconds); }
       else if (w.accountId) unmatchedAccounts.add(w.accountId);
@@ -288,9 +298,29 @@ export const integrationService = {
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 10);
 
-    // Record the cursor so the next (nightly) run only fetches the delta.
+    // Reconcile deletions: on a full pull (updatedFrom at the beginning of time)
+    // that wasn't truncated, any local worklog Tempo didn't return no longer
+    // exists there — remove it so actuals stop over-counting. Only when the pull
+    // returned something, so an API glitch returning empty can't wipe the org.
+    const isFullPull = updatedFrom <= '2001-01-01';
+    let deleted = 0;
+    if (isFullPull && !truncated && seenWorklogIds.size > 0) {
+      const res = await prisma.worklog.deleteMany({
+        where: { orgId, tempoWorklogId: { notIn: [...seenWorklogIds] } },
+      });
+      deleted = res.count;
+    }
+
+    // Advance the delta cursor only when this pull actually covers everything
+    // since the previous cursor and wasn't truncated. A narrow manual re-pull
+    // that starts after the cursor must not jump it forward (that would leave
+    // the gap permanently unfetched); a truncated pull mustn't advance either.
     const syncedAt = new Date();
-    await prisma.jiraConnection.update({ where: { orgId }, data: { worklogSyncedAt: syncedAt } });
+    const updatedFromDate = new Date(`${updatedFrom}T00:00:00.000Z`);
+    const coversGap = !prevCursor || updatedFromDate <= prevCursor;
+    if (coversGap && !truncated) {
+      await prisma.jiraConnection.update({ where: { orgId }, data: { worklogSyncedAt: syncedAt } });
+    }
 
     return {
       updatedFrom,
@@ -301,6 +331,9 @@ export const integrationService = {
       unmatchedAccounts: unmatchedAccounts.size,
       mappedWorklogs: mapped,
       unmappedWorklogs: worklogs.length - mapped,
+      deletedWorklogs: deleted,
+      truncated,
+      cursorAdvanced: coversGap && !truncated,
       byPerson,
       byCustomer,
     };
