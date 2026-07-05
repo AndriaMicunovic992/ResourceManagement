@@ -79,6 +79,7 @@ model Organization {
   clientSignals ClientSignal[]
   reminderDismissals ReminderDismissal[]
   customerReviews CustomerReview[]
+  teamsReminderStates TeamsReminderState[]
 }
 
 model User {
@@ -116,6 +117,7 @@ model User {
   managedTeams          Team[]          @relation("TeamManagerUser")
   managedPeople         PersonManager[] @relation("PersonManagerUser")
   teamsLink             TeamsUserLink?  @relation("UserTeamsLink")
+  teamsReminderStates   TeamsReminderState[]
 }
 
 // Per-user Microsoft Teams link. Captured when the bot is installed for a person:
@@ -134,6 +136,23 @@ model TeamsUserLink {
   updatedAt       DateTime  @updatedAt
 
   @@index([aadObjectId])
+}
+
+// Per-(org, user) daily reminder-send cursor. Kept separate from TeamsUserLink
+// (which is a single global row per user) so a person who belongs to several
+// reminder-enabled orgs gets each org's daily DM — the old global lastSentAt
+// let whichever org ran first suppress all the others for that day.
+model TeamsReminderState {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSentAt DateTime?
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([orgId, userId])
+  @@index([orgId])
 }
 
 // Per-org Azure Bot credentials for the Microsoft Teams reminder integration.

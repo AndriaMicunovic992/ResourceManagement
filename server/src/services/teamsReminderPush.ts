@@ -54,12 +54,20 @@ export async function runReminderPush(opts: {
     // Connected members: linked to a Teams conversation AND to a Microsoft identity.
     const members = await prisma.orgMember.findMany({
       where: { orgId: org.id, user: { microsoftId: { not: null }, teamsLink: { isNot: null } } },
-      select: { userId: true, role: true, user: { select: { teamsLink: { select: { lastSentAt: true } } } } },
+      select: { userId: true, role: true },
     });
+
+    // Per-(org, user) send cursor, so a multi-org user isn't suppressed in this
+    // org just because another org already sent them today.
+    const stateRows = await prisma.teamsReminderState.findMany({
+      where: { orgId: org.id, userId: { in: members.map((m) => m.userId) } },
+      select: { userId: true, lastSentAt: true },
+    });
+    const lastSentByUser = new Map(stateRows.map((s) => [s.userId, s.lastSentAt ?? null]));
 
     for (const m of members) {
       try {
-        const lastSentAt = m.user.teamsLink?.lastSentAt ?? null;
+        const lastSentAt = lastSentByUser.get(m.userId) ?? null;
         // Cheap gate before the work, in the org's configured hour + timezone.
         if (!force && !isDailyPushDue(lastSentAt, now, org.teamsReminderHour, org.teamsReminderTimezone ?? 'UTC')) {
           continue;
@@ -74,7 +82,11 @@ export async function runReminderPush(opts: {
         if (reminders.length === 0) continue; // nothing due for this person
 
         await sendProactiveMessage(org.id, m.userId, buildReminderText(org.teamsReminderMessage, reminders));
-        await prisma.teamsUserLink.update({ where: { userId: m.userId }, data: { lastSentAt: new Date() } });
+        await prisma.teamsReminderState.upsert({
+          where: { orgId_userId: { orgId: org.id, userId: m.userId } },
+          create: { orgId: org.id, userId: m.userId, lastSentAt: new Date() },
+          update: { lastSentAt: new Date() },
+        });
         sent++;
       } catch (err) {
         log?.error(
