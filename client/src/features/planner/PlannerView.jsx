@@ -143,15 +143,23 @@ export default function PlannerView() {
       if (existing) {
         // The person is already on this need for some months (e.g. earlier in
         // the year, before someone else covered a gap). Extend them into the
-        // remaining open months instead of doing nothing — apply only the
-        // positive fills so their existing months are never wiped.
+        // remaining open months. buildAutoFill returns the *incremental* FTE
+        // that still fits; the server merges per-month by replacement, so we
+        // must send the TARGET value (their current month FTE + the increment),
+        // never the bare increment — otherwise a partially-filled month would
+        // be reduced to just the gap. Only positive increments are applied, so
+        // existing months (and anyone else's) are never wiped.
+        const own = existing.monthAllocations || {};
         const additions = {};
-        for (const [m, fte] of Object.entries(monthAllocations)) {
-          if (fte > 0) additions[m] = fte;
+        const undoAllocs = {};
+        for (const [m, inc] of Object.entries(monthAllocations)) {
+          if (inc > 0) {
+            const prev = own[m] || 0;
+            additions[m] = Math.round((prev + inc) * 100) / 100;
+            undoAllocs[m] = prev; // restore the real prior value, not zero
+          }
         }
         if (Object.keys(additions).length === 0) return;
-        const undoAllocs = {};
-        for (const m of Object.keys(additions)) undoAllocs[m] = 0;
         Promise.resolve(
           upsertAssignment({ needId: need.id, resourceId: heldResource.id, monthAllocations: additions })
         ).then(() => {
