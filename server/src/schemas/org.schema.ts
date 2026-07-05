@@ -35,7 +35,9 @@ export const updateOrgSchema = z
     performanceTrendDefaultTo: z.string().nullable().optional(),
     // Default month window for the Insights → Planning tab. "rolling" spans N
     // months from the current month; "custom" uses the "YYYY-MM" start/end.
-    insightsDefaultKind: z.enum(['rolling', 'custom']).optional(),
+    insightsDefaultKind: z
+      .enum(['rolling_months', 'calendar_quarter', 'calendar_half', 'calendar_year', 'custom'])
+      .optional(),
     insightsDefaultMonths: z.number().int().positive().max(120).optional(),
     insightsDefaultStart: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
     insightsDefaultEnd: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),

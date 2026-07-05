@@ -42,7 +42,7 @@ model Organization {
   // Default month window shown on the Insights → Planning tab. Kind "rolling"
   // spans insightsDefaultMonths from the current month; "custom" uses the
   // insightsDefaultStart/End "YYYY-MM" months.
-  insightsDefaultKind   String  @default("rolling")
+  insightsDefaultKind   String  @default("rolling_months")
   insightsDefaultMonths Int     @default(12)
   insightsDefaultStart  String?
   insightsDefaultEnd    String?
