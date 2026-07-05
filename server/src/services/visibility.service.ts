@@ -1,5 +1,6 @@
 import { prisma } from '../db/prisma.js';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors.js';
+import { scopeFor, type PermissionMatrix, type Scope } from '../lib/permissions.js';
 
 /**
  * Visibility scope - the set of things a requesting user can see in an org.
@@ -55,7 +56,8 @@ export function isAdmin(role: string): boolean {
 export async function computeVisibility(
   orgId: string,
   userId: string,
-  level: number
+  level: number,
+  permissions?: PermissionMatrix | null
 ): Promise<VisibilityScope> {
   // Visibility tier follows the role's level so custom roles behave like their
   // base level (owner & admin → all, member → team, viewer → own). Per-segment
@@ -194,6 +196,40 @@ export async function computeVisibility(
 
   const visibleCustomerIds = new Set<string>(responsibleCustomerIds);
   const visibleProjectIds = new Set<string>(responsibleProjectIds);
+
+  // Honor the role's per-segment scope (own/team/all) for member-tier roles.
+  // Without a matrix (e.g. legacy callers) this is a no-op and the team-based
+  // computation above stands — preserving the default member behavior. The
+  // matrix's default member scope is 'team', so default roles are unchanged;
+  // only a custom role that widens to 'all' or narrows to 'own' shifts here.
+  if (permissions) {
+    const peopleScope: Scope = scopeFor(permissions, 'people');
+    const customerScope: Scope = scopeFor(permissions, 'customers');
+
+    if (peopleScope === 'own') {
+      visiblePersonIds.clear();
+      if (selfResourceId) visiblePersonIds.add(selfResourceId);
+    } else if (peopleScope === 'all') {
+      const all = await prisma.resource.findMany({ where: { orgId }, select: { id: true } });
+      for (const r of all) visiblePersonIds.add(r.id);
+    }
+
+    if (customerScope === 'all') {
+      const [customers, projects] = await Promise.all([
+        prisma.customer.findMany({ where: { orgId }, select: { id: true } }),
+        prisma.project.findMany({ where: { orgId }, select: { id: true } }),
+      ]);
+      for (const c of customers) visibleCustomerIds.add(c.id);
+      for (const p of projects) visibleProjectIds.add(p.id);
+    } else if (customerScope === 'own') {
+      // Narrow to only directly-responsible (drop customers merely reachable via
+      // managed people's assignments).
+      visibleCustomerIds.clear();
+      visibleProjectIds.clear();
+      for (const c of responsibleCustomerIds) visibleCustomerIds.add(c);
+      for (const p of responsibleProjectIds) visibleProjectIds.add(p);
+    }
+  }
 
   return {
     orgId,

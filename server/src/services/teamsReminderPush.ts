@@ -3,7 +3,7 @@ import { reminderService } from './reminder.service.js';
 import { computeVisibility } from './visibility.service.js';
 import { sendProactiveMessage, buildReminderText } from './teamsTransport.js';
 import { filterReminders, isDailyPushDue } from './teamsReminders.helpers.js';
-import { systemRoleDef, LEGACY_ROLE_LEVEL } from '../lib/permissions.js';
+import { systemRoleDef, LEGACY_ROLE_LEVEL, normalizeMatrix, emptyMatrix } from '../lib/permissions.js';
 
 interface Logger {
   info: (obj: object, msg?: string) => void;
@@ -48,8 +48,9 @@ export async function runReminderPush(opts: {
   for (const org of orgs) {
     // Role → level map for computing each member's visibility (same tiering the
     // request path uses: owner/admin → all, member → team, viewer → own).
-    const roles = await prisma.role.findMany({ where: { orgId: org.id }, select: { key: true, level: true } });
+    const roles = await prisma.role.findMany({ where: { orgId: org.id }, select: { key: true, level: true, permissions: true } });
     const roleLevel = new Map(roles.map((r) => [r.key, r.level]));
+    const roleMatrix = new Map(roles.map((r) => [r.key, normalizeMatrix(r.permissions)]));
 
     // Connected members: linked to a Teams conversation AND to a Microsoft identity.
     const members = await prisma.orgMember.findMany({
@@ -74,7 +75,8 @@ export async function runReminderPush(opts: {
         }
 
         const level = roleLevel.get(m.role) ?? systemRoleDef(m.role)?.level ?? LEGACY_ROLE_LEVEL[m.role] ?? 1;
-        const scope = await computeVisibility(org.id, m.userId, level);
+        const matrix = roleMatrix.get(m.role) ?? systemRoleDef(m.role)?.permissions ?? emptyMatrix();
+        const scope = await computeVisibility(org.id, m.userId, level, matrix);
         const reminders = filterReminders(
           await reminderService.forUser(org.id, m.userId, scope),
           org.teamsReminderTypes

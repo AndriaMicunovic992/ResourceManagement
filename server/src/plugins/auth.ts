@@ -90,6 +90,6 @@ export default fp(async (app) => {
   // tradeoff is that every handler can call req.visibility.* safely.
   app.addHook('preHandler', async (req) => {
     if (!req.userId || !req.orgId) return;
-    req.visibility = await computeVisibility(req.orgId, req.userId, req.roleLevel);
+    req.visibility = await computeVisibility(req.orgId, req.userId, req.roleLevel, req.permissions);
   });
 });
