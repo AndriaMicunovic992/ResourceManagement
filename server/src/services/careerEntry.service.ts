@@ -58,12 +58,13 @@ export const careerEntryService = {
 
   async update(
     orgId: string,
+    resourceId: string,
     id: string,
     requesterId: string,
     requesterRole: string,
     data: UpdateCareerEntryInput
   ) {
-    const existing = await prisma.careerEntry.findFirst({ where: { id, orgId } });
+    const existing = await prisma.careerEntry.findFirst({ where: { id, orgId, resourceId } });
     if (!existing) throw new NotFoundError('Career entry not found');
     if (existing.authorUserId !== requesterId && !isAdminRole(requesterRole)) {
       throw new ForbiddenError('You cannot edit this career entry');
@@ -76,8 +77,8 @@ export const careerEntryService = {
     return prisma.careerEntry.update({ where: { id }, data: patch, include: careerEntryInclude });
   },
 
-  async remove(orgId: string, id: string, requesterId: string, requesterRole: string) {
-    const existing = await prisma.careerEntry.findFirst({ where: { id, orgId } });
+  async remove(orgId: string, resourceId: string, id: string, requesterId: string, requesterRole: string) {
+    const existing = await prisma.careerEntry.findFirst({ where: { id, orgId, resourceId } });
     if (!existing) throw new NotFoundError('Career entry not found');
     if (existing.authorUserId !== requesterId && !isAdminRole(requesterRole)) {
       throw new ForbiddenError('You cannot delete this career entry');

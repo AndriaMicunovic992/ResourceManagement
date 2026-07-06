@@ -22,11 +22,16 @@ export const orgService = {
 
   async createOrg(userId: string, name: string) {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const org = await prisma.organization.create({
-      data: { name, slug: slug + '-' + Date.now().toString(36) },
-    });
-    await prisma.orgMember.create({
-      data: { userId, orgId: org.id, role: 'owner' },
+    // Org + owner membership must commit together — a failure between them would
+    // leave an org that nobody can access.
+    const org = await prisma.$transaction(async (tx) => {
+      const created = await tx.organization.create({
+        data: { name, slug: slug + '-' + Date.now().toString(36) },
+      });
+      await tx.orgMember.create({
+        data: { userId, orgId: created.id, role: 'owner' },
+      });
+      return created;
     });
     await seedDefaultRoles(org.id);
     await ensureTaxonomy(org.id);
@@ -132,6 +137,27 @@ export const orgService = {
     if (member.role === 'owner') throw new ForbiddenError('Cannot remove the owner');
     if (member.userId === requesterId) throw new ForbiddenError('Cannot remove yourself');
 
-    await prisma.orgMember.delete({ where: { id: memberId } });
+    const userId = member.userId;
+    // Detach the user-keyed authority this member held before removing them, all
+    // in one transaction. Otherwise it dangles: customers/projects they owned
+    // become invisible to non-admins and their reminders fire for nobody, and if
+    // the user is ever re-added they'd silently regain the old scope. Their
+    // responsibilities and team/person management must be explicitly reassigned.
+    await prisma.$transaction([
+      prisma.customer.updateMany({
+        where: { orgId, responsibleUserId: userId },
+        data: { responsibleUserId: null },
+      }),
+      prisma.project.updateMany({
+        where: { orgId, responsibleUserId: userId },
+        data: { responsibleUserId: null },
+      }),
+      prisma.team.updateMany({
+        where: { orgId, managerUserId: userId },
+        data: { managerUserId: null },
+      }),
+      prisma.personManager.deleteMany({ where: { orgId, managerUserId: userId } }),
+      prisma.orgMember.delete({ where: { id: memberId } }),
+    ]);
   },
 };

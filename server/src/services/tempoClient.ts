@@ -24,16 +24,19 @@ const DEFAULT_BASE = process.env.TEMPO_BASE_URL || 'https://api.tempo.io/4';
 // nightly runs only fetch the delta. The from/to window filters the logged
 // (start) date — kept very wide so an old worklog edited recently still comes
 // back. Re-pulled worklogs upsert by tempoWorklogId, so edits update in place.
+const MAX_PAGES = 1000;
+
 export async function fetchWorklogs(
   token: string | null,
   updatedFrom: string,
   baseUrl: string = DEFAULT_BASE
-): Promise<TempoWorklog[]> {
+): Promise<{ worklogs: TempoWorklog[]; truncated: boolean }> {
   if (!token) throw new TempoError('Missing Tempo API token');
   const out: TempoWorklog[] = [];
   const limit = 50;
   let offset = 0;
-  for (let page = 0; page < 1000; page++) {
+  let page = 0;
+  for (; page < MAX_PAGES; page++) {
     const url = new URL(baseUrl.replace(/\/+$/, '') + '/worklogs');
     url.searchParams.set('from', '2000-01-01');
     url.searchParams.set('to', '2999-12-31');
@@ -63,7 +66,10 @@ export async function fetchWorklogs(
     if (results.length < limit) break;
     offset += limit;
   }
-  return out;
+  // If we exhausted the page budget on full pages, more worklogs remain — the
+  // caller must not advance the delta cursor or the tail is lost forever.
+  const truncated = page >= MAX_PAGES;
+  return { worklogs: out, truncated };
 }
 
 export const tempoClient = { fetchWorklogs };

@@ -138,12 +138,15 @@ export async function listLogs(
 
 export async function getLog(
   orgId: string,
+  resourceId: string,
   id: string,
   requestingUserId: string,
   requestingUserRole: string
 ) {
+  // Bind the entry to the person in the URL — a log about a different person is
+  // not reachable via this person's page (visibility == existence).
   const log = await prisma.log.findFirst({
-    where: { id, orgId },
+    where: { id, orgId, resourceId },
     include: logInclude,
   });
   if (!log) throw new NotFoundError('Log not found');
@@ -278,12 +281,13 @@ export async function deleteGeneralCustomerLog(
 
 export async function updateLog(
   orgId: string,
+  resourceId: string,
   id: string,
   requestingUserId: string,
   requestingUserRole: string,
   data: UpdateLogInput
 ) {
-  const existing = await prisma.log.findFirst({ where: { id, orgId } });
+  const existing = await prisma.log.findFirst({ where: { id, orgId, resourceId } });
   if (!existing) throw new NotFoundError('Log not found');
   if (existing.authorUserId !== requestingUserId) {
     throw new ForbiddenError('Only the author can edit a log');
@@ -336,11 +340,12 @@ export async function updateLog(
 
 export async function deleteLog(
   orgId: string,
+  resourceId: string,
   id: string,
   requestingUserId: string,
   requestingUserRole: string
 ): Promise<void> {
-  const existing = await prisma.log.findFirst({ where: { id, orgId } });
+  const existing = await prisma.log.findFirst({ where: { id, orgId, resourceId } });
   if (!existing) throw new NotFoundError('Log not found');
   const isAuthor = existing.authorUserId === requestingUserId;
   const admin = isAdminRole(requestingUserRole);
@@ -357,12 +362,13 @@ export async function deleteLog(
 
 export async function addLogComment(
   orgId: string,
+  resourceId: string,
   logId: string,
   requestingUserId: string,
   requestingUserRole: string,
   content: string
 ) {
-  const log = await prisma.log.findFirst({ where: { id: logId, orgId } });
+  const log = await prisma.log.findFirst({ where: { id: logId, orgId, resourceId } });
   if (!log) throw new NotFoundError('Log not found');
 
   if (!isAdminRole(requestingUserRole)) {
@@ -384,13 +390,15 @@ export async function addLogComment(
 
 export async function deleteLogComment(
   orgId: string,
+  resourceId: string,
   logId: string,
   commentId: string,
   requestingUserId: string,
   requestingUserRole: string
 ): Promise<void> {
+  // Bind the comment's log to the person in the URL before touching it.
   const comment = await prisma.logComment.findFirst({
-    where: { id: commentId, logId, orgId },
+    where: { id: commentId, logId, orgId, log: { resourceId } },
   });
   if (!comment) throw new NotFoundError('Comment not found');
   const isAuthor = comment.authorUserId === requestingUserId;

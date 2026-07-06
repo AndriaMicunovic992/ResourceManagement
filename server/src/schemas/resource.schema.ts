@@ -19,7 +19,11 @@ export const createResourceSchema = z.object({
   roles: z.array(roleSchema).min(1),
 });
 
-export const updateResourceSchema = createResourceSchema.partial();
+export const updateResourceSchema = createResourceSchema.partial().extend({
+  // Offboarding toggle — archived people keep their history but leave the
+  // active roster and the planner pool.
+  archived: z.boolean().optional(),
+});
 
 export type CreateResourceInput = z.infer<typeof createResourceSchema>;
 export type UpdateResourceInput = z.infer<typeof updateResourceSchema>;

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { monthKey, monthAllocations } from './common.js';
 
 export const createNeedSchema = z.object({
   projectId: z.string().min(1),
@@ -7,8 +8,8 @@ export const createNeedSchema = z.object({
   role: z.string().min(1),
   seniority: z.string().min(1),
   label: z.string().optional().nullable(),
-  startMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
-  endMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+  startMonth: monthKey.optional().nullable(),
+  endMonth: monthKey.optional().nullable(),
   ftePerMonth: z.number().min(0.01).max(2.0),
   status: z.enum(['realised', 'potential']).default('realised'),
 });
@@ -18,11 +19,11 @@ export const updateNeedSchema = z.object({
   role: z.string().min(1).optional(),
   seniority: z.string().min(1).optional(),
   label: z.string().optional().nullable(),
-  startMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
-  endMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+  startMonth: monthKey.optional().nullable(),
+  endMonth: monthKey.optional().nullable(),
   ftePerMonth: z.number().min(0.01).max(2.0).optional(),
   status: z.enum(['realised', 'potential']).optional(),
-  monthAllocations: z.record(z.string(), z.number()).optional(),
+  monthAllocations: monthAllocations.optional(),
 });
 
 export type CreateNeedInput = z.infer<typeof createNeedSchema>;

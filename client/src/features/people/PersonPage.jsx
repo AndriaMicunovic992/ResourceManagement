@@ -38,6 +38,10 @@ export default function PersonPage() {
     navigate('/people', { replace: true });
   };
 
+  const handleArchive = async (archived) => {
+    await updateResource(resource.id, { archived });
+  };
+
   return (
     <div className="max-w-[1100px] mx-auto px-5 py-6">
       <PersonPageHeader
@@ -55,6 +59,7 @@ export default function PersonPage() {
           onSave={handleSave}
           onClose={() => setEditing(false)}
           onDelete={handleDelete}
+          onArchive={handleArchive}
         />
       )}
     </div>

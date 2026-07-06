@@ -40,18 +40,35 @@ export const notificationService = {
         take: 25,
         include: {
           authorUser: { select: { name: true, email: true } },
-          log: { select: { id: true, resourceId: true, kind: true, content: true } },
+          log: { select: { id: true, resourceId: true, customerId: true, projectId: true, kind: true, content: true } },
         },
       });
-      replies = comments.map((c) => ({
-        id: c.id,
-        createdAt: c.createdAt,
-        content: c.content,
-        author: c.authorUser?.name || c.authorUser?.email || 'Someone',
-        resourceId: c.log?.resourceId ?? null,
-        logKind: c.log?.kind ?? null,
-        excerpt: (c.log?.content || '').slice(0, 70),
-      }));
+      // Visibility is recomputed every request and must gate this feed too:
+      // once a user loses access to a person/customer, they must stop receiving
+      // the content of new replies on those threads (visibility == existence).
+      const inScope = (log: {
+        resourceId: string | null;
+        customerId: string | null;
+        projectId: string | null;
+      }): boolean => {
+        if (scope.isAdmin) return true;
+        if (log.resourceId) return scope.visiblePersonIds.has(log.resourceId);
+        // General (whole-customer) entry: gate on customer/project scope.
+        if (log.customerId && scope.visibleCustomerIds.has(log.customerId)) return true;
+        if (log.projectId && scope.visibleProjectIds.has(log.projectId)) return true;
+        return false;
+      };
+      replies = comments
+        .filter((c) => c.log && inScope(c.log))
+        .map((c) => ({
+          id: c.id,
+          createdAt: c.createdAt,
+          content: c.content,
+          author: c.authorUser?.name || c.authorUser?.email || 'Someone',
+          resourceId: c.log?.resourceId ?? null,
+          logKind: c.log?.kind ?? null,
+          excerpt: (c.log?.content || '').slice(0, 70),
+        }));
     }
 
     // --- Performance review reminders ---

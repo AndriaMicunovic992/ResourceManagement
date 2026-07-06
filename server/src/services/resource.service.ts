@@ -52,19 +52,25 @@ async function ensureMembersInOrg(orgId: string, userIds: string[]): Promise<voi
 async function setDirectManagers(orgId: string, personId: string, managerUserIds: string[]): Promise<void> {
   const unique = [...new Set(managerUserIds)];
   await ensureMembersInOrg(orgId, unique);
-  await prisma.personManager.deleteMany({ where: { personId } });
-  if (unique.length === 0) return;
   // A person can't manage themselves (via their own login user).
   const self = await prisma.resource.findUnique({
     where: { id: personId },
     select: { userId: true },
   });
   const filtered = unique.filter((uid) => uid !== self?.userId);
-  if (filtered.length === 0) return;
-  await prisma.personManager.createMany({
-    data: filtered.map((managerUserId) => ({ personId, managerUserId, orgId })),
-    skipDuplicates: true,
-  });
+  // Replace the manager set atomically so a failure can't drop all managers.
+  const ops: Prisma.PrismaPromise<unknown>[] = [
+    prisma.personManager.deleteMany({ where: { personId } }),
+  ];
+  if (filtered.length > 0) {
+    ops.push(
+      prisma.personManager.createMany({
+        data: filtered.map((managerUserId) => ({ personId, managerUserId, orgId })),
+        skipDuplicates: true,
+      })
+    );
+  }
+  await prisma.$transaction(ops);
 }
 
 export const resourceService = {
@@ -113,6 +119,10 @@ export const resourceService = {
       return this.getById(orgId, created.id);
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[] | undefined) ?? [];
+        if (target.includes('externalWorkId')) {
+          throw new ConflictError('That Jira account is already mapped to another person');
+        }
         throw new ConflictError('This user is already linked to another resource');
       }
       throw err;
@@ -127,10 +137,15 @@ export const resourceService = {
     if (teamIds) await ensureTeamsInOrg(orgId, teamIds);
 
     if (roles) {
-      await prisma.resourceRole.deleteMany({ where: { resourceId: id } });
-      await prisma.resourceRole.createMany({
-        data: roles.map((r) => ({ ...r, resourceId: id })),
-      });
+      // Replace atomically — a failure between delete and create would leave the
+      // person with no roles.
+      const ops: Prisma.PrismaPromise<unknown>[] = [
+        prisma.resourceRole.deleteMany({ where: { resourceId: id } }),
+      ];
+      if (roles.length > 0) {
+        ops.push(prisma.resourceRole.createMany({ data: roles.map((r) => ({ ...r, resourceId: id })) }));
+      }
+      await prisma.$transaction(ops);
     }
 
     const patch: Prisma.ResourceUpdateInput = { ...rest };
@@ -148,6 +163,10 @@ export const resourceService = {
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[] | undefined) ?? [];
+        if (target.includes('externalWorkId')) {
+          throw new ConflictError('That Jira account is already mapped to another person');
+        }
         throw new ConflictError('This user is already linked to another resource');
       }
       throw err;
@@ -157,11 +176,37 @@ export const resourceService = {
       await setDirectManagers(orgId, id, directManagerUserIds);
     }
 
+    // If the Jira account mapping changed, re-attribute already-synced worklogs
+    // so the fix applies to history too — otherwise a person matched after a
+    // sync stays invisible in actuals until a full re-pull. Detach this person
+    // from any worklog first, then claim the ones for the new account id.
+    if (data.externalWorkId !== undefined) {
+      await prisma.worklog.updateMany({ where: { orgId, resourceId: id }, data: { resourceId: null } });
+      if (data.externalWorkId) {
+        await prisma.worklog.updateMany({
+          where: { orgId, accountId: data.externalWorkId },
+          data: { resourceId: id },
+        });
+      }
+    }
+
     return this.getById(orgId, id);
   },
 
   async delete(orgId: string, id: string) {
     await this.getById(orgId, id);
-    return prisma.resource.delete({ where: { id } });
+    try {
+      return await prisma.resource.delete({ where: { id } });
+    } catch (err) {
+      // A person with protected history (evaluations, 1:1s, logs, career or
+      // follow-up entries) can't be hard-deleted — that would destroy the
+      // record of their reviews. Direct the caller to archive instead.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+        throw new ConflictError(
+          'This person has history (evaluations, 1:1s, logs, career or follow-up entries). Archive them instead of deleting.'
+        );
+      }
+      throw err;
+    }
   },
 };

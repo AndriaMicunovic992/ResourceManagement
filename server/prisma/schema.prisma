@@ -79,6 +79,7 @@ model Organization {
   clientSignals ClientSignal[]
   reminderDismissals ReminderDismissal[]
   customerReviews CustomerReview[]
+  teamsReminderStates TeamsReminderState[]
 }
 
 model User {
@@ -116,6 +117,7 @@ model User {
   managedTeams          Team[]          @relation("TeamManagerUser")
   managedPeople         PersonManager[] @relation("PersonManagerUser")
   teamsLink             TeamsUserLink?  @relation("UserTeamsLink")
+  teamsReminderStates   TeamsReminderState[]
 }
 
 // Per-user Microsoft Teams link. Captured when the bot is installed for a person:
@@ -134,6 +136,23 @@ model TeamsUserLink {
   updatedAt       DateTime  @updatedAt
 
   @@index([aadObjectId])
+}
+
+// Per-(org, user) daily reminder-send cursor. Kept separate from TeamsUserLink
+// (which is a single global row per user) so a person who belongs to several
+// reminder-enabled orgs gets each org's daily DM — the old global lastSentAt
+// let whichever org ran first suppress all the others for that day.
+model TeamsReminderState {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSentAt DateTime?
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([orgId, userId])
+  @@index([orgId])
 }
 
 // Per-org Azure Bot credentials for the Microsoft Teams reminder integration.
@@ -274,6 +293,10 @@ model Resource {
   // Identifier of this person in the external "actual hours" system (e.g. a
   // Jira accountId). Null until mapped in Settings → Integrations.
   externalWorkId String?
+  // Offboarding: an archived person is hidden from the planner pool and the
+  // active people list but keeps all their history (the non-destructive
+  // alternative to deleting, which is now blocked when history exists).
+  archived  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -298,6 +321,11 @@ model Resource {
   worklogs      Worklog[]
 
   @@unique([orgId, userId])
+  // A Jira account may map to at most one person per org. Postgres treats NULLs
+  // as distinct, so unmatched people (externalWorkId null) are unaffected; only
+  // duplicate non-null mappings are rejected (they silently mis-attributed all
+  // of an account's synced hours to one arbitrary person).
+  @@unique([orgId, externalWorkId])
   @@index([orgId])
   @@index([userId])
 }
@@ -492,7 +520,7 @@ model OneOnOne {
   orgId                 String
   org                   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   resourceId            String
-  resource              Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resource              Resource @relation(fields: [resourceId], references: [id], onDelete: Restrict)
   authorUserId          String
   authorUser            User     @relation("AuthoredOneOnOnes", fields: [authorUserId], references: [id], onDelete: Restrict)
   meetingDate           DateTime
@@ -525,7 +553,7 @@ model Log {
   org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   // Null = a general entry about the customer/project, not a specific person.
   resourceId      String?
-  resource        Resource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resource        Resource? @relation(fields: [resourceId], references: [id], onDelete: Restrict)
   authorUserId    String
   authorUser      User     @relation("AuthoredLogs", fields: [authorUserId], references: [id], onDelete: Restrict)
   content         String
@@ -581,7 +609,7 @@ model FollowUp {
   orgId                String
   org                  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   resourceId           String
-  resource             Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resource             Resource  @relation(fields: [resourceId], references: [id], onDelete: Restrict)
   createdByUserId      String
   createdByUser        User      @relation("FollowUpCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
   content              String
@@ -606,7 +634,7 @@ model CareerEntry {
   orgId        String
   org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   resourceId   String
-  resource     Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resource     Resource  @relation(fields: [resourceId], references: [id], onDelete: Restrict)
   authorUserId String
   authorUser   User      @relation("AuthoredCareerEntries", fields: [authorUserId], references: [id], onDelete: Restrict)
   content      String
@@ -671,7 +699,9 @@ model Evaluation {
   org                 Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   resourceId          String
-  resource            Resource @relation("EvaluationSubject", fields: [resourceId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade: deleting a person must not silently destroy their
+  // finalized reviews. Offboarding archives the person (see Resource.archived).
+  resource            Resource @relation("EvaluationSubject", fields: [resourceId], references: [id], onDelete: Restrict)
 
   customerId          String?
   customer            Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)

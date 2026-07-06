@@ -186,7 +186,7 @@ export default function Sidebar() {
     { to: '/home', label: 'Dashboard', icon: 'home' },
     ...(canViewArea('people') ? [{ to: '/people', label: 'People', icon: 'people' }] : []),
     ...(canViewArea('customers') ? [{ to: '/customers', label: 'Customers', icon: 'customers' }] : []),
-    ...(isAdmin ? [{ to: '/planner', label: 'Planner', icon: 'planner' }] : []),
+    ...(canViewArea('planner') ? [{ to: '/planner', label: 'Planner', icon: 'planner' }] : []),
     { to: '/dashboard', label: 'Insights', icon: 'insights' },
     { to: '/journal', label: 'My journal', icon: 'journal' },
     { to: '/settings', label: 'Settings', icon: 'settings' },

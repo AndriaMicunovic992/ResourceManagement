@@ -8,7 +8,7 @@ import { useData } from '../../contexts/DataContext';
 import { useOrg } from '../../contexts/OrgContext';
 import { api } from '../../lib/api';
 
-export default function ResourceForm({ initial, onSave, onClose, onDelete }) {
+export default function ResourceForm({ initial, onSave, onClose, onDelete, onArchive }) {
   const { teams, resources } = useData();
   const { role } = useOrg();
   const isAdmin = role === 'admin' || role === 'owner';
@@ -89,6 +89,16 @@ export default function ResourceForm({ initial, onSave, onClose, onDelete }) {
     } catch (err) {
       setError(err.message || 'Failed to delete person');
       setDeleting(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    setError('');
+    try {
+      await onArchive(!initial?.archived);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to update person');
     }
   };
 
@@ -228,12 +238,21 @@ export default function ResourceForm({ initial, onSave, onClose, onDelete }) {
         </Field>
         {error && <div className="text-xs text-danger bg-danger-bg p-2 rounded mt-3">{error}</div>}
         <div className="flex items-center mt-6">
+          {initial && onArchive && isAdmin && (
+            <button
+              type="button"
+              onClick={handleArchive}
+              className="text-xs font-bold text-text-mid bg-[#EEF1F5] border-0 rounded-lg px-3 py-2 cursor-pointer hover:brightness-95"
+            >
+              {initial?.archived ? 'Restore person' : 'Archive person'}
+            </button>
+          )}
           {initial && onDelete && isAdmin && (
             <button
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="text-xs font-bold text-danger bg-danger-bg border-0 rounded-lg px-3 py-2 cursor-pointer hover:brightness-95 disabled:opacity-50"
+              className="ml-2 text-xs font-bold text-danger bg-danger-bg border-0 rounded-lg px-3 py-2 cursor-pointer hover:brightness-95 disabled:opacity-50"
             >
               {deleting ? 'Deleting…' : 'Delete person'}
             </button>

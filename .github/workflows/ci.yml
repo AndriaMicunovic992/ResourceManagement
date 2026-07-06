@@ -7,11 +7,27 @@ on:
 
 jobs:
   server:
-    name: Server (typecheck + tests)
+    name: Server (typecheck + tests + migrations)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: server
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: databob_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/databob_test
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/databob_shadow
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,6 +38,20 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npm run typecheck
+      # Apply every migration to a real Postgres — catches a migration that
+      # doesn't apply (which would 500 production on boot) before merge.
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+      # Fail if schema.prisma has drifted from the migration history (a model
+      # change committed without a migration would pass generate but break prod).
+      - name: Check migration drift
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE databob_shadow;'
+          npx prisma migrate diff \
+            --from-migrations ./prisma/migrations \
+            --to-schema-datamodel ./prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --exit-code
       - run: npm test
 
   client:

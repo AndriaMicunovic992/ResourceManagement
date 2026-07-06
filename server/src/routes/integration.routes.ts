@@ -67,7 +67,9 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     const { customerId, month } = req.query as { customerId?: string; month?: string };
     if (!customerId || !month) throw new BadRequestError('customerId and month are required');
     assertCanViewCustomer(req.visibility, customerId);
-    return integrationService.actualsForCustomerMonth(req.orgId, customerId, month);
+    const v = req.visibility;
+    const visibleIds = v.isAdmin ? null : [...v.visiblePersonIds];
+    return integrationService.actualsForCustomerMonth(req.orgId, customerId, month, visibleIds);
   });
 
   // Actual hours per person per month over a range — scoped to the caller's
@@ -103,7 +105,9 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     const cur = new Date().toISOString().slice(0, 7);
     const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
     const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
-    return integrationService.actualsForResourceByCustomer(req.orgId, q.resourceId, from, to);
+    const v = req.visibility;
+    const visibleCustomerIds = v.isAdmin ? null : [...v.visibleCustomerIds];
+    return integrationService.actualsForResourceByCustomer(req.orgId, q.resourceId, from, to, visibleCustomerIds);
   });
 
   // Actual hours for one customer, broken down by person + month. Feeds the
@@ -115,7 +119,9 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     const cur = new Date().toISOString().slice(0, 7);
     const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
     const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
-    return integrationService.actualsForCustomerByResource(req.orgId, q.customerId, from, to);
+    const v = req.visibility;
+    const visibleIds = v.isAdmin ? null : [...v.visiblePersonIds];
+    return integrationService.actualsForCustomerByResource(req.orgId, q.customerId, from, to, visibleIds);
   });
 
   app.get('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {

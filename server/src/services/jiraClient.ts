@@ -1,3 +1,5 @@
+import { outboundUrlProblem } from '../utils/ssrf.js';
+
 // Minimal Jira REST client for pulling reference data (projects, epics, user
 // accounts). Cloud uses Basic auth (email:token); if no email is set we send
 // the token as a Bearer, which is how Jira Data Center PATs work — so the same
@@ -38,6 +40,10 @@ function authHeader(conn: JiraConn): string {
 function baseUrl(conn: JiraConn): string {
   const b = (conn.baseUrl || '').trim().replace(/\/+$/, '');
   if (!b) throw new JiraError('Missing Jira base URL');
+  // Defense in depth against SSRF: refuse to fetch internal/reserved addresses
+  // even if such a value was stored before validation was added.
+  const problem = outboundUrlProblem(b);
+  if (problem) throw new JiraError(`Jira base URL ${problem}`);
   return b;
 }
 

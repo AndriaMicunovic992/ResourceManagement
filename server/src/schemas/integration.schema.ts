@@ -1,9 +1,18 @@
 import { z } from 'zod';
+import { outboundUrlProblem } from '../utils/ssrf.js';
 
 // Connection config. Tokens are optional on save: omit to leave the stored
 // (encrypted) value untouched, send "" or null to clear, send a value to set.
 export const saveConnectionSchema = z.object({
-  baseUrl: z.string().max(300).nullable().optional(),
+  baseUrl: z
+    .string()
+    .max(300)
+    .nullable()
+    .optional()
+    // Reject internal/reserved hosts up front (SSRF). Empty / null clears it.
+    .refine((v) => !v || outboundUrlProblem(v) === null, {
+      message: 'Base URL must be a public http(s) address',
+    }),
   jiraEmail: z.string().max(200).nullable().optional(),
   enabled: z.boolean().optional(),
   autoSyncEnabled: z.boolean().optional(),

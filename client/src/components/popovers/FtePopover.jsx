@@ -77,6 +77,18 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
     inputRef.current?.select();
   }, []);
 
+  // Commit only a finite value — clearing the input and pressing Enter/Set
+  // otherwise fires onSave(NaN), which serialises to fte:null and is rejected
+  // by the server, leaving the popover stuck with no feedback.
+  const commitFte = () => {
+    const n = parseFloat(value);
+    if (Number.isFinite(n)) onSave(Math.min(Math.max(n, 0), maxFte));
+  };
+  const commitNeed = () => {
+    const n = parseFloat(needValue);
+    if (Number.isFinite(n)) onSaveNeed?.(Math.max(n, 0));
+  };
+
   const handleFteChange = (e) => {
     const v = e.target.value;
     setValue(v);
@@ -106,12 +118,12 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); onSave(parseFloat(value)); }
+    if (e.key === 'Enter') { e.preventDefault(); commitFte(); }
     if (e.key === 'Escape') onClose();
   };
 
   const handleNeedKeyDown = (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); onSaveNeed?.(parseFloat(needValue)); }
+    if (e.key === 'Enter') { e.preventDefault(); commitNeed(); }
     if (e.key === 'Escape') onClose();
   };
 
@@ -151,7 +163,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
                 <span className="text-[10px] text-text-light">h/mo</span>
               </div>
             </div>
-            <button onClick={() => onSave(parseFloat(value))}
+            <button onClick={commitFte}
               className="px-3 py-1 bg-primary text-white rounded-lg text-xs font-bold cursor-pointer border-0 hover:opacity-90 active:scale-95 transition">
               Set
             </button>
@@ -184,7 +196,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
           <FteRow
             label="Assignment" value={value} hours={hours} maxFte={maxFte}
             onFteChange={handleFteChange} onHoursChange={handleHoursChange}
-            onKeyDown={handleKeyDown} onSave={() => onSave(parseFloat(value))}
+            onKeyDown={handleKeyDown} onSave={commitFte}
             inputRef={inputRef} accent
           />
           <QuickChips maxFte={maxFte} onPick={(v) => onSave(v)} />
@@ -192,7 +204,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
             <FteRow
               label="Need" value={needValue} hours={needHours} maxFte={2.0}
               onFteChange={handleNeedFteChange} onHoursChange={handleNeedHoursChange}
-              onKeyDown={handleNeedKeyDown} onSave={() => onSaveNeed?.(parseFloat(needValue))}
+              onKeyDown={handleNeedKeyDown} onSave={commitNeed}
             />
           </div>
         </div>

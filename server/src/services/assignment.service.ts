@@ -19,56 +19,52 @@ export const assignmentService = {
     const needEnd = need.endMonth ?? need.project.endMonth;
     const allNeedMonths = monthRange(needStart, needEnd);
 
-    const existing = await prisma.assignment.findUnique({
-      where: { needId_resourceId: { needId: input.needId, resourceId: input.resourceId } },
-    });
-
-    // If full monthAllocations provided, use them directly (per-month FTE)
+    // The set of months this write touches (the "delta"). Both the full
+    // monthAllocations payload and the uniform-fte payload reduce to a map of
+    // month -> fte that gets merged into whatever is already stored.
+    let mergeObj: Record<string, number>;
     if (input.monthAllocations) {
-      if (existing) {
-        const merged = { ...(existing.monthAllocations as Record<string, number>), ...input.monthAllocations };
-        return prisma.assignment.update({
-          where: { id: existing.id },
-          data: { monthAllocations: merged },
-          include: INCLUDE,
-        });
-      }
-      const monthAllocations: Record<string, number> = {};
-      allNeedMonths.forEach((m) => { monthAllocations[m] = 0; });
-      Object.assign(monthAllocations, input.monthAllocations);
-      return prisma.assignment.create({
-        data: { needId: input.needId, resourceId: input.resourceId, orgId, monthAllocations },
-        include: INCLUDE,
-      });
+      mergeObj = input.monthAllocations;
+    } else {
+      const fte = input.fte ?? 0;
+      const targetMonths = input.months || (input.month ? [input.month] : allNeedMonths);
+      mergeObj = {};
+      for (const m of targetMonths) mergeObj[m] = fte;
     }
 
-    // Uniform FTE: determine which months to assign
-    const fte = input.fte ?? 0;
-    const targetMonths = input.months || (input.month ? [input.month] : allNeedMonths);
+    // A brand-new row seeds every in-window month to 0 (so the need's months
+    // exist as keys) and then applies the delta.
+    const createAllocations: Record<string, number> = {};
+    allNeedMonths.forEach((m) => { createAllocations[m] = 0; });
+    Object.assign(createAllocations, mergeObj);
 
-    if (existing) {
-      const merged = { ...(existing.monthAllocations as Record<string, number>) };
-      for (const m of targetMonths) {
-        merged[m] = fte;
-      }
-      return prisma.assignment.update({
-        where: { id: existing.id },
-        data: { monthAllocations: merged },
-        include: INCLUDE,
-      });
-    }
+    const key = { needId_resourceId: { needId: input.needId, resourceId: input.resourceId } };
 
-    // New assignment: initialize all need months to 0, then set targets
-    const monthAllocations: Record<string, number> = {};
-    allNeedMonths.forEach((m) => { monthAllocations[m] = 0; });
-    for (const m of targetMonths) {
-      monthAllocations[m] = fte;
-    }
-
-    return prisma.assignment.create({
-      data: { needId: input.needId, resourceId: input.resourceId, orgId, monthAllocations },
-      include: INCLUDE,
+    // Ensure the row exists without a find-then-create race: two concurrent
+    // placements of the same (need, resource) both resolve here instead of one
+    // hitting the @@unique constraint and 500ing. The empty `update` leaves an
+    // existing row untouched — the real merge happens atomically below.
+    await prisma.assignment.upsert({
+      where: key,
+      create: { needId: input.needId, resourceId: input.resourceId, orgId, monthAllocations: createAllocations },
+      update: {},
     });
+
+    // Merge the delta into the stored JSON with an atomic jsonb concat. Doing
+    // the merge in the database (rather than read-modify-write in JS) means two
+    // planners editing different months of the same person can't clobber each
+    // other's months — the previous approach silently dropped the loser's edit.
+    if (Object.keys(mergeObj).length > 0) {
+      await prisma.$executeRaw`
+        UPDATE "Assignment"
+        SET "monthAllocations" = COALESCE("monthAllocations", '{}'::jsonb) || ${JSON.stringify(mergeObj)}::jsonb,
+            "updatedAt" = now()
+        WHERE "orgId" = ${orgId} AND "needId" = ${input.needId} AND "resourceId" = ${input.resourceId}`;
+    }
+
+    const row = await prisma.assignment.findUnique({ where: key, include: INCLUDE });
+    if (!row) throw new NotFoundError('Assignment not found');
+    return row;
   },
 
   async update(orgId: string, id: string, data: { monthAllocations: Record<string, number> }) {
