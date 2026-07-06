@@ -112,9 +112,9 @@ export async function inviteOverTeams(
   const user = await ensureMatchableUser(normalized, entra.aadId, entra.displayName);
   // Snapshot before the install: an existing link means we can DM immediately;
   // otherwise we wait for the install event to register a fresh one.
-  const hadLink = !!(await prisma.teamsUserLink.findUnique({
-    where: { userId: user.id },
-    select: { userId: true },
+  const hadLink = !!(await prisma.teamsUserLink.findFirst({
+    where: { userId: user.id, OR: [{ orgId }, { orgId: null }] },
+    select: { id: true },
   }));
 
   const catalogAppId = await findCatalogAppId(token, conn.botAppId);
@@ -131,9 +131,9 @@ export async function inviteOverTeams(
       // seconds; poll for the captured conversation, then DM.
       for (let i = 0; i < 6 && !welcomed; i++) {
         await sleep(1000);
-        const link = await prisma.teamsUserLink.findUnique({
-          where: { userId: user.id },
-          select: { userId: true },
+        const link = await prisma.teamsUserLink.findFirst({
+          where: { userId: user.id, OR: [{ orgId }, { orgId: null }] },
+          select: { id: true },
         });
         if (link) {
           await sendProactiveMessage(orgId, user.id, text);

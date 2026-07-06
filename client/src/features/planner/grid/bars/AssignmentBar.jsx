@@ -61,6 +61,12 @@ export default function AssignmentBar({ assignment, need, resource, months, over
   const startSegResize = (segIndex, side) => (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // Pointer capture: the handle keeps receiving move/up events even if the
+    // cursor leaves the window, so releasing outside can't leak the drag and
+    // make a later unrelated click commit the resize.
+    const target = e.currentTarget;
+    const pointerId = e.pointerId;
+    try { target.setPointerCapture(pointerId); } catch { /* not supported */ }
     const startX = e.clientX;
     const seg = visibleSegments[segIndex];
     const fte = seg.fte;
@@ -102,34 +108,47 @@ export default function AssignmentBar({ assignment, need, resource, months, over
 
     const onMove = (mE) => setResizePreview({ segIndex, ...resolve(mE.clientX) });
 
+    const cleanup = () => {
+      target.removeEventListener('pointermove', onMove);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', onCancel);
+      try { target.releasePointerCapture(pointerId); } catch { /* already released */ }
+    };
+    const onCancel = () => { cleanup(); setResizePreview(null); };
+
     const onUp = async (uE) => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      cleanup();
       const { newStartIdx, newEndIdx } = resolve(uE.clientX);
       if (newStartIdx === segStartIdx && newEndIdx === segEndIdx) { setResizePreview(null); return; }
 
       // Operate on the FULL segment (months may extend off the visible window):
-      // a clipped bar still trims/keeps its off-screen part correctly.
+      // a clipped bar still trims/keeps its off-screen part correctly. Build a
+      // DELTA of only the months this drag changes (trimmed → 0, new extent →
+      // fte); the server merges per-month, so months this resize didn't touch
+      // (other segments, or a concurrent edit) are never clobbered by a stale
+      // full-map snapshot.
       const fullMonths = seg.full.months;
       const fullFirst = fullMonths[0];
       const fullLast = fullMonths[fullMonths.length - 1];
       const allocs = assignment.monthAllocations || {};
-      const newAllocs = { ...allocs };
+      const delta = {};
       if (side === 'left') {
         const newStartMonth = months[newStartIdx];
-        for (const m of fullMonths) if (m < newStartMonth) newAllocs[m] = 0;
-        for (const m of monthRange(newStartMonth, fullLast)) newAllocs[m] = fte;
+        for (const m of fullMonths) if (m < newStartMonth) delta[m] = 0;
+        for (const m of monthRange(newStartMonth, fullLast)) delta[m] = fte;
       } else {
         const newEndMonth = months[newEndIdx];
-        for (const m of fullMonths) if (m > newEndMonth) newAllocs[m] = 0;
-        for (const m of monthRange(fullFirst, newEndMonth)) newAllocs[m] = fte;
+        for (const m of fullMonths) if (m > newEndMonth) delta[m] = 0;
+        for (const m of monthRange(fullFirst, newEndMonth)) delta[m] = fte;
       }
+      // Undo restores only the months the resize touched to their prior values.
+      const undo = {};
+      for (const m of Object.keys(delta)) undo[m] = allocs[m] ?? 0;
 
-      const prevAllocs = { ...allocs };
       try {
-        await upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: newAllocs });
+        await upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: delta });
         onUndoable?.(`Resized ${resource.name}`, () =>
-          upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: prevAllocs })
+          upsertAssignment({ needId: assignment.needId, resourceId: assignment.resourceId, monthAllocations: undo })
         );
         // Preview stays on until the updated assignment renders (effect above).
       } catch {
@@ -137,8 +156,9 @@ export default function AssignmentBar({ assignment, need, resource, months, over
       }
     };
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    target.addEventListener('pointermove', onMove);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', onCancel);
   };
 
   return (
@@ -181,7 +201,7 @@ export default function AssignmentBar({ assignment, need, resource, months, over
           >
             {/* A resize handle on every free edge — including the start of a
                 second engagement after a gap, or an edge that runs off-window. */}
-            {showLeftHandle && <ResizeHandle side="left" onMouseDown={startSegResize(i, 'left')} />}
+            {showLeftHandle && <ResizeHandle side="left" onPointerDown={startSegResize(i, 'left')} />}
             <AssignmentSegment
               segment={seg} resource={resource} domainColor={color}
               barHeight={BAR_H}
@@ -194,7 +214,7 @@ export default function AssignmentBar({ assignment, need, resource, months, over
               totalSegments={visibleSegments.length}
               onClickMonth={(month, e) => { e.stopPropagation(); onClickSegment(seg, month, e); }}
             />
-            {showRightHandle && <ResizeHandle side="right" onMouseDown={startSegResize(i, 'right')} />}
+            {showRightHandle && <ResizeHandle side="right" onPointerDown={startSegResize(i, 'right')} />}
             {/* Duration readout sits INSIDE the bar so the row's clipping never
                 hides it (it used to float above and get cut off). */}
             {preview && (
@@ -209,7 +229,19 @@ export default function AssignmentBar({ assignment, need, resource, months, over
             )}
             {isLast && (
               <button
-                onClick={(e) => { e.stopPropagation(); deleteAssignment(assignment.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Snapshot the full allocation (incl. off-screen months) so the
+                  // delete is undoable — it used to destroy the whole assignment
+                  // with no way back.
+                  const snapshot = { ...(assignment.monthAllocations || {}) };
+                  const { needId, resourceId } = assignment;
+                  Promise.resolve(deleteAssignment(assignment.id)).then(() => {
+                    onUndoable?.(`Removed ${resource.name}`, () =>
+                      upsertAssignment({ needId, resourceId, monthAllocations: snapshot })
+                    );
+                  }).catch(() => {});
+                }}
                 className="opacity-0 group-hover/bar:opacity-100 absolute -right-4 top-0 w-4 flex items-center justify-center text-[8px] text-danger bg-white/80 border-0 cursor-pointer rounded hover:bg-danger-bg transition-opacity"
                 style={{ height: BAR_H }}
               >

@@ -258,11 +258,43 @@ export const evaluationService = {
       return all.map((e) => ({ ...e, _viewerKind: 'admin' as const }));
     }
 
-    // Filter by viewer ability.
+    // Filter by viewer ability. Precompute the requester's manager/responsible
+    // context ONCE (this used to call viewerKindFor per evaluation, each running
+    // several queries → N+1). Classification below mirrors viewerKindFor's order.
     const meId = await getRequestingResourceId(orgId, requestingUserId);
+    const [directMgr, managedTeams, respCustomers, allProjects] = await Promise.all([
+      prisma.personManager.findMany({ where: { orgId, managerUserId: requestingUserId }, select: { personId: true } }),
+      prisma.team.findMany({ where: { orgId, managerUserId: requestingUserId }, include: { resources: { select: { id: true } } } }),
+      prisma.customer.findMany({ where: { orgId, responsibleUserId: requestingUserId }, select: { id: true } }),
+      prisma.project.findMany({ where: { orgId }, select: { id: true, customerId: true, responsibleUserId: true } }),
+    ]);
+    const managedResourceIds = new Set<string>();
+    for (const d of directMgr) managedResourceIds.add(d.personId);
+    for (const t of managedTeams) for (const r of t.resources) managedResourceIds.add(r.id);
+    const respCustomerIds = new Set(respCustomers.map((c) => c.id));
+    const directRespProjectIds = new Set(
+      allProjects.filter((p) => p.responsibleUserId === requestingUserId).map((p) => p.id)
+    );
+    const projectCustomer = new Map(allProjects.map((p) => [p.id, p.customerId]));
+    const isResponsibleFor = (e: EvaluationFull): boolean => {
+      if (e.projectId) {
+        if (directRespProjectIds.has(e.projectId)) return true;
+        const cid = projectCustomer.get(e.projectId);
+        return !!cid && respCustomerIds.has(cid);
+      }
+      if (e.customerId) return respCustomerIds.has(e.customerId);
+      return false;
+    };
+    const kindFor = (e: EvaluationFull): 'subject' | 'manager' | 'responsible' | null => {
+      if (meId && meId === e.resourceId) return 'subject';
+      if (managedResourceIds.has(e.resourceId)) return 'manager';
+      if (isResponsibleFor(e)) return 'responsible';
+      return null;
+    };
+
     const out: Record<string, unknown>[] = [];
     for (const e of all) {
-      const kind = await viewerKindFor(orgId, e, requestingUserId, requestingUserRole);
+      const kind = kindFor(e);
       if (!kind) continue;
       if (kind === 'subject') {
         if (e.state !== 'finalized') {

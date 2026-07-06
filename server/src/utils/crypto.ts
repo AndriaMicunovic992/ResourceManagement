@@ -31,6 +31,10 @@ export function decryptSecret(stored: string | null | undefined): string | null 
     const pt = Buffer.concat([decipher.update(Buffer.from(ctB, 'base64')), decipher.final()]);
     return pt.toString('utf8');
   } catch {
+    // A stored value that won't decrypt usually means the encryption key changed
+    // (e.g. JWT_SECRET was rotated while ENCRYPTION_KEY was unset). Log a distinct
+    // signal rather than silently behaving as if no token were configured.
+    console.warn('decryptSecret: stored value failed to decrypt — the encryption key may have changed.');
     return null;
   }
 }

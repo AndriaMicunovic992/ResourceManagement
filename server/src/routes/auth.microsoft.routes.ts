@@ -50,7 +50,7 @@ export const microsoftAuthRoutes: FastifyPluginAsync = async (app) => {
     }
   }
 
-  app.get('/auth/microsoft/login', async (req, reply) => {
+  app.get('/auth/microsoft/login', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
     if (!microsoftService.isEnabled()) {
       return reply.redirect(clientRedirect({ error: 'sso_disabled' }));
     }
@@ -59,7 +59,7 @@ export const microsoftAuthRoutes: FastifyPluginAsync = async (app) => {
     return reply.redirect(url);
   });
 
-  app.get('/auth/microsoft/callback', async (req, reply) => {
+  app.get('/auth/microsoft/callback', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
     reply.clearCookie(TXN_COOKIE, { path: '/' });
     if (error) return reply.redirect(clientRedirect({ error }));

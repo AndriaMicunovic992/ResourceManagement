@@ -40,7 +40,9 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Pull Tempo worklogs for a date range and resolve them through the mappings.
-  app.post('/integration/tempo/sync', { preHandler: requireRole('admin') }, async (req) => {
+  // Rate-limited: a full sync is expensive (paginated Jira/Tempo calls + per-row
+  // upserts), so cap how often it can be kicked off.
+  app.post('/integration/tempo/sync', { preHandler: requireRole('admin'), config: { rateLimit: { max: 6, timeWindow: '1 minute' } } }, async (req) => {
     const { updatedFrom } = syncHoursSchema.parse(req.body);
     return integrationService.syncHours(req.orgId, updatedFrom);
   });

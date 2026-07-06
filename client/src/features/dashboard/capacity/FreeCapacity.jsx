@@ -101,6 +101,12 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
     return Math.round(free * 100) / 100;
   };
 
+  // Total free capacity per month (all resources, deduplicated). Must be
+  // declared before any conditional return so the hook count is stable across
+  // renders — otherwise toggling to a team with no roles (tree empty) and back
+  // throws React's "rendered more hooks than during the previous render".
+  const allResourceIds = useMemo(() => [...new Set(resources.map((r) => r.id))], [resources]);
+
   if (tree.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-border-light shadow-card p-8 text-center text-sm text-text-light">
@@ -108,9 +114,6 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
       </div>
     );
   }
-
-  // Total free capacity per month (all resources, deduplicated)
-  const allResourceIds = useMemo(() => [...new Set(resources.map((r) => r.id))], [resources]);
 
   return (
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
@@ -203,7 +206,12 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
         </div>
         {months.map((m) => {
           const free = computeFree(allResourceIds, m);
-          const totalPDemand = Object.values(potentialDemand).reduce((s, dm) => s + (dm[m] || 0), 0);
+          // Each potential need is stored under three keys (domain, domain|role,
+          // domain|role|seniority) for the hierarchical rows. Sum only the
+          // domain-level keys here so a single need isn't subtracted 3×.
+          const totalPDemand = Object.entries(potentialDemand)
+            .filter(([k]) => !k.includes('|'))
+            .reduce((s, [, dm]) => s + (dm[m] || 0), 0);
           const val = includePotential ? Math.max(0, free - totalPDemand) : free;
           return (
             <div key={m} className="w-[82px] shrink-0 flex items-center justify-center text-[11px] font-mono font-bold text-primary">

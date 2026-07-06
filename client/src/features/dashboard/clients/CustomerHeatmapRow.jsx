@@ -8,7 +8,7 @@ import { ACCENT_COLORS } from '../../../lib/constants';
 import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 
-export default function CustomerHeatmapRow({ customer, index, months, includePotential }) {
+export default function CustomerHeatmapRow({ customer, index, months, includePotential, teamResourceIds }) {
   const [expanded, setExpanded] = useState(false);
   const { projects, needs, assignments } = useData();
   const { canViewCustomer } = useVisibility();
@@ -34,7 +34,9 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
       for (const n of custNeeds) {
         const needed = (n.monthAllocations || {})[m] || 0;
         if (needed <= 0) continue;
-        const filled = assignments.filter((a) => a.needId === n.id).reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+        const filled = assignments
+          .filter((a) => a.needId === n.id && (!teamResourceIds || teamResourceIds.has(a.resourceId)))
+          .reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
         totalNeeded += needed;
         totalFilled += filled;
         if (n.status === 'potential') hasPotential = true;
@@ -49,7 +51,7 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
       };
     }
     return result;
-  }, [custProjects, needs, assignments, months, includePotential, projects]);
+  }, [custProjects, needs, assignments, months, includePotential, projects, teamResourceIds]);
 
   return (
     <>
@@ -88,7 +90,7 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
         })}
       </div>
       {expanded && custProjects.map((p) => (
-        <ProjectHeatmapRow key={p.id} project={p} customer={customer} months={months} includePotential={includePotential} />
+        <ProjectHeatmapRow key={p.id} project={p} customer={customer} months={months} includePotential={includePotential} teamResourceIds={teamResourceIds} />
       ))}
     </>
   );

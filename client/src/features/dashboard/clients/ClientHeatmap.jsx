@@ -5,12 +5,20 @@ import EmptyState from '../../../components/ui/EmptyState';
 import InfoDot from '../../../components/ui/InfoDot';
 import { useData } from '../../../contexts/DataContext';
 
-export default function ClientHeatmap({ months, includePotential }) {
-  const { customers, projects, needs, assignments } = useData();
+export default function ClientHeatmap({ months, includePotential, teamId }) {
+  const { customers, projects, needs, assignments, resources } = useData();
   const filtered = useMemo(() => {
     if (includePotential) return customers;
     return customers.filter((c) => c.status === 'realised');
   }, [customers, includePotential]);
+
+  // When a team is selected, only count filled FTE contributed by that team's
+  // people (null = no team filter → count everyone). Without this the tab
+  // silently ignored the team selector every other view respects.
+  const teamResourceIds = useMemo(
+    () => (teamId ? new Set(resources.filter((r) => (r.teams || []).some((t) => t.id === teamId)).map((r) => r.id)) : null),
+    [resources, teamId]
+  );
 
   // Totals: sum filled FTE per month across all visible customers
   const totals = useMemo(() => {
@@ -26,12 +34,17 @@ export default function ClientHeatmap({ months, includePotential }) {
     for (const m of months) {
       let filled = 0;
       for (const n of visibleNeeds) {
-        filled += assignments.filter((a) => a.needId === n.id).reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+        // Skip months where this need has no demand, matching the per-row cells
+        // (which continue on needed <= 0) so the footer can't exceed the rows.
+        if (((n.monthAllocations || {})[m] || 0) <= 0) continue;
+        filled += assignments
+          .filter((a) => a.needId === n.id && (!teamResourceIds || teamResourceIds.has(a.resourceId)))
+          .reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
       }
       result[m] = Math.round(filled * 100) / 100;
     }
     return result;
-  }, [filtered, months, needs, projects, assignments, includePotential]);
+  }, [filtered, months, needs, projects, assignments, includePotential, teamResourceIds]);
 
   if (filtered.length === 0) {
     return <EmptyState icon="🏢" message={includePotential ? 'No customers yet' : 'No realised customers'} />;
@@ -45,7 +58,7 @@ export default function ClientHeatmap({ months, includePotential }) {
       </h3>
       <ClientHeatmapHeader months={months} />
       {filtered.map((c, i) => (
-        <CustomerHeatmapRow key={c.id} customer={c} index={i} months={months} includePotential={includePotential} />
+        <CustomerHeatmapRow key={c.id} customer={c} index={i} months={months} includePotential={includePotential} teamResourceIds={teamResourceIds} />
       ))}
       {/* Totals row */}
       <div className="flex items-center border-t-2 border-border bg-primary-bg/30 sticky bottom-0">

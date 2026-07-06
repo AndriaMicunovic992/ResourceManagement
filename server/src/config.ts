@@ -50,3 +50,16 @@ export function assertProductionConfig(): string[] {
   }
   return errors;
 }
+
+/** Non-fatal configuration warnings to surface at boot. */
+export function configWarnings(): string[] {
+  const warnings: string[] = [];
+  if (isProd && !process.env.ENCRYPTION_KEY) {
+    warnings.push(
+      'ENCRYPTION_KEY is not set — integration tokens are encrypted with a key derived from JWT_SECRET. ' +
+        'Rotating JWT_SECRET will make all stored Jira/Tempo/Teams tokens undecryptable. ' +
+        'Set ENCRYPTION_KEY to decouple them.'
+    );
+  }
+  return warnings;
+}

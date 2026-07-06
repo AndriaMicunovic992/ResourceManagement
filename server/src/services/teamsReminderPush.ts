@@ -54,7 +54,15 @@ export async function runReminderPush(opts: {
 
     // Connected members: linked to a Teams conversation AND to a Microsoft identity.
     const members = await prisma.orgMember.findMany({
-      where: { orgId: org.id, user: { microsoftId: { not: null }, teamsLink: { isNot: null } } },
+      where: {
+        orgId: org.id,
+        user: {
+          microsoftId: { not: null },
+          // Reachable if this org's bot captured a conversation, or a legacy
+          // null-org link exists (backward compat).
+          teamsLinks: { some: { OR: [{ orgId: org.id }, { orgId: null }] } },
+        },
+      },
       select: { userId: true, role: true },
     });
 
