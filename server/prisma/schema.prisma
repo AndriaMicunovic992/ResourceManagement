@@ -80,6 +80,7 @@ model Organization {
   reminderDismissals ReminderDismissal[]
   customerReviews CustomerReview[]
   teamsReminderStates TeamsReminderState[]
+  teamsUserLinks TeamsUserLink[]
 }
 
 model User {
@@ -116,7 +117,7 @@ model User {
   // Likewise, a manager (of people / teams) is any org user.
   managedTeams          Team[]          @relation("TeamManagerUser")
   managedPeople         PersonManager[] @relation("PersonManagerUser")
-  teamsLink             TeamsUserLink?  @relation("UserTeamsLink")
+  teamsLinks            TeamsUserLink[] @relation("UserTeamsLink")
   teamsReminderStates   TeamsReminderState[]
 }
 
@@ -126,15 +127,24 @@ model User {
 // object id we already store on User.microsoftId.
 model TeamsUserLink {
   id              String    @id @default(cuid())
-  userId          String    @unique
+  userId          String
   user            User      @relation("UserTeamsLink", fields: [userId], references: [id], onDelete: Cascade)
+  // Which org's bot captured this conversation. Each org runs its own bot, so a
+  // user who belongs to several reminder-enabled orgs gets one link per org and
+  // a proactive send uses the conversation captured by that org's bot. Nullable
+  // for links captured before per-org support — sends fall back to a null-org
+  // link so existing single-bot deployments keep working.
+  orgId           String?
+  org             Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
   aadObjectId     String?   // Entra object id from the bot activity (matches User.microsoftId)
   serviceUrl      String    // Bot Framework service URL for this user's channel
   conversationRef Json      // serialized ConversationReference for proactive sends
-  lastSentAt      DateTime? // last reminder DM we pushed — for daily de-dupe
+  lastSentAt      DateTime? // legacy per-user cursor (superseded by TeamsReminderState)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  @@unique([orgId, userId])
+  @@index([userId])
   @@index([aadObjectId])
 }
 

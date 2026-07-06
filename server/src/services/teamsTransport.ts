@@ -81,8 +81,10 @@ type Activity = {
 
 type CaptureResult = 'linked' | 'unmatched' | 'skipped';
 
-/** Persist a user's conversation reference so we can DM them later. */
-async function captureConversation(activity: Activity): Promise<CaptureResult> {
+/** Persist a user's conversation reference so we can DM them later. Scoped to
+ * the org whose bot received the activity, so a user in multiple orgs gets one
+ * conversation per bot. */
+async function captureConversation(activity: Activity, orgId: string): Promise<CaptureResult> {
   const serviceUrl = activity.serviceUrl;
   const conversationId = activity.conversation?.id;
   if (!serviceUrl || !conversationId) return 'skipped';
@@ -106,8 +108,8 @@ async function captureConversation(activity: Activity): Promise<CaptureResult> {
     userName: activity.from?.name ?? null,
   };
   await prisma.teamsUserLink.upsert({
-    where: { userId: user.id },
-    create: { userId: user.id, aadObjectId, serviceUrl, conversationRef },
+    where: { orgId_userId: { orgId, userId: user.id } },
+    create: { orgId, userId: user.id, aadObjectId, serviceUrl, conversationRef },
     update: { aadObjectId, serviceUrl, conversationRef },
   });
   return 'linked';
@@ -152,7 +154,7 @@ export async function handleInboundActivity(body: unknown, authHeader: string | 
   // for someone, so people never have to message the bot first.
   let result: CaptureResult = 'skipped';
   try {
-    result = await captureConversation(activity);
+    result = await captureConversation(activity, conn.orgId);
   } catch {
     /* non-fatal — the token was already valid */
   }
@@ -189,7 +191,11 @@ export function buildReminderText(intro: string | null | undefined, reminders: R
 export async function sendProactiveMessage(orgId: string, userId: string, text: string) {
   const conn = await prisma.teamsConnection.findUnique({ where: { orgId } });
   if (!conn?.botAppId) throw new BadRequestError('Set up the Teams bot connection first.');
-  const link = await prisma.teamsUserLink.findUnique({ where: { userId } });
+  // Prefer this org's own captured conversation; fall back to a legacy null-org
+  // link (captured before per-org support) so existing deployments keep working.
+  const link =
+    (await prisma.teamsUserLink.findUnique({ where: { orgId_userId: { orgId, userId } } })) ??
+    (await prisma.teamsUserLink.findFirst({ where: { userId, orgId: null } }));
   if (!link) {
     throw new BadRequestError(
       'No Teams conversation for this person yet. They need to open the bot in Teams once (say "hi") so we can reach them.'
