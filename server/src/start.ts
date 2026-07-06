@@ -4,7 +4,7 @@
 // db:migrate` yourself.
 
 import { execSync } from 'child_process';
-import { assertProductionConfig } from './config.js';
+import { assertProductionConfig, configWarnings } from './config.js';
 
 const varNames = ['DATABASE_URL', 'DATABASE_PRIVATE_URL', 'DATABASE_PUBLIC_URL'];
 
@@ -36,6 +36,9 @@ if (configErrors.length > 0) {
   console.error('========================================');
   process.exit(1);
 }
+
+// Surface non-fatal configuration warnings (don't block boot).
+for (const w of configWarnings()) console.warn(`WARNING: ${w}`);
 
 // Apply migrations. A failure here means the schema is stale — booting anyway
 // risks silent data corruption and confusing 500s, so refuse to start.

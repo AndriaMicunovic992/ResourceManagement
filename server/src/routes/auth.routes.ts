@@ -57,7 +57,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   // the audit trail and is enforced read-only by the auth hook.
   app.post(
     '/auth/impersonate',
-    { preHandler: requireRole('admin') },
+    { preHandler: requireRole('admin'), config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
     async (req) => {
       if (req.impersonatorUserId) {
         throw new BadRequestError('Already viewing as another user');
