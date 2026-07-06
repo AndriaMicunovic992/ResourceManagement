@@ -48,7 +48,9 @@ export default function StatsCards({ months, includePotential, teamId }) {
       const hasUnfilledMonth = Object.entries(allocs).some(([m, needed]) => {
         if (!monthSet.has(m)) return false;
         const filled = nF[n.id]?.[m]?.filled || 0;
-        return needed > 0 && filled < needed;
+        // Epsilon guard so floating-point dust (e.g. 0.1+0.2) doesn't flag a
+        // fully-staffed need as unfilled — matching the home dashboard.
+        return needed > 0 && filled < needed - 0.001;
       });
       if (hasUnfilledMonth) unfilled++;
     }

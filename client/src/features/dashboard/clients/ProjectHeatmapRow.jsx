@@ -6,7 +6,7 @@ import { formatMonth, monthRange } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useMemo } from 'react';
 
-export default function ProjectHeatmapRow({ project, customer, months, includePotential }) {
+export default function ProjectHeatmapRow({ project, customer, months, includePotential, teamResourceIds }) {
   const { needs, assignments, members } = useData();
   const ok = useMemo(() => isProjectOk(project, needs, assignments), [project, needs, assignments]);
   const isPotentialProject = customer.status === 'potential' || project.status === 'potential';
@@ -28,7 +28,9 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
       for (const n of projNeeds) {
         const needed = (n.monthAllocations || {})[m] || 0;
         if (needed <= 0) continue;
-        const filled = assignments.filter((a) => a.needId === n.id).reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+        const filled = assignments
+          .filter((a) => a.needId === n.id && (!teamResourceIds || teamResourceIds.has(a.resourceId)))
+          .reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
         totalNeeded += needed;
         totalFilled += filled;
         if (n.status === 'potential') hasPotential = true;
@@ -41,7 +43,7 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
       };
     }
     return result;
-  }, [project, needs, assignments, months, projMonths, isPotentialProject, includePotential]);
+  }, [project, needs, assignments, months, projMonths, isPotentialProject, includePotential, teamResourceIds]);
 
   return (
     <div className="flex items-center border-b border-border-light" style={{ opacity: isPotentialProject ? 0.75 : 1 }}>
