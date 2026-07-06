@@ -1,9 +1,10 @@
+import { memo } from 'react';
 import { shortName, initials } from '../../../../lib/resourceUtils';
 import { CW } from '../../../../lib/constants';
 
 /** Hero pill segment: saturated gradient, white label, avatar inside,
  * white FTE chip. contLeft/contRight mark continuation beyond the window. */
-export default function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, roundLeft, roundRight, totalSegments, showLabel = false, contLeft, contRight, overloadMonths, onClickMonth }) {
+function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, roundLeft, roundRight, totalSegments, showLabel = false, contLeft, contRight, overloadMonths, onClickMonth }) {
   // A separator line only sits where two segments actually touch (an FTE
   // change), not where there's a gap or a free/continuation end.
   const hasLeftSeparator = !roundLeft && !contLeft && totalSegments > 1;
@@ -81,3 +82,5 @@ export default function AssignmentSegment({ segment, resource, domainColor, barH
     </div>
   );
 }
+
+export default memo(AssignmentSegment);

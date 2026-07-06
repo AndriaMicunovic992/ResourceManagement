@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import { utilColor, utilBg } from '../../../lib/statusUtils';
 
-export default function HeatmapCell({ value, showDash, totalFilled, isPotential }) {
+function HeatmapCell({ value, showDash, totalFilled, isPotential }) {
   if (showDash || value === null || value === undefined) {
     return (
       <div className="w-[82px] shrink-0 flex items-center justify-center text-[11px] font-mono text-text-light">—</div>
@@ -24,3 +25,6 @@ export default function HeatmapCell({ value, showDash, totalFilled, isPotential 
     </div>
   );
 }
+
+// Pure presentational leaf — memoized (one per customer/project × month).
+export default memo(HeatmapCell);

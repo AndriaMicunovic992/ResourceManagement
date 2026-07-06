@@ -1,10 +1,11 @@
+import { memo } from 'react';
 import { CW } from '../../../../lib/constants';
 
 /**
  * Cells encode state instead of printing it: amber tint = gap, green tint =
  * filled, a 2px meter shows filled/needed. Exact numbers appear on hover.
  */
-export default function NeedCell({ width, needed, filled, inRange, canPlace, paintActive, onPointerDown }) {
+function NeedCell({ width, needed, filled, inRange, canPlace, paintActive, onPointerDown }) {
   const cellWidth = width || CW;
 
   if (!inRange) {
@@ -49,3 +50,7 @@ export default function NeedCell({ width, needed, filled, inRange, canPlace, pai
     </div>
   );
 }
+
+// One NeedCell per need × month — memoize so unrelated grid state changes
+// (hover, popover, the undo-toast timer) don't re-render every cell.
+export default memo(NeedCell);
