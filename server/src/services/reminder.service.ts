@@ -1,4 +1,5 @@
 import { prisma } from '../db/prisma.js';
+import { NotFoundError } from '../utils/errors.js';
 import type { VisibilityScope } from './visibility.service.js';
 
 /**
@@ -78,14 +79,27 @@ export const reminderService = {
     userId: string,
     data: { type: string; resourceId: string; customerId?: string | null }
   ) {
-    return prisma.reminderDismissal.create({
-      data: {
-        orgId,
-        userId,
-        type: data.type,
-        resourceId: data.resourceId,
-        customerId: data.customerId ?? null,
-      },
+    const customerId = data.customerId ?? null;
+    // Validate the referenced records belong to the org so a caller can't seed
+    // the table with unlimited junk-id rows.
+    const resource = await prisma.resource.findFirst({
+      where: { id: data.resourceId, orgId },
+      select: { id: true },
+    });
+    if (!resource) throw new NotFoundError('Resource not found');
+    if (customerId) {
+      const cust = await prisma.customer.findFirst({ where: { id: customerId, orgId }, select: { id: true } });
+      if (!cust) throw new NotFoundError('Customer not found');
+    }
+    // Keep at most one dismissal per (type, resource, customer) — replace the
+    // prior one — so repeated dismissals can't grow the table without bound.
+    return prisma.$transaction(async (tx) => {
+      await tx.reminderDismissal.deleteMany({
+        where: { orgId, userId, type: data.type, resourceId: data.resourceId, customerId },
+      });
+      return tx.reminderDismissal.create({
+        data: { orgId, userId, type: data.type, resourceId: data.resourceId, customerId },
+      });
     });
   },
 
@@ -146,8 +160,11 @@ export const reminderService = {
 
     // Dismissals ("on leave this month" etc.): for cadence-based reminders the
     // dismissal counts as activity; for monthly signals it hides the month.
+    // Only recent dismissals can still suppress a reminder (an older one is
+    // already superseded by a later cadence tick), so bound the read.
+    const dismissalCutoff = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
     const dismissals = await prisma.reminderDismissal.findMany({
-      where: { orgId, userId },
+      where: { orgId, userId, createdAt: { gte: dismissalCutoff } },
       orderBy: { createdAt: 'desc' },
     });
     const latestDismissal = new Map<string, Date>();

@@ -16,18 +16,18 @@ export const personSkillRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/person-skills', { preHandler: requirePermission('skills', 'create') }, async (req) => {
     const data = upsertPersonSkillSchema.parse(req.body);
-    return personSkillService.upsert(req.orgId, data);
+    return personSkillService.upsert(req.orgId, req.visibility, data);
   });
 
   app.patch('/person-skills/:id', { preHandler: requirePermission('skills', 'edit') }, async (req) => {
     const { id } = req.params as { id: string };
     const data = updatePersonSkillSchema.parse(req.body);
-    return personSkillService.update(req.orgId, id, data);
+    return personSkillService.update(req.orgId, req.visibility, id, data);
   });
 
   app.delete('/person-skills/:id', { preHandler: requirePermission('skills', 'delete') }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    await personSkillService.delete(req.orgId, id);
+    await personSkillService.delete(req.orgId, req.visibility, id);
     return reply.status(204).send();
   });
 };

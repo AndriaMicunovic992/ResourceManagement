@@ -1,5 +1,6 @@
 import { prisma } from '../db/prisma.js';
 import { NotFoundError } from '../utils/errors.js';
+import { assertCanViewPerson, type VisibilityScope } from './visibility.service.js';
 import type {
   UpsertPersonSkillInput,
   UpdatePersonSkillInput,
@@ -13,10 +14,13 @@ export const personSkillService = {
     });
   },
 
-  async upsert(orgId: string, data: UpsertPersonSkillInput) {
+  async upsert(orgId: string, scope: VisibilityScope, data: UpsertPersonSkillInput) {
     // Ensure both resource and skill belong to this org
     const resource = await prisma.resource.findFirst({ where: { id: data.resourceId, orgId } });
     if (!resource) throw new NotFoundError('Resource not found');
+    // A skills-write role may only edit skills for people it can see, not the
+    // whole org (visibility == existence — 404 for out-of-scope people).
+    assertCanViewPerson(scope, data.resourceId);
     const skill = await prisma.skill.findFirst({ where: { id: data.skillId, orgId } });
     if (!skill) throw new NotFoundError('Skill not found');
 
@@ -36,15 +40,17 @@ export const personSkillService = {
     });
   },
 
-  async update(orgId: string, id: string, data: UpdatePersonSkillInput) {
+  async update(orgId: string, scope: VisibilityScope, id: string, data: UpdatePersonSkillInput) {
     const existing = await prisma.personSkill.findFirst({ where: { id, orgId } });
     if (!existing) throw new NotFoundError('PersonSkill not found');
+    assertCanViewPerson(scope, existing.resourceId);
     return prisma.personSkill.update({ where: { id }, data });
   },
 
-  async delete(orgId: string, id: string) {
+  async delete(orgId: string, scope: VisibilityScope, id: string) {
     const existing = await prisma.personSkill.findFirst({ where: { id, orgId } });
     if (!existing) throw new NotFoundError('PersonSkill not found');
+    assertCanViewPerson(scope, existing.resourceId);
     return prisma.personSkill.delete({ where: { id } });
   },
 };

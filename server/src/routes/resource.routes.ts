@@ -16,8 +16,8 @@ import { z } from 'zod';
 
 const dismissReminderSchema = z.object({
   type: z.enum(['oneOnOne', 'pmUpdate', 'clientSignal']),
-  resourceId: z.string().min(1),
-  customerId: z.string().optional().nullable(),
+  resourceId: z.string().min(1).max(40),
+  customerId: z.string().max(40).optional().nullable(),
 });
 
 export const resourceRoutes: FastifyPluginAsync = async (app) => {

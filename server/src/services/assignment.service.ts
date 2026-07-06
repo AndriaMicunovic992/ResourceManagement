@@ -70,11 +70,20 @@ export const assignmentService = {
   async update(orgId: string, id: string, data: { monthAllocations: Record<string, number> }) {
     const assignment = await prisma.assignment.findFirst({ where: { id, orgId } });
     if (!assignment) throw new NotFoundError('Assignment not found');
-    return prisma.assignment.update({
-      where: { id },
-      data: { monthAllocations: data.monthAllocations },
-      include: INCLUDE,
-    });
+    // Merge per-month via an atomic jsonb concat (same semantics as upsertMonth)
+    // rather than replacing the whole map: a partial payload no longer silently
+    // wipes the months it omits, and concurrent writers can't clobber each other.
+    // Clear a month by sending it as 0.
+    if (Object.keys(data.monthAllocations).length > 0) {
+      await prisma.$executeRaw`
+        UPDATE "Assignment"
+        SET "monthAllocations" = COALESCE("monthAllocations", '{}'::jsonb) || ${JSON.stringify(data.monthAllocations)}::jsonb,
+            "updatedAt" = now()
+        WHERE "id" = ${id} AND "orgId" = ${orgId}`;
+    }
+    const row = await prisma.assignment.findFirst({ where: { id, orgId }, include: INCLUDE });
+    if (!row) throw new NotFoundError('Assignment not found');
+    return row;
   },
 
   async delete(orgId: string, id: string) {
