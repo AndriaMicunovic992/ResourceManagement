@@ -28,6 +28,13 @@ export function hoursToFte(hours) {
   return Math.round((hours / MONTHLY_HOURS_PER_FTE) * 100) / 100;
 }
 
+// Work-type classification of logged hours (from the Jira mapping buckets).
+// The colors are the stacked-actual segment hues on the people heatmap —
+// green/violet validated for CVD separation; absence is a neutral slate.
+export const WORK_TYPES = ['client', 'internal', 'absence'];
+export const WORK_TYPE_LABELS = { client: 'Client', internal: 'Internal', absence: 'Absences' };
+export const WORK_TYPE_COLORS = { client: '#34C98E', internal: '#8B5CF6', absence: '#94A3B8' };
+
 export { SKILL_LEVELS, SKILL_LEVEL_LIST } from './skillLevels';
 
 // --- Activity log entry types ---

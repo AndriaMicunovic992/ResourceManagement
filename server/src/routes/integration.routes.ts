@@ -86,6 +86,19 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.actualsByResource(req.orgId, from, to, visibleIds);
   });
 
+  // Actual hours per person per month per work type (client/internal/absence),
+  // unfiltered — scoped to visible people. Feeds the people-capacity heatmap's
+  // stacked bar, its work-type filter, and the per-person drill-down buckets.
+  app.get('/integration/tempo/actuals/monthly-by-type', async (req) => {
+    const q = req.query as { from?: string; to?: string };
+    const cur = new Date().toISOString().slice(0, 7);
+    const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
+    const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
+    const v = req.visibility;
+    const visibleIds = v.isAdmin ? null : [...v.visiblePersonIds];
+    return integrationService.actualsByResourceType(req.orgId, from, to, visibleIds);
+  });
+
   // Actual hours per customer per month — scoped to visible customers. Feeds the
   // client-staffing heatmap and the PM-review chart.
   app.get('/integration/tempo/actuals/monthly-by-customer', async (req) => {
