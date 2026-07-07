@@ -48,8 +48,12 @@ async function apiFetch(path, options = {}) {
 
   if (res.status === 204) return null;
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error || 'Request failed');
+    // Include the status when the body carries no message (or isn't JSON at
+    // all — e.g. an HTML timeout page from a proxy), so failures are
+    // diagnosable instead of a bare "Request failed".
+    const fallback = `Request failed (${res.status})`;
+    const err = await res.json().catch(() => ({ error: fallback }));
+    throw new Error(err.error || err.message || fallback);
   }
   return res.json();
 }
