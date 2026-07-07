@@ -262,6 +262,16 @@ export const integrationService = {
     const secondsByCustomer = new Map<string, number>();
     const seenWorklogIds = new Set<string>();
 
+    // Resolve every worklog first, then write in batches. Per-row upserts
+    // round-trip the database thousands of times on a first full pull — slow
+    // enough to push the request past upstream proxy timeouts, which surfaces
+    // in the UI as an opaque "Request failed".
+    const rows: {
+      tempoWorklogId: string; accountId: string; resourceId: string | null;
+      customerId: string | null; projectId: string | null; workType: string;
+      jiraIssueKey: string | null; jiraEpicKey: string | null;
+      workDate: string; month: string; seconds: number; description: string | null;
+    }[] = [];
     for (const w of worklogs) {
       seenWorklogIds.add(w.tempoWorklogId);
       const resourceId = resourceByAccount.get(w.accountId) ?? null;
@@ -274,19 +284,43 @@ export const integrationService = {
       if (customerId) secondsByCustomer.set(customerId, (secondsByCustomer.get(customerId) || 0) + w.seconds);
       totalSeconds += w.seconds;
 
-      await prisma.worklog.upsert({
-        where: { orgId_tempoWorklogId: { orgId, tempoWorklogId: w.tempoWorklogId } },
-        create: {
-          orgId, tempoWorklogId: w.tempoWorklogId, accountId: w.accountId, resourceId,
-          customerId, projectId, workType, jiraIssueKey: ref?.key ?? null, jiraEpicKey: ref?.epicKey ?? null,
-          workDate: w.date, month: (w.date || '').slice(0, 7), seconds: w.seconds, description: w.description,
-        },
-        update: {
-          accountId: w.accountId, resourceId, customerId, projectId, workType,
-          jiraIssueKey: ref?.key ?? null, jiraEpicKey: ref?.epicKey ?? null,
-          workDate: w.date, month: (w.date || '').slice(0, 7), seconds: w.seconds, description: w.description,
-        },
+      rows.push({
+        tempoWorklogId: w.tempoWorklogId, accountId: w.accountId, resourceId,
+        customerId, projectId, workType, jiraIssueKey: ref?.key ?? null, jiraEpicKey: ref?.epicKey ?? null,
+        workDate: w.date, month: (w.date || '').slice(0, 7), seconds: w.seconds, description: w.description,
       });
+    }
+
+    // Tempo pagination can return the same worklog on two pages when rows shift
+    // mid-pull — keep the last occurrence so createMany can't hit the unique key.
+    const uniqueRows = [...new Map(rows.map((r) => [r.tempoWorklogId, r])).values()];
+
+    // Split into create vs update against what's already stored.
+    const existingIds = new Set<string>();
+    const allIds = uniqueRows.map((r) => r.tempoWorklogId);
+    for (let i = 0; i < allIds.length; i += 5000) {
+      const found = await prisma.worklog.findMany({
+        where: { orgId, tempoWorklogId: { in: allIds.slice(i, i + 5000) } },
+        select: { tempoWorklogId: true },
+      });
+      for (const f of found) existingIds.add(f.tempoWorklogId);
+    }
+    const toCreate = uniqueRows.filter((r) => !existingIds.has(r.tempoWorklogId));
+    const toUpdate = uniqueRows.filter((r) => existingIds.has(r.tempoWorklogId));
+    for (let i = 0; i < toCreate.length; i += 1000) {
+      await prisma.worklog.createMany({
+        data: toCreate.slice(i, i + 1000).map((r) => ({ orgId, ...r })),
+        skipDuplicates: true,
+      });
+    }
+    for (let i = 0; i < toUpdate.length; i += 200) {
+      // updateMany per row (not update) so a row deleted by a concurrent full
+      // sync's reconciliation can't throw and abort the chunk.
+      await prisma.$transaction(
+        toUpdate.slice(i, i + 200).map(({ tempoWorklogId, ...data }) =>
+          prisma.worklog.updateMany({ where: { orgId, tempoWorklogId }, data })
+        )
+      );
     }
 
     const names = await prisma.resource.findMany({ where: { orgId, id: { in: [...secondsByResource.keys()] } }, select: { id: true, name: true } });
@@ -331,6 +365,8 @@ export const integrationService = {
       updatedFrom,
       syncedAt: syncedAt.toISOString(),
       worklogs: worklogs.length,
+      createdWorklogs: toCreate.length,
+      updatedWorklogs: toUpdate.length,
       hours: Math.round((totalSeconds / 3600) * 10) / 10,
       matchedPeople: matchedResourceIds.size,
       unmatchedAccounts: unmatchedAccounts.size,
