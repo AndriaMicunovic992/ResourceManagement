@@ -5,7 +5,7 @@ import ProjectHeatmapRow from './ProjectHeatmapRow';
 import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { ACCENT_COLORS, hoursToFte } from '../../../lib/constants';
-import { currentMonth } from '../../../lib/dateUtils';
+import { currentMonth, formatMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 
@@ -44,22 +44,30 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
         const proj = projects.find((p) => p.id === n.projectId);
         if (proj?.status === 'potential') hasPotential = true;
       }
-      result[m] = {
-        ratio: totalNeeded > 0 ? totalFilled / totalNeeded : null,
-        totalNeeded,
-        totalFilled,
-        isPotential: hasPotential,
-      };
+      result[m] = { totalNeeded, totalFilled, isPotential: hasPotential };
     }
     return result;
   }, [custProjects, needs, assignments, months, includePotential, projects, teamResourceIds]);
 
   // Actual FTE logged on this customer per elapsed month. Customers with no
-  // synced hours anywhere in the window get no act layer at all (they're
+  // synced hours anywhere in the window get no actual layer at all (they're
   // likely just not mapped), rather than a misleading wall of zeros.
   const cur = currentMonth();
   const custActuals = actuals?.byCustomer?.[customer.id];
   const custHasActuals = !!custActuals && Object.values(custActuals).some((h) => h > 0);
+
+  // Row scale: bullet lengths are fractions of the row's own peak, so bars
+  // compare within the row; absolute values live in the labels. Floored at
+  // 1 FTE so a row with only tiny values (e.g. 0.2 of unplanned work) doesn't
+  // blow them up to full-width bars.
+  const rowMax = useMemo(() => {
+    let max = 0;
+    for (const m of months) {
+      max = Math.max(max, staffingByMonth[m].totalFilled, staffingByMonth[m].totalNeeded);
+      if (custHasActuals && m <= cur) max = Math.max(max, hoursToFte(custActuals[m] || 0));
+    }
+    return Math.max(max, 1);
+  }, [months, staffingByMonth, custHasActuals, custActuals, cur]);
 
   return (
     <>
@@ -91,16 +99,17 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
         </div>
         {months.map((m) => {
           const d = staffingByMonth[m];
-          const actual = custHasActuals && m <= cur ? hoursToFte(custActuals[m] || 0) : null;
+          const act = custHasActuals && m <= cur ? hoursToFte(custActuals[m] || 0) : null;
           return (
-            <HeatmapCell key={m} value={d.ratio} totalNeeded={d.totalNeeded} totalFilled={d.totalFilled}
-              isPotential={d.isPotential && includePotential} actual={actual} actualPartial={m === cur} />
+            <HeatmapCell key={m} title={`${customer.name} · ${formatMonth(m)}`}
+              plan={d.totalFilled} needed={d.totalNeeded} act={act} max={rowMax} accent={accent}
+              isPotential={d.isPotential && includePotential} actualPartial={m === cur} />
           );
         })}
       </div>
       {expanded && custProjects.map((p) => (
         <ProjectHeatmapRow key={p.id} project={p} customer={customer} months={months} includePotential={includePotential}
-          teamResourceIds={teamResourceIds} actuals={actuals} />
+          teamResourceIds={teamResourceIds} actuals={actuals} accent={accent} />
       ))}
     </>
   );

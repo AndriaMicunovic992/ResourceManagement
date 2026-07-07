@@ -1598,7 +1598,7 @@ The following features must be implemented (full details in `UI-SPEC.md`):
 - **Home stats cards**: Active Projects, "Actual vs potential" (or Realised Utilization fallback), Unfilled Slots, By-domain donut
 - **Utilization chart**: planned · actual · potential lines over the year. The **actual** line counts only Jira-**matched** people (`externalWorkId`) over matched capacity.
 - **"Your people" rail**: people you manage, falling back to the org's people for admins who manage no one
-- **Insights sub-tabs**: Client Overview | People Capacity | Free Capacity — the Client-Staffing and People-Capacity heatmaps show an **"act"** line (logged Tempo hours) under the plan for elapsed months, colored against the plan; Free Capacity stays plan-only (it looks forward)
+- **Insights sub-tabs**: Client Overview | People Capacity | Free Capacity — the Client-Staffing and People-Capacity heatmaps render **bullet cells** (plan track + target tick, logged-hours fill, `act/plan` label, tooltip with Δ; red tick = understaffed/over-capacity, amber fill = unplanned work, grey = month in progress); Free Capacity stays plan-only (it looks forward)
 - **Resource profile modal**: avatar, roles, monthly utilization bars, assigned-to list grouped by customer/project with engagement time ranges
 - **Color thresholds**: ≥80% green, 50-79% orange, <50% red
 

@@ -3,7 +3,7 @@ import ResourceHeatmapRow from './ResourceHeatmapRow';
 import { formatMonth, currentMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
-import { utilColor, actualVsPlanColor } from '../../../lib/statusUtils';
+import { utilColor } from '../../../lib/statusUtils';
 import { MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
 import InfoDot from '../../../components/ui/InfoDot';
 import ActualsLegend from '../ActualsLegend';
@@ -59,8 +59,8 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
       <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">
         Capacity Heatmap{' '}
-        <InfoDot text="Each cell = a person’s realised allocation ÷ their capacity that month; the “+Xp” is extra potential (all-plan minus realised). For elapsed months, “act” underneath is what they actually logged in Tempo (hours → FTE ÷ capacity) — green ≈ on plan (85–115%), amber under, red over; people without synced hours get no act line. Row “% avg” averages the months they’re allocated. Footer “Avg Utilization” = Σ used ÷ Σ capacity per month; its act line covers matched people ÷ their capacity only." />
-        {showActuals && <ActualsLegend />}
+        <InfoDot text="Each month is a small bullet: the soft track is the person’s realised allocation as % of capacity with a tick at its target (red when over 100%), the solid bar is the utilization they actually logged in Tempo, and the label reads actual/planned. The faint track extension is extra potential allocation (with Include potential on). Rows share a scale anchored at 100% capacity; people without synced hours get no actual layer. A grey bar is the current month, still being logged. Row “% avg” averages the months they’re allocated. Footer “Avg Utilization” = Σ used ÷ Σ capacity per month; its act line covers matched people ÷ their capacity only." />
+        <ActualsLegend showAct={showActuals} />
       </h3>
       <div className="flex items-center border-b-2 border-border sticky top-0 bg-white z-10">
         <div className="w-[270px] shrink-0 px-3 py-2">
@@ -91,7 +91,7 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
               <span className="text-[11px] font-mono font-bold" style={{ color }}>{pct}%</span>
               {hasActualTotals && m <= cur && (
                 <span className="text-[9px] font-mono font-semibold leading-tight"
-                  style={{ color: m === cur ? '#9CA3AF' : actualVsPlanColor(actualTotals[m] ?? 0, pct) }}>
+                  style={{ color: m === cur ? '#9CA3AF' : '#34C98E' }}>
                   act {actualTotals[m] ?? 0}%
                 </span>
               )}

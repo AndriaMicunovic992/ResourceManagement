@@ -4,7 +4,7 @@ import ResourceUtilCell from './ResourceUtilCell';
 import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import { utilColor } from '../../../lib/statusUtils';
 import { MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
-import { currentMonth } from '../../../lib/dateUtils';
+import { currentMonth, formatMonth } from '../../../lib/dateUtils';
 import { useComputed } from '../../../hooks/useComputed';
 
 export default function ResourceHeatmapRow({ resource, months, onClick, includePotential, actualHours }) {
@@ -12,24 +12,26 @@ export default function ResourceHeatmapRow({ resource, months, onClick, includeP
   const color = domainColor(resourcePrimaryDomain(resource));
   const cur = currentMonth();
 
-  // People with no synced hours in the window get no act layer (they're likely
-  // not matched to a Jira account) instead of a misleading wall of zeros.
+  // People with no synced hours in the window get no actual layer (they're
+  // likely not matched to a Jira account) instead of a misleading wall of zeros.
   const hasActualHours = !!actualHours && Object.values(actualHours).some((h) => h > 0);
 
-  const { avgPct, actAvgPct, monthData, hasPotential } = useMemo(() => {
+  const { avgPct, actAvgPct, monthData, rowMax } = useMemo(() => {
     const data = {};
     let sum = 0, count = 0;
     let actSum = 0, actCount = 0;
-    let anyPotential = false;
+    // Anchor the row scale at 100% so a full capacity reads the same width on
+    // every row; only overbooked plans or heavy logging stretch it further.
+    let max = 100;
     for (const m of months) {
       const realised = (rURealised[resource.id]?.[m] || 0) / resource.capacity * 100;
       const total = (rU[resource.id]?.[m] || 0) / resource.capacity * 100;
-      const potential = total - realised;
+      const potential = Math.max(0, total - realised);
       const actual = hasActualHours && m <= cur
         ? ((actualHours[m] || 0) / MONTHLY_HOURS_PER_FTE / (resource.capacity || 1)) * 100
         : null;
-      data[m] = { realisedPct: realised, potentialPct: potential > 0 ? potential : 0, actualPct: actual, actualPartial: m === cur };
-      if (potential > 0) anyPotential = true;
+      data[m] = { realisedPct: realised, potentialPct: potential, actualPct: actual, actualPartial: m === cur };
+      max = Math.max(max, includePotential ? realised + potential : realised, actual || 0);
       if (realised > 0 || total > 0) { sum += realised; count++; }
       // The act average covers completed months only — the in-progress month
       // would drag it down while hours are still being logged.
@@ -39,14 +41,9 @@ export default function ResourceHeatmapRow({ resource, months, onClick, includeP
       avgPct: count > 0 ? Math.round(sum / count) : 0,
       actAvgPct: actCount > 0 ? Math.round(actSum / actCount) : null,
       monthData: data,
-      hasPotential: anyPotential,
+      rowMax: max,
     };
-  }, [rURealised, rU, resource, months, hasActualHours, actualHours, cur]);
-
-  // When includePotential is off, hide resources that only have potential allocations
-  if (!includePotential && !hasPotential && avgPct === 0) {
-    // still show — they have no allocations at all
-  }
+  }, [rURealised, rU, resource, months, hasActualHours, actualHours, cur, includePotential]);
 
   const avgColor = utilColor(avgPct);
 
@@ -63,9 +60,14 @@ export default function ResourceHeatmapRow({ resource, months, onClick, includeP
           </div>
         </div>
       </div>
-      {months.map((m) => (
-        <ResourceUtilCell key={m} {...monthData[m]} showPotential={includePotential} />
-      ))}
+      {months.map((m) => {
+        const d = monthData[m];
+        return (
+          <ResourceUtilCell key={m} title={`${resource.name} · ${formatMonth(m)}`}
+            plan={d.realisedPct} extra={includePotential ? d.potentialPct : 0} act={d.actualPct}
+            max={rowMax} accent={color} actualPartial={d.actualPartial} />
+        );
+      })}
     </div>
   );
 }

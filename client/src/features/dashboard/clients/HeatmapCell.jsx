@@ -1,52 +1,63 @@
 import { memo } from 'react';
-import { utilColor, utilBg, actualVsPlanColor } from '../../../lib/statusUtils';
+import BulletCell from '../BulletCell';
+import { TipRow } from '../Tip';
 
-function HeatmapCell({ value, showDash, totalFilled, isPotential, actual, actualPartial }) {
-  // `actual` (FTE, may be 0) only arrives for elapsed months of rows that have
-  // synced hours; null = no act layer for this cell. An actual with no plan
-  // behind it still renders under the dash — that's unplanned work.
-  // `actualPartial` = the month is still being logged, so the value renders
-  // neutral instead of being judged against a full-month plan.
-  const showActual = actual != null && (actual > 0 || (!showDash && value != null));
-  const noPlan = showDash || value === null || value === undefined;
+/**
+ * One customer/project × month cell: adapts row staffing data to the shared
+ * bullet cell. `plan` is the filled assignment FTE (the track + tick),
+ * `needed` only drives the red understaffed tick and the tooltip, `act` is
+ * logged Tempo FTE (null = no actual layer for this row/month).
+ */
+function HeatmapCell({ title, plan, needed, act, max, accent, isPotential, actualPartial }) {
+  const hasAct = act != null;
+  const understaffed = !isPotential && needed > 0 && plan + 0.001 < needed;
 
-  if (noPlan && !showActual) {
-    return (
-      <div className="w-[82px] shrink-0 flex items-center justify-center text-[11px] font-mono text-text-light">—</div>
-    );
+  const fmt = (v) => (Math.round(v * 10) / 10).toFixed(1);
+  const labelAct = hasAct && (act > 0 || plan > 0) ? fmt(act) : null;
+  const labelPlan = plan > 0 ? fmt(plan) : null;
+
+  let delta = null;
+  if (hasAct && !actualPartial && plan > 0 && act > 0) {
+    const pct = Math.round((act / plan - 1) * 100);
+    const word = Math.abs(pct) <= 15 ? 'on plan' : pct < 0 ? 'under plan' : 'over plan';
+    delta = `${pct >= 0 ? '+' : ''}${pct}% · ${word}`;
   }
 
-  const pct = noPlan ? null : Math.round(value * 100);
-  const filledStr = (!noPlan && totalFilled != null) ? totalFilled.toFixed(1) : null;
-  const isPot = isPotential;
-  const color = isPot ? '#9CA3AF' : pct == null ? '#A0BCC9' : pct >= 100 ? utilColor(pct) : '#F5A623';
-  const bg = isPot ? '#F3F4F6' : pct == null ? 'transparent' : pct >= 100 ? utilBg(pct) : '#FFF6E8';
-  const fteColor = isPot ? '#9CA3AF' : pct >= 100 ? '#5BC68A' : '#F5A623';
-  const actColor = isPot || actualPartial ? '#9CA3AF' : actualVsPlanColor(actual, noPlan ? 0 : totalFilled);
+  const tip = (plan > 0 || needed > 0 || (hasAct && act > 0)) ? (
+    <>
+      <b className="text-[11px]">{title}</b>
+      {needed > 0 && <TipRow label="Needed" value={`${fmt(needed)} FTE`} />}
+      {plan > 0 ? (
+        <TipRow swatch={accent} label="Planned" value={`${fmt(plan)} FTE`} />
+      ) : (
+        hasAct && act > 0 && <TipRow swatch={accent} label="Planned" value="none" />
+      )}
+      {hasAct && (act > 0 || plan > 0) && (
+        <TipRow swatch="#34C98E" label="Actual" value={`${fmt(act)} FTE${actualPartial ? ' so far' : ''}`} />
+      )}
+      {delta && <TipRow label="Δ" value={delta} />}
+      {actualPartial && <div className="opacity-80">month in progress</div>}
+      {hasAct && act > 0 && plan <= 0 && <div className="opacity-80">unplanned work</div>}
+      {understaffed && <div className="text-[#FBA9B1]">understaffed: {fmt(needed - plan)} FTE open</div>}
+      {isPotential && <div className="opacity-80">potential — not committed</div>}
+    </>
+  ) : null;
 
   return (
-    <div className="w-[82px] shrink-0 flex flex-col items-center justify-center py-0.5" style={{ backgroundColor: bg }}>
-      <div className="flex items-center justify-center gap-1">
-        {pct == null ? (
-          <span className="text-[11px] font-mono text-text-light">—</span>
-        ) : (
-          <>
-            <span className="text-[11px] font-mono font-semibold" style={{ color }}>{pct}%</span>
-            {filledStr && <>
-              <span className="text-[9px]" style={{ color: isPot ? '#D1D5DB' : color + '60' }}>|</span>
-              <span className="text-[11px] font-mono" style={{ color: fteColor }}>{filledStr}</span>
-            </>}
-          </>
-        )}
-      </div>
-      {showActual && (
-        <div className="text-[9px] font-mono font-semibold leading-tight" style={{ color: actColor }}>
-          act {actual.toFixed(1)}
-        </div>
-      )}
-    </div>
+    <BulletCell
+      plan={plan}
+      act={hasAct ? act : null}
+      max={max}
+      accent={accent}
+      alert={understaffed}
+      inProgress={hasAct && actualPartial}
+      muted={isPotential}
+      labelAct={labelAct}
+      labelPlan={labelPlan}
+      tip={tip}
+    />
   );
 }
 
-// Pure presentational leaf — memoized (one per customer/project × month).
+// Presentational leaf — memoized (one per customer/project × month).
 export default memo(HeatmapCell);
