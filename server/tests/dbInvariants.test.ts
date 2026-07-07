@@ -5,7 +5,8 @@ import { getOneOnOne, createOneOnOne } from '../src/services/oneOnOne.service.js
 import { getLog } from '../src/services/log.service.js';
 import { createLog } from '../src/services/log.service.js';
 import { resourceService } from '../src/services/resource.service.js';
-import { NotFoundError, ConflictError } from '../src/utils/errors.js';
+import { integrationService } from '../src/services/integration.service.js';
+import { NotFoundError, ConflictError, BadRequestError } from '../src/utils/errors.js';
 
 // DB-backed invariant tests. They exercise the actual services against a real
 // Postgres, so they only run when DATABASE_URL is configured (CI provides a
@@ -83,5 +84,55 @@ describe.skipIf(!HAS_DB)('DB invariants', () => {
     // r2 has no history → deletes cleanly.
     const res3 = await prisma.resource.create({ data: { orgId, name: 'Person Three', capacity: 1 } });
     await expect(resourceService.delete(orgId, res3.id)).resolves.toBeTruthy();
+  });
+
+  it('work-item workType and customer/project mapping are mutually exclusive', async () => {
+    const customer = await prisma.customer.findFirstOrThrow({ where: { orgId } });
+    await integrationService.createWorkItem(orgId, {
+      kind: 'project', externalKey: 'WT-1', name: 'Some Jira project', customerId: customer.id,
+    });
+    const byKey = async (key: string) =>
+      prisma.jiraWorkItem.findFirstOrThrow({ where: { orgId, externalKey: key } });
+    let item = await byKey('WT-1');
+    expect(item.workType).toBe('client');
+
+    // Reclassifying as internal clears the customer mapping.
+    await integrationService.updateWorkItem(orgId, item.id, { workType: 'internal' });
+    item = await byKey('WT-1');
+    expect(item.workType).toBe('internal');
+    expect(item.customerId).toBeNull();
+
+    // An explicit customer alongside a non-client type is a contradiction.
+    await expect(
+      integrationService.updateWorkItem(orgId, item.id, { workType: 'absence', customerId: customer.id })
+    ).rejects.toBeInstanceOf(BadRequestError);
+    await expect(
+      integrationService.createWorkItem(orgId, {
+        kind: 'project', externalKey: 'WT-2', name: 'Bad combo', workType: 'absence', customerId: customer.id,
+      })
+    ).rejects.toBeInstanceOf(BadRequestError);
+
+    // Mapping it back to a customer flips it to client work again.
+    await integrationService.updateWorkItem(orgId, item.id, { workType: 'client', customerId: customer.id });
+    item = await byKey('WT-1');
+    expect(item.workType).toBe('client');
+    expect(item.customerId).toBe(customer.id);
+  });
+
+  it('absence worklogs are excluded from per-person actuals; internal ones count', async () => {
+    const mk = (id: string, workType: string, seconds: number) =>
+      prisma.worklog.create({
+        data: {
+          orgId, tempoWorklogId: `wt-test-${id}`, accountId: 'acc-x', resourceId: r1,
+          workType, workDate: '2026-02-10', month: '2026-02', seconds,
+        },
+      });
+    await mk('client', 'client', 2 * 3600);
+    await mk('internal', 'internal', 1 * 3600);
+    await mk('absence', 'absence', 8 * 3600);
+
+    const byResource = await integrationService.actualsByResource(orgId, '2026-02', '2026-02', null);
+    // 2h client + 1h internal; the 8h absence never counts as logged work.
+    expect(byResource[r1]?.['2026-02']).toBe(3);
   });
 });

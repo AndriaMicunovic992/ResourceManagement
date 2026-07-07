@@ -229,7 +229,7 @@ export const integrationService = {
 
     // Mapping lookups.
     const [workItems, mappedResources, projectRows] = await Promise.all([
-      prisma.jiraWorkItem.findMany({ where: { orgId }, select: { externalKey: true, customerId: true, projectId: true } }),
+      prisma.jiraWorkItem.findMany({ where: { orgId }, select: { externalKey: true, customerId: true, projectId: true, workType: true } }),
       prisma.resource.findMany({ where: { orgId, externalWorkId: { not: null } }, select: { id: true, externalWorkId: true } }),
       prisma.project.findMany({ where: { orgId }, select: { id: true, customerId: true } }),
     ]);
@@ -238,15 +238,20 @@ export const integrationService = {
     const customerByProject = new Map(projectRows.map((p) => [p.id, p.customerId]));
 
     // Resolve to our entity, most-specific (epic) first, then the Jira project.
-    const resolveEntity = (epicKey: string | null, projectKey: string | null): { customerId: string | null; projectId: string | null } => {
+    // Internal/absence buckets classify the hours without a customer/project.
+    const resolveEntity = (
+      epicKey: string | null,
+      projectKey: string | null
+    ): { customerId: string | null; projectId: string | null; workType: string } => {
       for (const key of [epicKey, projectKey]) {
         if (!key) continue;
         const wi = workItemByKey.get(key);
         if (!wi) continue;
-        if (wi.projectId) return { projectId: wi.projectId, customerId: customerByProject.get(wi.projectId) ?? null };
-        if (wi.customerId) return { projectId: null, customerId: wi.customerId };
+        if (wi.workType && wi.workType !== 'client') return { customerId: null, projectId: null, workType: wi.workType };
+        if (wi.projectId) return { projectId: wi.projectId, customerId: customerByProject.get(wi.projectId) ?? null, workType: 'client' };
+        if (wi.customerId) return { projectId: null, customerId: wi.customerId, workType: 'client' };
       }
-      return { customerId: null, projectId: null };
+      return { customerId: null, projectId: null, workType: 'client' };
     };
 
     let totalSeconds = 0;
@@ -264,8 +269,8 @@ export const integrationService = {
       else if (w.accountId) unmatchedAccounts.add(w.accountId);
 
       const ref = issueById.get(w.issueId) || null;
-      const { customerId, projectId } = resolveEntity(ref?.epicKey ?? null, ref?.projectKey ?? null);
-      if (customerId || projectId) mapped += 1;
+      const { customerId, projectId, workType } = resolveEntity(ref?.epicKey ?? null, ref?.projectKey ?? null);
+      if (customerId || projectId || workType !== 'client') mapped += 1;
       if (customerId) secondsByCustomer.set(customerId, (secondsByCustomer.get(customerId) || 0) + w.seconds);
       totalSeconds += w.seconds;
 
@@ -273,11 +278,11 @@ export const integrationService = {
         where: { orgId_tempoWorklogId: { orgId, tempoWorklogId: w.tempoWorklogId } },
         create: {
           orgId, tempoWorklogId: w.tempoWorklogId, accountId: w.accountId, resourceId,
-          customerId, projectId, jiraIssueKey: ref?.key ?? null, jiraEpicKey: ref?.epicKey ?? null,
+          customerId, projectId, workType, jiraIssueKey: ref?.key ?? null, jiraEpicKey: ref?.epicKey ?? null,
           workDate: w.date, month: (w.date || '').slice(0, 7), seconds: w.seconds, description: w.description,
         },
         update: {
-          accountId: w.accountId, resourceId, customerId, projectId,
+          accountId: w.accountId, resourceId, customerId, projectId, workType,
           jiraIssueKey: ref?.key ?? null, jiraEpicKey: ref?.epicKey ?? null,
           workDate: w.date, month: (w.date || '').slice(0, 7), seconds: w.seconds, description: w.description,
         },
@@ -369,10 +374,12 @@ export const integrationService = {
   /**
    * Actual hours per person per month over [fromMonth, toMonth]. Scoped to the
    * given resource ids (the caller's visible people); null = all (admin).
+   * Absence hours are excluded — time off is not logged work, and counting it
+   * would inflate a person's actual utilization. Internal hours count.
    * Returned as { [resourceId]: { [month]: hours } } for easy lookup.
    */
   async actualsByResource(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null) {
-    const where: any = { orgId, month: { gte: fromMonth, lte: toMonth } };
+    const where: any = { orgId, month: { gte: fromMonth, lte: toMonth }, workType: { not: 'absence' } };
     where.resourceId = visibleIds ? { in: visibleIds } : { not: null };
     const rows = await prisma.worklog.groupBy({
       by: ['resourceId', 'month'],
@@ -529,7 +536,7 @@ export const integrationService = {
       where: { orgId },
       orderBy: [{ kind: 'asc' }, { externalKey: 'asc' }],
       select: {
-        id: true, kind: true, externalKey: true, name: true, parentId: true,
+        id: true, kind: true, workType: true, externalKey: true, name: true, parentId: true,
         customerId: true, projectId: true,
         customer: { select: { id: true, name: true } },
         project: { select: { id: true, name: true } },
@@ -540,8 +547,14 @@ export const integrationService = {
 
   async createWorkItem(
     orgId: string,
-    data: { kind: string; externalKey: string; name: string; parentId?: string | null; customerId?: string | null; projectId?: string | null }
+    data: { kind: string; workType?: string; externalKey: string; name: string; parentId?: string | null; customerId?: string | null; projectId?: string | null }
   ) {
+    const workType = data.workType ?? 'client';
+    // Internal/absence items classify hours org-wide — a customer/project
+    // target alongside them is a contradiction.
+    if (workType !== 'client' && (data.customerId || data.projectId)) {
+      throw new BadRequestError('Internal/absence items cannot also map to a customer or project');
+    }
     await ensureCustomerOrProject(orgId, data.customerId, data.projectId);
     if (data.parentId) {
       const parent = await prisma.jiraWorkItem.findFirst({ where: { id: data.parentId, orgId }, select: { id: true } });
@@ -552,6 +565,7 @@ export const integrationService = {
         data: {
           orgId,
           kind: data.kind,
+          workType,
           externalKey: data.externalKey.trim(),
           name: data.name.trim(),
           parentId: data.parentId ?? null,
@@ -568,14 +582,27 @@ export const integrationService = {
   async updateWorkItem(
     orgId: string,
     id: string,
-    data: { kind?: string; externalKey?: string; name?: string; parentId?: string | null; customerId?: string | null; projectId?: string | null }
+    data: { kind?: string; workType?: string; externalKey?: string; name?: string; parentId?: string | null; customerId?: string | null; projectId?: string | null }
   ) {
     const item = await prisma.jiraWorkItem.findFirst({ where: { id, orgId } });
     if (!item) throw new NotFoundError('Work item not found');
 
-    // Resolve the effective mapping so "set both" is rejected even on partial updates.
-    const nextCustomer = data.customerId !== undefined ? data.customerId : item.customerId;
-    const nextProject = data.projectId !== undefined ? data.projectId : item.projectId;
+    // Resolve the effective state so the invariants hold on partial updates too:
+    // at most one of customer/project, and never a customer/project on an
+    // internal/absence bucket.
+    const nextWorkType = data.workType !== undefined ? data.workType : item.workType;
+    let nextCustomer = data.customerId !== undefined ? data.customerId : item.customerId;
+    let nextProject = data.projectId !== undefined ? data.projectId : item.projectId;
+    if (nextWorkType !== 'client') {
+      if (data.customerId || data.projectId) {
+        throw new BadRequestError('Internal/absence items cannot also map to a customer or project');
+      }
+      // Reclassifying clears any previous customer/project mapping.
+      nextCustomer = null;
+      nextProject = null;
+    }
+    // Assigning a customer/project makes it client work again.
+    const effectiveWorkType = nextCustomer || nextProject ? 'client' : nextWorkType;
     await ensureCustomerOrProject(orgId, nextCustomer, nextProject);
 
     if (data.parentId) await assertNoCycle(orgId, id, data.parentId);
@@ -585,11 +612,12 @@ export const integrationService = {
         where: { id },
         data: {
           kind: data.kind ?? undefined,
+          workType: effectiveWorkType,
           externalKey: data.externalKey?.trim() ?? undefined,
           name: data.name?.trim() ?? undefined,
           parentId: data.parentId !== undefined ? data.parentId : undefined,
-          customerId: data.customerId !== undefined ? data.customerId : undefined,
-          projectId: data.projectId !== undefined ? data.projectId : undefined,
+          customerId: nextCustomer,
+          projectId: nextProject,
         },
       });
     } catch (e) {

@@ -160,9 +160,16 @@ export default function IntegrationsSection() {
   const itemsForCustomer = (cId) => items.filter((i) => i.customerId === cId);
   const itemsForProject = (pId) => items.filter((i) => i.projectId === pId);
   // The entity a Jira item is currently mapped to (for the "→ owner" lock).
+  // Internal/absence buckets own their items the same way a customer does.
   const custName = useMemo(() => new Map(customers.map((c) => [c.id, c.name])), [customers]);
   const projName = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
-  const ownerName = (i) => (i.customerId ? custName.get(i.customerId) || 'a customer' : i.projectId ? projName.get(i.projectId) || 'a project' : null);
+  const ownerName = (i) => (
+    i.workType === 'internal' ? 'Internal work'
+      : i.workType === 'absence' ? 'Absences'
+        : i.customerId ? custName.get(i.customerId) || 'a customer'
+          : i.projectId ? projName.get(i.projectId) || 'a project'
+            : null
+  );
   const assign = (workItemId, target) => run(async () => {
     await api.updateJiraWorkItem(workItemId, { customerId: target.customerId ?? null, projectId: target.projectId ?? null });
     await loadRefs();
@@ -171,6 +178,18 @@ export default function IntegrationsSection() {
     await api.updateJiraWorkItem(workItemId, { customerId: null, projectId: null });
     await loadRefs();
   })();
+  // Classify a Jira item as internal work / absences (or back to unmapped
+  // client work). The server clears any customer/project mapping itself.
+  const setWorkType = (workItemId, workType) => run(async () => {
+    await api.updateJiraWorkItem(workItemId, { workType });
+    await loadRefs();
+  })();
+
+  // The two org-level buckets shown above the customer rows.
+  const WORK_BUCKETS = [
+    { key: 'internal', label: 'Internal work', hint: 'counts as worked time, no customer' },
+    { key: 'absence', label: 'Absences', hint: 'vacation & sick — excluded from actuals' },
+  ];
 
   const [expanded, setExpanded] = useState(() => new Set());
   const toggle = (id) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -334,13 +353,27 @@ export default function IntegrationsSection() {
       <div id="integrations-mapping" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
         <h3 className="text-sm font-bold text-text mb-1">Customer / project mapping</h3>
         <p className="text-[10px] text-text-light mb-3">
-          Pick one or more Jira projects/epics for each customer or project. A Jira project pulls in everything under it (epics &amp; issues); a customer covers all its projects. {items.length === 0 && <span className="text-warning">Refresh from Jira to load projects &amp; epics.</span>}
+          Pick one or more Jira projects/epics for each customer or project. A Jira project pulls in everything under it (epics &amp; issues); a customer covers all its projects. Jira projects that aren&apos;t client work go under <b>Internal work</b> or <b>Absences</b> — absence hours never count as logged work. {items.length === 0 && <span className="text-warning">Refresh from Jira to load projects &amp; epics.</span>}
         </p>
 
         <div className={`${COLS} text-[10px] font-semibold text-text-light uppercase tracking-wider px-2 pb-1 border-b border-border-light`}>
           <span>Customer / project</span><span>Jira mapping</span>
         </div>
         <div className="divide-y divide-border-light/60">
+          {WORK_BUCKETS.map(({ key, label, hint }) => {
+            const sel = new Set(items.filter((i) => i.workType === key).map((i) => i.id));
+            return (
+              <div key={key} className={`${COLS} items-center px-2 py-1.5 bg-[#FAFBFD]`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-4 shrink-0" />
+                  <span className="text-xs font-bold text-text-mid truncate">{label}</span>
+                  <span className="text-[9px] text-text-light shrink-0">{hint}</span>
+                </div>
+                <JiraMultiSelect items={items} selectedIds={sel} ownerName={ownerName}
+                  onToggle={(o, checked) => setWorkType(o.id, checked ? key : 'client')} />
+              </div>
+            );
+          })}
           {customers.map((c) => {
             const cProjects = projectsByCustomer[c.id] || [];
             const open = expanded.has(c.id);

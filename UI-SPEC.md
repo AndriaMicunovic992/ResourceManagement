@@ -94,7 +94,7 @@ Organization (tenant boundary)
 
 Seniority short forms (for compact display): `Junior→Jr`, `Medior→Mid`, `Senior→Sr`, `Senior Principal→SP`.
 
-**Integration models (actual hours).** `JiraConnection` (per-org Jira/Tempo config, **encrypted** tokens), `JiraAccount` (cached Jira users for the matching dropdown), `JiraWorkItem` (Jira epic/project → customer/project mapping), and `Worklog` (one synced Tempo entry → resolved `{ resourceId?, customerId?, projectId? }`, `month: "YYYY-MM"`, `seconds`). A person is "matched" once `Resource.externalWorkId` is set. See `CLAUDE.md` → *Data model notes* for the read endpoints.
+**Integration models (actual hours).** `JiraConnection` (per-org Jira/Tempo config, **encrypted** tokens), `JiraAccount` (cached Jira users for the matching dropdown), `JiraWorkItem` (Jira epic/project → customer/project mapping, or a `workType` classification: `client | internal | absence` — the mapping table has **Internal work** and **Absences** bucket rows; non-client items never carry a customer/project), and `Worklog` (one synced Tempo entry → resolved `{ resourceId?, customerId?, projectId?, workType }`, `month: "YYYY-MM"`, `seconds`). Absence hours are excluded from per-person actuals. A person is "matched" once `Resource.externalWorkId` is set. See `CLAUDE.md` → *Data model notes* for the read endpoints.
 
 ### Key Computed Values
 
