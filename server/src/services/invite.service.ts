@@ -1,5 +1,6 @@
 import { prisma } from '../db/prisma.js';
-import { ConflictError, NotFoundError } from '../utils/errors.js';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../utils/errors.js';
+import { roleService } from './role.service.js';
 
 /**
  * Invite-first provisioning. An admin invites an email to an org with a role;
@@ -8,6 +9,13 @@ import { ConflictError, NotFoundError } from '../utils/errors.js';
  */
 export const inviteService = {
   async create(orgId: string, email: string, role: string, invitedByUserId: string) {
+    // The invite's role becomes an OrgMember role verbatim on first sign-in, so
+    // enforce the same invariants as direct member writes: a real role key of
+    // this org, and never 'owner'.
+    if (role === 'owner') throw new ForbiddenError('There can only be one owner');
+    if (!(await roleService.exists(orgId, role))) {
+      throw new BadRequestError('Unknown role');
+    }
     const normalized = email.trim().toLowerCase();
 
     const existingUser = await prisma.user.findFirst({

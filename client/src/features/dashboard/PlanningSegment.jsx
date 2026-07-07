@@ -9,14 +9,17 @@ import TimeRangePicker from '../planner/toolbar/TimeRangePicker';
 import { currentMonth, addMonths, monthRange } from '../../lib/dateUtils';
 import { useOrg } from '../../contexts/OrgContext';
 import { useData } from '../../contexts/DataContext';
+import { useWindowActuals } from './useWindowActuals';
 
 // The month window Insights opens with, from the org's saved default (Settings →
 // Insights range). Same option set as the Performance-trend default, but as a
-// forward planning window of "YYYY-MM" months:
+// planning window of "YYYY-MM" months:
 //  - calendar_quarter / _half / _year: the current calendar period
 //  - custom: the fixed start/end months
-//  - rolling_months (default): N months from the current month (default 12 —
-//    the previous hardcoded value).
+//  - rolling_months (default): N months, reaching 3 months back so the
+//    planned-vs-actual comparison is visible without touching the range picker
+//    (windows under 6 months stay forward-looking — too short to give slots
+//    away to the past). Default 12.
 export function insightsDefaultRange(org) {
   const kind = org?.insightsDefaultKind || 'rolling_months';
   const cur = currentMonth(); // "YYYY-MM"
@@ -37,7 +40,10 @@ export function insightsDefaultRange(org) {
     return { start: org.insightsDefaultStart, end: org.insightsDefaultEnd };
   }
   const months = Math.min(120, Math.max(1, org?.insightsDefaultMonths ?? 12));
-  return { start: cur, end: addMonths(cur, months - 1) };
+  let start = months >= 6 ? addMonths(cur, -3) : cur;
+  // Respect the org's planning floor if one is set.
+  if (org?.minPlanningDate && start < org.minPlanningDate) start = org.minPlanningDate;
+  return { start, end: addMonths(start, months - 1) };
 }
 
 export default function PlanningSegment() {
@@ -60,10 +66,13 @@ export default function PlanningSegment() {
   const months = useMemo(() => monthRange(timeRange.start, timeRange.end), [timeRange]);
   const [includePotential, setIncludePotential] = useState(false);
   const [teamId, setTeamId] = useState('');
+  // Synced Tempo hours for the elapsed part of the window — the heatmaps and
+  // KPI row show them next to the plan so both are comparable at a glance.
+  const actuals = useWindowActuals(months);
 
   return (
     <>
-      <StatsCards months={months} includePotential={includePotential} teamId={teamId} />
+      <StatsCards months={months} includePotential={includePotential} teamId={teamId} actuals={actuals} />
       <div className="flex items-center justify-between mb-4">
         <DashboardTabs activeTab={activeTab} onChange={setActiveTab} />
         <div className="flex items-center gap-3">
@@ -92,8 +101,8 @@ export default function PlanningSegment() {
             minDate={currentOrg?.minPlanningDate} maxDate={currentOrg?.maxPlanningDate} />
         </div>
       </div>
-      {activeTab === 'clients' && <ClientHeatmap months={months} includePotential={includePotential} teamId={teamId} />}
-      {activeTab === 'resources' && <ResourceCapacity months={months} includePotential={includePotential} teamId={teamId} onResourceClick={(r) => navigate(`/people/${r.id}`)} />}
+      {activeTab === 'clients' && <ClientHeatmap months={months} includePotential={includePotential} teamId={teamId} actuals={actuals} />}
+      {activeTab === 'resources' && <ResourceCapacity months={months} includePotential={includePotential} teamId={teamId} actuals={actuals} onResourceClick={(r) => navigate(`/people/${r.id}`)} />}
       {activeTab === 'free' && <FreeCapacity months={months} includePotential={includePotential} teamId={teamId} />}
     </>
   );

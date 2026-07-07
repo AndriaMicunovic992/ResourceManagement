@@ -548,8 +548,8 @@ Accessible to owners and admins:
 - Organization name (editable)
 - Members list with role dropdowns (owners/admins can change member roles)
 - Remove member action
-- Invite new member by email (creates a pending invite with a role)
-- Pending invites list with resend/revoke actions
+- Add member by email (adds an existing account directly, or creates a pending invite with a role)
+- Pending invites list with revoke — and, when the Teams bot is configured, an **Invite over Teams** action per pending invite / not-yet-linked member (installs the databob app and DMs a sign-in link); the same action is offered right after adding someone
 
 ---
 
@@ -621,7 +621,7 @@ The app pulls **actual logged hours** from Tempo/Jira to compare against the pla
 - **Settings → Integrations.** Admins connect Jira/Tempo (tokens stored encrypted, never echoed back), map Jira projects/epics → customers/projects, and **match people**: each person's `externalWorkId` is set to their Jira `accountId` via a searchable dropdown. A nightly/manual sync pulls Tempo worklogs (by created/updated date so edits update in place, not duplicate) into per-month actual hours per person/customer/project.
 - **Planned vs actual chart** (`PlannedVsActualChart`): grouped monthly bars, planned (teal) vs actual (green). Planned FTE converts to hours via `MONTHLY_HOURS_PER_FTE` (≈173.33). It appears on the home dashboard utilization view and inside both cockpits, and runs a few months into the **future** so the plan ahead is visible.
 - **Dashboard utilization.** The actual line and the "Actual vs potential" KPI count **only matched people** (`externalWorkId` set), divided by *matched* capacity, so the rate isn't diluted by people not yet tracked. When no actuals are synced, the KPI falls back to realised-plan utilization.
-- **Insights heatmaps (Client Staffing, People Capacity) are plan-only** — actuals live on the cockpit charts, not the heatmaps.
+- **Insights heatmaps (Client Staffing, People Capacity) compare plan and actuals in place** — for elapsed months each cell shows a small **"act"** line under the planned value (logged Tempo hours as FTE / utilization %), colored against the plan: green ≈ on plan (85–115%), amber under, red over; an act value with no plan above it flags unplanned work. Rows with no synced hours get no act line, project rows only count hours mapped to that project (the customer row is authoritative), and the Client-Staffing act layer hides while a team filter is active (hours aren't team-attributable). An **"Actual vs plan"** KPI card summarises the elapsed window (logged hours ÷ realised planned hours over matched people).
 
 ### Cockpits (1:1 review & PM review)
 

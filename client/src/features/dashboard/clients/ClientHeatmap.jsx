@@ -3,9 +3,13 @@ import ClientHeatmapHeader from './ClientHeatmapHeader';
 import CustomerHeatmapRow from './CustomerHeatmapRow';
 import EmptyState from '../../../components/ui/EmptyState';
 import InfoDot from '../../../components/ui/InfoDot';
+import ActualsLegend from '../ActualsLegend';
 import { useData } from '../../../contexts/DataContext';
+import { currentMonth } from '../../../lib/dateUtils';
+import { hoursToFte } from '../../../lib/constants';
+import { actualVsPlanColor } from '../../../lib/statusUtils';
 
-export default function ClientHeatmap({ months, includePotential, teamId }) {
+export default function ClientHeatmap({ months, includePotential, teamId, actuals }) {
   const { customers, projects, needs, assignments, resources } = useData();
   const filtered = useMemo(() => {
     if (includePotential) return customers;
@@ -19,6 +23,9 @@ export default function ClientHeatmap({ months, includePotential, teamId }) {
     () => (teamId ? new Set(resources.filter((r) => (r.teams || []).some((t) => t.id === teamId)).map((r) => r.id)) : null),
     [resources, teamId]
   );
+
+  const cur = currentMonth();
+  const showActuals = !!actuals?.hasActuals && !teamId; // hours aren't team-attributable
 
   // Totals: sum filled FTE per month across all visible customers
   const totals = useMemo(() => {
@@ -46,6 +53,20 @@ export default function ClientHeatmap({ months, includePotential, teamId }) {
     return result;
   }, [filtered, months, needs, projects, assignments, includePotential, teamResourceIds]);
 
+  // Actual FTE logged per month, summed across the visible customers.
+  const actualTotals = useMemo(() => {
+    if (!showActuals) return {};
+    const byCustomer = actuals?.byCustomer || {};
+    const result = {};
+    for (const m of months) {
+      if (m > cur) continue;
+      let hours = 0;
+      for (const c of filtered) hours += byCustomer[c.id]?.[m] || 0;
+      result[m] = hoursToFte(hours);
+    }
+    return result;
+  }, [showActuals, actuals, filtered, months, cur]);
+
   if (filtered.length === 0) {
     return <EmptyState icon="🏢" message={includePotential ? 'No customers yet' : 'No realised customers'} />;
   }
@@ -54,20 +75,31 @@ export default function ClientHeatmap({ months, includePotential, teamId }) {
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
       <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">
         Client Staffing{' '}
-        <InfoDot text="Each cell = filled ÷ needed FTE for that customer/project that month (summed over its needs). The “Total FTE” footer sums filled assignment FTE across all shown needs per month. Realised-only unless Include potential is on." />
+        <InfoDot text="Each cell = filled ÷ needed FTE for that customer/project that month (summed over its needs), plus the filled FTE. For elapsed months, “act” underneath is the FTE actually logged in Tempo — green ≈ on plan (85–115%), amber under, red over; amber with no plan above it is unplanned work. Project rows only show hours mapped to that project, so the customer row is the authoritative total. Logged hours can’t be split by team, so the act layer hides while a team filter is on. Realised-only unless Include potential is on." />
+        {showActuals && <ActualsLegend />}
       </h3>
       <ClientHeatmapHeader months={months} />
       {filtered.map((c, i) => (
-        <CustomerHeatmapRow key={c.id} customer={c} index={i} months={months} includePotential={includePotential} teamResourceIds={teamResourceIds} />
+        <CustomerHeatmapRow key={c.id} customer={c} index={i} months={months} includePotential={includePotential}
+          teamResourceIds={teamResourceIds} actuals={showActuals ? actuals : null} />
       ))}
       {/* Totals row */}
       <div className="flex items-center border-t-2 border-border bg-primary-bg/30 sticky bottom-0">
         <div className="w-[270px] shrink-0 px-3 py-2">
           <span className="text-xs font-bold text-text">Total FTE</span>
+          {showActuals && <span className="block text-[9px] font-semibold text-text-light">plan / act</span>}
         </div>
         {months.map((m) => (
-          <div key={m} className="w-[82px] shrink-0 flex items-center justify-center text-[11px] font-mono font-bold text-primary">
-            {totals[m] > 0 ? totals[m].toFixed(1) : '—'}
+          <div key={m} className="w-[82px] shrink-0 flex flex-col items-center justify-center py-0.5">
+            <span className="text-[11px] font-mono font-bold text-primary">
+              {totals[m] > 0 ? totals[m].toFixed(1) : '—'}
+            </span>
+            {showActuals && m <= cur && (
+              <span className="text-[9px] font-mono font-semibold leading-tight"
+                style={{ color: m === cur ? '#9CA3AF' : actualVsPlanColor(actualTotals[m] || 0, totals[m]) }}>
+                act {(actualTotals[m] || 0).toFixed(1)}
+              </span>
+            )}
           </div>
         ))}
       </div>

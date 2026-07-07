@@ -4,11 +4,12 @@ import HeatmapCell from './HeatmapCell';
 import ProjectHeatmapRow from './ProjectHeatmapRow';
 import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
-import { ACCENT_COLORS } from '../../../lib/constants';
+import { ACCENT_COLORS, hoursToFte } from '../../../lib/constants';
+import { currentMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 
-export default function CustomerHeatmapRow({ customer, index, months, includePotential, teamResourceIds }) {
+export default function CustomerHeatmapRow({ customer, index, months, includePotential, teamResourceIds, actuals }) {
   const [expanded, setExpanded] = useState(false);
   const { projects, needs, assignments } = useData();
   const { canViewCustomer } = useVisibility();
@@ -53,6 +54,13 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
     return result;
   }, [custProjects, needs, assignments, months, includePotential, projects, teamResourceIds]);
 
+  // Actual FTE logged on this customer per elapsed month. Customers with no
+  // synced hours anywhere in the window get no act layer at all (they're
+  // likely just not mapped), rather than a misleading wall of zeros.
+  const cur = currentMonth();
+  const custActuals = actuals?.byCustomer?.[customer.id];
+  const custHasActuals = !!custActuals && Object.values(custActuals).some((h) => h > 0);
+
   return (
     <>
       <div className="flex items-center border-b border-border cursor-pointer hover:bg-primary-bg/30"
@@ -83,14 +91,16 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
         </div>
         {months.map((m) => {
           const d = staffingByMonth[m];
+          const actual = custHasActuals && m <= cur ? hoursToFte(custActuals[m] || 0) : null;
           return (
             <HeatmapCell key={m} value={d.ratio} totalNeeded={d.totalNeeded} totalFilled={d.totalFilled}
-              isPotential={d.isPotential && includePotential} />
+              isPotential={d.isPotential && includePotential} actual={actual} actualPartial={m === cur} />
           );
         })}
       </div>
       {expanded && custProjects.map((p) => (
-        <ProjectHeatmapRow key={p.id} project={p} customer={customer} months={months} includePotential={includePotential} teamResourceIds={teamResourceIds} />
+        <ProjectHeatmapRow key={p.id} project={p} customer={customer} months={months} includePotential={includePotential}
+          teamResourceIds={teamResourceIds} actuals={actuals} />
       ))}
     </>
   );

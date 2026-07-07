@@ -142,6 +142,7 @@ export const api = {
   getActualHours: (customerId, month) => apiFetch(`/integration/tempo/actuals?customerId=${encodeURIComponent(customerId)}&month=${encodeURIComponent(month)}`),
   getMonthlyActuals: (from, to) => apiFetch(`/integration/tempo/actuals/monthly?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getMonthlyActualsByCustomer: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-by-customer?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  getMonthlyActualsByProject: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-by-project?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getResourceActualsByCustomer: (resourceId, from, to) => apiFetch(`/integration/tempo/actuals/resource-by-customer?resourceId=${encodeURIComponent(resourceId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getCustomerActualsByResource: (customerId, from, to) => apiFetch(`/integration/tempo/actuals/customer-by-resource?customerId=${encodeURIComponent(customerId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getJiraWorkItems: () => apiFetch('/integration/jira/work-items'),

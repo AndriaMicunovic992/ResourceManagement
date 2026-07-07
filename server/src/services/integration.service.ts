@@ -409,6 +409,29 @@ export const integrationService = {
   },
 
   /**
+   * Actual hours per project per month over [fromMonth, toMonth], scoped to the
+   * given project ids (caller's visible projects); null = all (admin). Only
+   * worklogs whose mapping resolves to a project appear here — the per-customer
+   * aggregation is the authoritative total.
+   * Returned as { [projectId]: { [month]: hours } }.
+   */
+  async actualsByProject(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null) {
+    const where: any = { orgId, month: { gte: fromMonth, lte: toMonth }, projectId: { not: null } };
+    if (visibleIds) where.projectId = { in: visibleIds };
+    const rows = await prisma.worklog.groupBy({
+      by: ['projectId', 'month'],
+      where,
+      _sum: { seconds: true },
+    });
+    const out: Record<string, Record<string, number>> = {};
+    for (const r of rows) {
+      if (!r.projectId) continue;
+      (out[r.projectId] = out[r.projectId] || {})[r.month] = Math.round(((r._sum.seconds || 0) / 3600) * 10) / 10;
+    }
+    return out;
+  },
+
+  /**
    * Actual hours for one person, broken down by customer + month. Feeds the
    * 1:1 cockpit chart when a project (→ customer) is focused.
    * Returned as { [customerId]: { [month]: hours } }.

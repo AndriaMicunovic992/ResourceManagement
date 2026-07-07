@@ -10,9 +10,11 @@ function isValidTimeZone(tz: string): boolean {
   }
 }
 
-// Admins may grant admin/member/viewer — never owner. This is what prevents an
-// admin from minting another owner via the member endpoints.
-export const ROLE_VALUES = ['admin', 'member', 'viewer'] as const;
+// A member/invite role is any role key defined in the org — system or custom —
+// so it's a plain string here. The services enforce the real invariants:
+// the key must exist in the org (roleService.exists) and can never be 'owner',
+// which is what prevents an admin from minting another owner.
+const roleKey = z.string().min(1).max(50);
 
 export const createOrgSchema = z.object({
   name: z.string().min(1).max(100),
@@ -65,16 +67,16 @@ export const updateOrgSchema = z
 
 export const addMemberSchema = z.object({
   email: z.string().email(),
-  role: z.enum(ROLE_VALUES).optional(),
+  role: roleKey.optional(),
 });
 
 export const updateMemberRoleSchema = z.object({
-  role: z.enum(ROLE_VALUES),
+  role: roleKey,
 });
 
 export const inviteSchema = z.object({
   email: z.string().email(),
-  role: z.enum(ROLE_VALUES).optional(),
+  role: roleKey.optional(),
 });
 
 export type UpdateOrgInput = z.infer<typeof updateOrgSchema>;

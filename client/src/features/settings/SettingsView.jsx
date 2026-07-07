@@ -31,7 +31,14 @@ export default function SettingsView() {
   );
   const [email, setEmail] = useState('');
   const [newRole, setNewRole] = useState('member');
-  const [teamsInviting, setTeamsInviting] = useState(false);
+  // Which row's "Invite over Teams" is in flight (invite id / member id /
+  // 'last-added'), and whether the org's Teams bot is configured at all —
+  // without a bot the option is pointless, so it stays hidden.
+  const [teamsInvitingKey, setTeamsInvitingKey] = useState(null);
+  const [teamsConfigured, setTeamsConfigured] = useState(false);
+  // The person the admin just added — the notice offers the Teams invite as
+  // the natural next step.
+  const [lastAdded, setLastAdded] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState('account');
@@ -251,6 +258,10 @@ export default function SettingsView() {
   useEffect(() => { loadMembers(); }, [loadMembers]);
   useEffect(() => { if (isAdmin) loadInvites(); }, [isAdmin, loadInvites]);
   useEffect(() => { api.getAuthConfig().then(setAuthConfig).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.getTeamsConnection().then((c) => setTeamsConfigured(!!c?.configured)).catch(() => {});
+  }, [isAdmin]);
 
   const handleConnectMicrosoft = async () => {
     setAccountError('');
@@ -267,17 +278,20 @@ export default function SettingsView() {
     if (!email.trim()) return;
     setError('');
     setMemberNotice('');
+    setLastAdded(null);
     setLoading(true);
     try {
       const res = await api.addMember(email.trim(), newRole);
       setEmail('');
       setNewRole('member');
       // The server adds existing accounts directly, but invites unknown emails —
-      // tell the admin which happened.
+      // tell the admin which happened, and offer the Teams ping as the next step.
       if (res && res.type === 'invited') {
         setMemberNotice(`Invitation created for ${res.invite.email}. They'll get access the first time they sign in.`);
+        setLastAdded({ email: res.invite.email, role: res.invite.role, name: res.invite.email });
       } else if (res && res.member) {
         setMemberNotice(`${res.member.user.name} added to the organization.`);
+        setLastAdded({ email: res.member.user.email, role: res.member.role, name: res.member.user.name });
       }
       await loadMembers();
       await loadInvites();
@@ -287,29 +301,28 @@ export default function SettingsView() {
     setLoading(false);
   };
 
-  // Onboard over Teams: create the invite AND ping the person in Teams with a
-  // sign-in link (installs the databob app for them). Microsoft tenant only.
-  const handleTeamsInvite = async () => {
-    if (!email.trim()) { setError('Enter an email first'); return; }
+  // Follow-up to adding someone: ping them over Teams — install the databob app
+  // for them via Graph and DM a sign-in link. Microsoft tenant only. `key`
+  // identifies which row's button is in flight.
+  const handleTeamsInvite = async (targetEmail, targetRole, key) => {
     setError('');
     setMemberNotice('');
-    setTeamsInviting(true);
+    setTeamsInvitingKey(key);
     try {
-      const r = await api.inviteTeams(email.trim(), newRole);
-      const who = r.microsoftName || email.trim();
+      const r = await api.inviteTeams(targetEmail, targetRole || 'member');
+      const who = r.microsoftName || targetEmail;
       const lead = r.status === 'already_member' ? `${who} is already a member` : `Invited ${who}`;
       const app = r.installed === 'installed' ? 'installed the databob app' : 'app already installed';
       const dm = r.welcomed
         ? 'and DMed them a sign-in link'
         : 'the Teams welcome will arrive once Teams finishes provisioning';
       setMemberNotice(`${lead}, ${app}, ${dm}.`);
-      setEmail('');
-      setNewRole('member');
+      setLastAdded(null);
       await loadInvites();
     } catch (err) {
       setError(err.message || 'Could not invite over Teams');
     }
-    setTeamsInviting(false);
+    setTeamsInvitingKey(null);
   };
 
   const handleViewAs = async (userId) => {
@@ -740,7 +753,7 @@ export default function SettingsView() {
         <div id="insights-range" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Insights default range</h3>
           <p className="text-[10px] text-text-light mb-3">
-            The month window the Insights → Planning tab opens with. Choose a rolling window (N months from the current month), a calendar-aligned period, or a fixed range. Anyone can still change it on the page.
+            The month window the Insights → Planning tab opens with. Choose a rolling window (N months starting 3 months back, so recent actuals stay comparable next to the plan ahead), a calendar-aligned period, or a fixed range. Anyone can still change it on the page.
           </p>
           <div className="flex gap-3 items-end flex-wrap">
             <div className="flex-1 min-w-[180px] max-w-[240px]">
@@ -1103,7 +1116,20 @@ export default function SettingsView() {
           <div className="text-xs text-danger bg-danger-bg p-2 rounded mb-3">{error}</div>
         )}
         {memberNotice && (
-          <div className="text-xs text-primary bg-primary-light p-2 rounded mb-3">{memberNotice}</div>
+          <div className="text-xs text-primary bg-primary-light p-2 rounded mb-3 flex items-center gap-2 flex-wrap">
+            <span>{memberNotice}</span>
+            {teamsConfigured && lastAdded && (
+              <button
+                type="button"
+                onClick={() => handleTeamsInvite(lastAdded.email, lastAdded.role, 'last-added')}
+                disabled={teamsInvitingKey != null}
+                title="Install the databob app for them and DM a sign-in link over Teams (Microsoft tenant only)"
+                className="text-[11px] font-bold text-white bg-primary border-0 rounded-lg px-2.5 py-1 cursor-pointer hover:bg-primary/90 disabled:opacity-50 whitespace-nowrap"
+              >
+                {teamsInvitingKey === 'last-added' ? 'Inviting…' : `Invite ${lastAdded.name} over Teams →`}
+              </button>
+            )}
+          </div>
         )}
 
         {/* Member list */}
@@ -1129,6 +1155,16 @@ export default function SettingsView() {
                 </select>
               ) : (
                 <span className="text-[10px] text-text-light capitalize">{m.role}</span>
+              )}
+              {isAdmin && teamsConfigured && !m.user.microsoftLinked && m.user.id !== user?.id && m.role !== 'owner' && (
+                <button
+                  onClick={() => handleTeamsInvite(m.user.email, m.role, m.id)}
+                  disabled={teamsInvitingKey != null}
+                  className="text-[10px] text-primary bg-transparent border-0 cursor-pointer hover:text-primary/80 px-1 disabled:opacity-50"
+                  title="They haven't signed in with Microsoft yet — install the databob app for them and DM a sign-in link over Teams"
+                >
+                  {teamsInvitingKey === m.id ? 'Inviting…' : 'Invite over Teams'}
+                </button>
               )}
               {isAdmin && m.user.id !== user?.id && (
                 <button
@@ -1165,6 +1201,16 @@ export default function SettingsView() {
                     <div className="text-xs font-semibold text-text truncate">{inv.email}</div>
                     <div className="text-[10px] text-text-light">Invited as {inv.role} — awaiting first sign-in</div>
                   </div>
+                  {teamsConfigured && (
+                    <button
+                      onClick={() => handleTeamsInvite(inv.email, inv.role, inv.id)}
+                      disabled={teamsInvitingKey != null}
+                      className="text-[10px] font-semibold text-primary bg-transparent border-0 cursor-pointer hover:text-primary/80 px-1 disabled:opacity-50"
+                      title="Install the databob app for them and DM a sign-in link over Teams (Microsoft tenant only)"
+                    >
+                      {teamsInvitingKey === inv.id ? 'Inviting…' : 'Invite over Teams'}
+                    </button>
+                  )}
                   <button
                     onClick={() => handleRevokeInvite(inv.id)}
                     className="text-[10px] text-danger bg-transparent border-0 cursor-pointer hover:text-danger/80 px-1"
@@ -1199,23 +1245,19 @@ export default function SettingsView() {
                 ))}
               </select>
             </div>
-            <button
-              type="button" onClick={handleTeamsInvite} disabled={teamsInviting || loading}
-              title="Create the invite, install the databob app for them, and DM a sign-in link over Teams (Microsoft tenant only)"
-              className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50 whitespace-nowrap"
-            >
-              {teamsInviting ? 'Inviting…' : 'Invite over Teams'}
-            </button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || teamsInvitingKey != null}>
               {loading ? 'Adding...' : 'Add'}
             </Button>
           </form>
         )}
         {isAdmin && (
           <p className="text-[10px] text-text-light mt-2">
-            <b>Add</b> creates the invite (they get access on first Microsoft sign-in).
-            <b> Invite over Teams</b> also installs the databob app for them and sends a
-            sign-in link as a Teams DM — for people in your Microsoft tenant.
+            <b>Add</b> puts an existing account straight into the organization, or creates a
+            pending invite for a new email (they get access on first sign-in).
+            {teamsConfigured && (
+              <> Then use <b>Invite over Teams</b> next to the person to install the databob
+              app for them and DM a sign-in link — for people in your Microsoft tenant.</>
+            )}
           </p>
         )}
       </div>

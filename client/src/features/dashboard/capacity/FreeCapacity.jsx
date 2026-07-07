@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { formatMonth } from '../../../lib/dateUtils';
+import { formatMonth, currentMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { domainColor, seniorityShort } from '../../../lib/taxonomy';
@@ -127,7 +127,7 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
         </div>
         {months.map((m) => (
           <div key={m} className="w-[82px] shrink-0 text-center text-[10px] font-mono font-bold text-primary py-2">
-            {formatMonth(m)}
+            <span className={m === currentMonth() ? 'bg-primary-light rounded-md px-1.5 py-0.5' : ''}>{formatMonth(m)}</span>
           </div>
         ))}
       </div>
