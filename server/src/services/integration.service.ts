@@ -395,6 +395,32 @@ export const integrationService = {
   },
 
   /**
+   * Actual hours per person per month per work type over [fromMonth, toMonth] —
+   * the un-filtered companion to actualsByResource. Feeds the People-capacity
+   * heatmap's stacked client/internal bar, its work-type filter, and the
+   * per-person drill-down's Internal/Absence bucket rows. Scoped like
+   * actualsByResource; null = all (admin).
+   * Returned as { [resourceId]: { [month]: { [workType]: hours } } }.
+   */
+  async actualsByResourceType(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null) {
+    const where: any = { orgId, month: { gte: fromMonth, lte: toMonth } };
+    where.resourceId = visibleIds ? { in: visibleIds } : { not: null };
+    const rows = await prisma.worklog.groupBy({
+      by: ['resourceId', 'month', 'workType'],
+      where,
+      _sum: { seconds: true },
+    });
+    const out: Record<string, Record<string, Record<string, number>>> = {};
+    for (const r of rows) {
+      if (!r.resourceId) continue;
+      const months = (out[r.resourceId] = out[r.resourceId] || {});
+      const types = (months[r.month] = months[r.month] || {});
+      types[r.workType || 'client'] = Math.round(((r._sum.seconds || 0) / 3600) * 10) / 10;
+    }
+    return out;
+  },
+
+  /**
    * Actual hours per customer per month over [fromMonth, toMonth], scoped to the
    * given customer ids (caller's visible customers); null = all (admin).
    * Returned as { [customerId]: { [month]: hours } }.

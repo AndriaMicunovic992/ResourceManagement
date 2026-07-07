@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { currentMonth } from '../../lib/dateUtils';
 
-const EMPTY = { byResource: {}, byCustomer: {}, byProject: {} };
+const EMPTY = { byResource: {}, byResourceType: {}, byCustomer: {}, byProject: {} };
 
 /**
- * Synced Tempo actuals for the Insights window, keyed three ways:
- * byResource / byCustomer / byProject → { [id]: { "YYYY-MM": hours } }.
+ * Synced Tempo actuals for the Insights window, keyed four ways:
+ *  byResource      { [resourceId]: { "YYYY-MM": hours } }   — worked time (absences excluded server-side)
+ *  byResourceType  { [resourceId]: { "YYYY-MM": { client|internal|absence: hours } } } — unfiltered
+ *  byCustomer / byProject — client-work hours per entity.
  * Worklogs only exist up to the current month, so the fetch is clamped there —
  * a window entirely in the future skips the requests. `hasActuals` is true when
  * any hours came back; without it the heatmaps hide their actual layer.
@@ -26,10 +28,18 @@ export function useWindowActuals(months) {
     let dead = false;
     Promise.all([
       api.getMonthlyActuals(from, to).catch(() => ({})),
+      api.getMonthlyActualsByType(from, to).catch(() => ({})),
       api.getMonthlyActualsByCustomer(from, to).catch(() => ({})),
       api.getMonthlyActualsByProject(from, to).catch(() => ({})),
-    ]).then(([byResource, byCustomer, byProject]) => {
-      if (!dead) setData({ byResource: byResource || {}, byCustomer: byCustomer || {}, byProject: byProject || {} });
+    ]).then(([byResource, byResourceType, byCustomer, byProject]) => {
+      if (!dead) {
+        setData({
+          byResource: byResource || {},
+          byResourceType: byResourceType || {},
+          byCustomer: byCustomer || {},
+          byProject: byProject || {},
+        });
+      }
     });
     return () => { dead = true; };
   }, [from, to]);
@@ -42,5 +52,5 @@ export function useWindowActuals(months) {
     [data]
   );
 
-  return { ...data, hasActuals };
+  return { ...data, hasActuals, window: { from, to } };
 }

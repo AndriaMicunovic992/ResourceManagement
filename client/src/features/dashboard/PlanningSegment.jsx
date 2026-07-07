@@ -66,6 +66,9 @@ export default function PlanningSegment() {
   const months = useMemo(() => monthRange(timeRange.start, timeRange.end), [timeRange]);
   const [includePotential, setIncludePotential] = useState(false);
   const [teamId, setTeamId] = useState('');
+  // Which logged hours the People-capacity actual layer shows: worked time
+  // (client + internal, the default), a single work type, or absences.
+  const [workTypeFilter, setWorkTypeFilter] = useState('work');
   // Synced Tempo hours for the elapsed part of the window — the heatmaps and
   // KPI row show them next to the plan so both are comparable at a glance.
   const actuals = useWindowActuals(months);
@@ -76,6 +79,19 @@ export default function PlanningSegment() {
       <div className="flex items-center justify-between mb-4">
         <DashboardTabs activeTab={activeTab} onChange={setActiveTab} />
         <div className="flex items-center gap-3">
+          {activeTab === 'resources' && actuals.hasActuals && (
+            <select
+              value={workTypeFilter}
+              onChange={(e) => setWorkTypeFilter(e.target.value)}
+              title="Which logged hours the actual bar shows"
+              className="px-3 py-1.5 rounded-lg text-[11px] font-semibold border border-border bg-white text-text-mid outline-none focus:border-primary cursor-pointer"
+            >
+              <option value="work">Hours: all work</option>
+              <option value="client">Hours: client only</option>
+              <option value="internal">Hours: internal only</option>
+              <option value="absence">Hours: absences</option>
+            </select>
+          )}
           {teams.length > 0 && (
             <select
               value={teamId}
@@ -102,7 +118,7 @@ export default function PlanningSegment() {
         </div>
       </div>
       {activeTab === 'clients' && <ClientHeatmap months={months} includePotential={includePotential} teamId={teamId} actuals={actuals} />}
-      {activeTab === 'resources' && <ResourceCapacity months={months} includePotential={includePotential} teamId={teamId} actuals={actuals} onResourceClick={(r) => navigate(`/people/${r.id}`)} />}
+      {activeTab === 'resources' && <ResourceCapacity months={months} includePotential={includePotential} teamId={teamId} actuals={actuals} workTypeFilter={workTypeFilter} onResourceClick={(r) => navigate(`/people/${r.id}`)} />}
       {activeTab === 'free' && <FreeCapacity months={months} includePotential={includePotential} teamId={teamId} />}
     </>
   );

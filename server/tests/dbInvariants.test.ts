@@ -134,5 +134,10 @@ describe.skipIf(!HAS_DB)('DB invariants', () => {
     const byResource = await integrationService.actualsByResource(orgId, '2026-02', '2026-02', null);
     // 2h client + 1h internal; the 8h absence never counts as logged work.
     expect(byResource[r1]?.['2026-02']).toBe(3);
+
+    // The unfiltered per-type companion returns the full breakdown — it feeds
+    // the stacked bar, the work-type filter and the drill-down buckets.
+    const byType = await integrationService.actualsByResourceType(orgId, '2026-02', '2026-02', null);
+    expect(byType[r1]?.['2026-02']).toEqual({ client: 2, internal: 1, absence: 8 });
   });
 });
