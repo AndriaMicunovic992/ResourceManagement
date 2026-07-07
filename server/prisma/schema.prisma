@@ -868,6 +868,11 @@ model JiraWorkItem {
   parentId    String?
   parent      JiraWorkItem?  @relation("JiraWorkItemTree", fields: [parentId], references: [id], onDelete: SetNull)
   children    JiraWorkItem[] @relation("JiraWorkItemTree")
+  // What hours logged under this item mean: client work (mapped to a
+  // customer/project below), internal work, or absences (vacation/sick
+  // tracking). Non-client items are org-level buckets and never carry a
+  // customer/project (enforced in the service).
+  workType    String   @default("client") // client | internal | absence
   // Maps to at most one of our entities (enforced in the service).
   customerId  String?
   customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -919,6 +924,10 @@ model Worklog {
   project        Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   jiraIssueKey   String?
   jiraEpicKey    String?
+  // Copied from the resolving JiraWorkItem at sync time. Absence hours are
+  // excluded from utilization actuals; internal hours count as worked time
+  // but never roll into a customer.
+  workType       String   @default("client") // client | internal | absence
   workDate       String   // "YYYY-MM-DD"
   month          String   // "YYYY-MM"
   seconds        Int

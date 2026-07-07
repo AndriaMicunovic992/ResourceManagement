@@ -32,9 +32,13 @@ export const saveTeamsConnectionSchema = z.object({
 });
 
 const kind = z.enum(['project', 'epic', 'issue', 'other']);
+// What hours under this item mean — client work (maps to a customer/project),
+// internal work, or absences. Non-client items never carry a customer/project.
+const workType = z.enum(['client', 'internal', 'absence']);
 
 export const createWorkItemSchema = z.object({
   kind: kind.default('project'),
+  workType: workType.optional(),
   externalKey: z.string().min(1).max(100),
   name: z.string().min(1).max(200),
   parentId: z.string().nullable().optional(),
@@ -44,6 +48,7 @@ export const createWorkItemSchema = z.object({
 
 export const updateWorkItemSchema = z.object({
   kind: kind.optional(),
+  workType: workType.optional(),
   externalKey: z.string().min(1).max(100).optional(),
   name: z.string().min(1).max(200).optional(),
   parentId: z.string().nullable().optional(),
