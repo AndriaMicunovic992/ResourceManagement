@@ -14,6 +14,19 @@ export function utilBg(pct) {
   return 'transparent';
 }
 
+// Color for an actual value displayed against its plan: green when roughly on
+// plan (85–115%), amber when meaningfully under, red when meaningfully over
+// (burning more than planned). Actuals with no plan behind them are amber —
+// unplanned work worth noticing.
+export function actualVsPlanColor(actual, planned) {
+  if (actual == null) return '#A0BCC9';
+  if (!planned || planned <= 0) return actual > 0 ? '#F5A623' : '#A0BCC9';
+  const ratio = actual / planned;
+  if (ratio > 1.15) return '#E8636F';
+  if (ratio < 0.85) return '#F5A623';
+  return '#5BC68A';
+}
+
 // Color helpers for 1-5 evaluation scores.
 export function scoreColor(score) {
   if (score == null) return '#A0BCC9';

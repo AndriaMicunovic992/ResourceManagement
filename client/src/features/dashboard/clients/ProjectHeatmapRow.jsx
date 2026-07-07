@@ -2,11 +2,12 @@ import HeatmapCell from './HeatmapCell';
 import AssignedTeamChips from './AssignedTeamChips';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { isProjectOk } from '../../../lib/gridUtils';
-import { formatMonth, monthRange } from '../../../lib/dateUtils';
+import { formatMonth, monthRange, currentMonth } from '../../../lib/dateUtils';
+import { hoursToFte } from '../../../lib/constants';
 import { useData } from '../../../contexts/DataContext';
 import { useMemo } from 'react';
 
-export default function ProjectHeatmapRow({ project, customer, months, includePotential, teamResourceIds }) {
+export default function ProjectHeatmapRow({ project, customer, months, includePotential, teamResourceIds, actuals }) {
   const { needs, assignments, members } = useData();
   const ok = useMemo(() => isProjectOk(project, needs, assignments), [project, needs, assignments]);
   const isPotentialProject = customer.status === 'potential' || project.status === 'potential';
@@ -45,6 +46,13 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
     return result;
   }, [project, needs, assignments, months, projMonths, isPotentialProject, includePotential, teamResourceIds]);
 
+  // Hours mapped to this specific project (epic → project mappings). A project
+  // with no mapped hours in the window gets no act layer — its work may still
+  // be counted at the customer level.
+  const cur = currentMonth();
+  const projActuals = actuals?.byProject?.[project.id];
+  const projHasActuals = !!projActuals && Object.values(projActuals).some((h) => h > 0);
+
   return (
     <div className="flex items-center border-b border-border-light" style={{ opacity: isPotentialProject ? 0.75 : 1 }}>
       <div className="w-[270px] shrink-0 pl-9 py-2 pr-3">
@@ -55,15 +63,20 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
           <StatusBadge status={project.status} small />
         </div>
         <div className="text-[9px] font-mono text-text-light mt-0.5">
-          {formatMonth(project.startMonth)}{'\u2192'}{formatMonth(project.endMonth)}
+          {formatMonth(project.startMonth)}{'→'}{formatMonth(project.endMonth)}
         </div>
         <AssignedTeamChips projectId={project.id} />
       </div>
       {months.map((m) => {
         const d = staffingByMonth[m];
+        const inProject = projMonths.includes(m);
+        // Off-window actuals still render: hours logged outside the project's
+        // planned months are exactly the kind of drift this view is for.
+        const actual = projHasActuals && m <= cur ? hoursToFte(projActuals[m] || 0) : null;
         return (
           <HeatmapCell key={m} value={d.ratio} totalNeeded={d.totalNeeded} totalFilled={d.totalFilled}
-            isPotential={d.isPotential && includePotential} showDash={!projMonths.includes(m)} />
+            isPotential={d.isPotential && includePotential} showDash={!inProject}
+            actual={actual} actualPartial={m === cur} />
         );
       })}
     </div>

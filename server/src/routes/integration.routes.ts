@@ -98,6 +98,18 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.actualsByCustomer(req.orgId, from, to, visibleIds);
   });
 
+  // Actual hours per project per month — scoped to visible projects. Feeds the
+  // client-staffing heatmap's expanded project rows.
+  app.get('/integration/tempo/actuals/monthly-by-project', async (req) => {
+    const q = req.query as { from?: string; to?: string };
+    const cur = new Date().toISOString().slice(0, 7);
+    const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
+    const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
+    const v = req.visibility;
+    const visibleIds = v.isAdmin ? null : [...v.visibleProjectIds];
+    return integrationService.actualsByProject(req.orgId, from, to, visibleIds);
+  });
+
   // Actual hours for one person, broken down by customer + month. Feeds the
   // 1:1 cockpit chart when a project (→ customer) is focused.
   app.get('/integration/tempo/actuals/resource-by-customer', async (req) => {

@@ -75,11 +75,17 @@ export const orgService = {
   // --- Member management ---
 
   async listMembers(orgId: string) {
-    return prisma.orgMember.findMany({
+    const members = await prisma.orgMember.findMany({
       where: { orgId },
-      include: { user: { select: { id: true, email: true, name: true, avatar: true } } },
+      include: { user: { select: { id: true, email: true, name: true, avatar: true, microsoftId: true } } },
       orderBy: { user: { name: 'asc' } },
     });
+    // Expose only whether a Microsoft account is linked (the UI uses it to offer
+    // the Teams onboarding ping), never the Entra object id itself.
+    return members.map(({ user: { microsoftId, ...user }, ...m }) => ({
+      ...m,
+      user: { ...user, microsoftLinked: !!microsoftId },
+    }));
   },
 
   /**
