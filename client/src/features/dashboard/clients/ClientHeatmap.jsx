@@ -7,7 +7,6 @@ import ActualsLegend from '../ActualsLegend';
 import { useData } from '../../../contexts/DataContext';
 import { currentMonth } from '../../../lib/dateUtils';
 import { hoursToFte } from '../../../lib/constants';
-import { actualVsPlanColor } from '../../../lib/statusUtils';
 
 export default function ClientHeatmap({ months, includePotential, teamId, actuals }) {
   const { customers, projects, needs, assignments, resources } = useData();
@@ -75,8 +74,8 @@ export default function ClientHeatmap({ months, includePotential, teamId, actual
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
       <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">
         Client Staffing{' '}
-        <InfoDot text="Each cell = filled ÷ needed FTE for that customer/project that month (summed over its needs), plus the filled FTE. For elapsed months, “act” underneath is the FTE actually logged in Tempo — green ≈ on plan (85–115%), amber under, red over; amber with no plan above it is unplanned work. Project rows only show hours mapped to that project, so the customer row is the authoritative total. Logged hours can’t be split by team, so the act layer hides while a team filter is on. Realised-only unless Include potential is on." />
-        {showActuals && <ActualsLegend />}
+        <InfoDot text="Each month is a small bullet: the soft track is the planned (filled) FTE with a tick at its target, the solid bar is the FTE actually logged in Tempo, and the label underneath reads actual/planned. A red tick means the month is understaffed (planned < needed); an amber bar over a dashed baseline is unplanned work; a grey bar is the current month, still being logged. Bar lengths compare within a row. Project rows only show hours mapped to that project, so the customer row is the authoritative total. Logged hours can’t be split by team, so the actual layer hides while a team filter is on. Realised-only unless Include potential is on." />
+        <ActualsLegend showAct={showActuals} />
       </h3>
       <ClientHeatmapHeader months={months} />
       {filtered.map((c, i) => (
@@ -96,7 +95,7 @@ export default function ClientHeatmap({ months, includePotential, teamId, actual
             </span>
             {showActuals && m <= cur && (
               <span className="text-[9px] font-mono font-semibold leading-tight"
-                style={{ color: m === cur ? '#9CA3AF' : actualVsPlanColor(actualTotals[m] || 0, totals[m]) }}>
+                style={{ color: m === cur ? '#9CA3AF' : '#34C98E' }}>
                 act {(actualTotals[m] || 0).toFixed(1)}
               </span>
             )}

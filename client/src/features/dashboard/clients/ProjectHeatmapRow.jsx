@@ -7,7 +7,7 @@ import { hoursToFte } from '../../../lib/constants';
 import { useData } from '../../../contexts/DataContext';
 import { useMemo } from 'react';
 
-export default function ProjectHeatmapRow({ project, customer, months, includePotential, teamResourceIds, actuals }) {
+export default function ProjectHeatmapRow({ project, customer, months, includePotential, teamResourceIds, actuals, accent }) {
   const { needs, assignments, members } = useData();
   const ok = useMemo(() => isProjectOk(project, needs, assignments), [project, needs, assignments]);
   const isPotentialProject = customer.status === 'potential' || project.status === 'potential';
@@ -23,7 +23,7 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
       return true;
     });
     for (const m of months) {
-      if (!projMonths.includes(m)) { result[m] = { ratio: null, totalNeeded: 0, totalFilled: 0, isPotential: false }; continue; }
+      if (!projMonths.includes(m)) { result[m] = { totalNeeded: 0, totalFilled: 0, isPotential: false }; continue; }
       let totalNeeded = 0, totalFilled = 0;
       let hasPotential = isPotentialProject;
       for (const n of projNeeds) {
@@ -36,22 +36,29 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
         totalFilled += filled;
         if (n.status === 'potential') hasPotential = true;
       }
-      result[m] = {
-        ratio: totalNeeded > 0 ? totalFilled / totalNeeded : null,
-        totalNeeded,
-        totalFilled,
-        isPotential: hasPotential,
-      };
+      result[m] = { totalNeeded, totalFilled, isPotential: hasPotential };
     }
     return result;
   }, [project, needs, assignments, months, projMonths, isPotentialProject, includePotential, teamResourceIds]);
 
   // Hours mapped to this specific project (epic → project mappings). A project
-  // with no mapped hours in the window gets no act layer — its work may still
-  // be counted at the customer level.
+  // with no mapped hours in the window gets no actual layer — its work may
+  // still be counted at the customer level. Off-window actuals still render:
+  // hours logged outside the project's planned months are exactly the kind of
+  // drift this view is for.
   const cur = currentMonth();
   const projActuals = actuals?.byProject?.[project.id];
   const projHasActuals = !!projActuals && Object.values(projActuals).some((h) => h > 0);
+
+  // Floored at 1 FTE like the customer rows, so tiny values stay tiny.
+  const rowMax = useMemo(() => {
+    let max = 0;
+    for (const m of months) {
+      max = Math.max(max, staffingByMonth[m].totalFilled, staffingByMonth[m].totalNeeded);
+      if (projHasActuals && m <= cur) max = Math.max(max, hoursToFte(projActuals[m] || 0));
+    }
+    return Math.max(max, 1);
+  }, [months, staffingByMonth, projHasActuals, projActuals, cur]);
 
   return (
     <div className="flex items-center border-b border-border-light" style={{ opacity: isPotentialProject ? 0.75 : 1 }}>
@@ -69,14 +76,11 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
       </div>
       {months.map((m) => {
         const d = staffingByMonth[m];
-        const inProject = projMonths.includes(m);
-        // Off-window actuals still render: hours logged outside the project's
-        // planned months are exactly the kind of drift this view is for.
-        const actual = projHasActuals && m <= cur ? hoursToFte(projActuals[m] || 0) : null;
+        const act = projHasActuals && m <= cur ? hoursToFte(projActuals[m] || 0) : null;
         return (
-          <HeatmapCell key={m} value={d.ratio} totalNeeded={d.totalNeeded} totalFilled={d.totalFilled}
-            isPotential={d.isPotential && includePotential} showDash={!inProject}
-            actual={actual} actualPartial={m === cur} />
+          <HeatmapCell key={m} title={`${project.name} · ${formatMonth(m)}`}
+            plan={d.totalFilled} needed={d.totalNeeded} act={act} max={rowMax} accent={accent}
+            isPotential={d.isPotential && includePotential} actualPartial={m === cur} />
         );
       })}
     </div>
