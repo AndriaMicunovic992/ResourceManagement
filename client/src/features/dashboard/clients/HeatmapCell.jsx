@@ -16,11 +16,14 @@ function HeatmapCell({ title, plan, needed, act, max, accent, isPotential, actua
   const labelAct = hasAct && (act > 0 || plan > 0) ? fmt(act) : null;
   const labelPlan = plan > 0 ? fmt(plan) : null;
 
+  // Δ as an absolute FTE difference — a ratio blows up into noise when the
+  // plan is small; the qualitative word still comes from the ratio.
   let delta = null;
   if (hasAct && !actualPartial && plan > 0 && act > 0) {
-    const pct = Math.round((act / plan - 1) * 100);
-    const word = Math.abs(pct) <= 15 ? 'on plan' : pct < 0 ? 'under plan' : 'over plan';
-    delta = `${pct >= 0 ? '+' : ''}${pct}% · ${word}`;
+    const r = Math.round((act / plan - 1) * 100);
+    const word = Math.abs(r) <= 15 ? 'on plan' : r < 0 ? 'under plan' : 'over plan';
+    const d = act - plan;
+    delta = `${d >= 0 ? '+' : '−'}${fmt(Math.abs(d))} FTE · ${word}`;
   }
 
   const tip = (plan > 0 || needed > 0 || (hasAct && act > 0)) ? (
