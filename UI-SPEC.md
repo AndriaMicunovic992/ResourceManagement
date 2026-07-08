@@ -447,12 +447,14 @@ A table showing customer staffing over time.
 
 Two sections:
 
-#### Domain Cards (3 across)
-One card per domain (Data, Web, General):
-- 10px colored square + domain name (13px bold) + person count on the right
-- Thin progress bar showing current-month realised utilization
-- Percentage next to the bar (colored by threshold)
+#### Domain Cards (auto-fit row)
+An **"Everyone"** card first, then one card per **taxonomy domain** (custom domains included — the row is driven by Settings → Domains, not a hardcoded three). Four cards sit 4-across; more wrap.
+- 10px colored square + name (13px bold) + person count on the right
+- **Heatmap-style bar** (same language as the table below): soft track with a tick = average planned FTE over the window, stacked fill = the average FTE actually logged per completed month (green client / violet internal / slate absences), anchored at the group's capacity
+- Percentage next to the bar (colored by threshold) + a small "· act X%" when hours are synced (client + internal only — absences render in the stack but don't count as worked)
 - Subtitle: "X.X / Y.Y FTE (realised)" in tiny DM Mono
+
+The Insights KPI row uses the same bar on the **Actual vs plan** card (track + tick = expected hours, stacked fill = logged hours by type), and the planned-allocation KPI is labeled **"Planned utilization"**.
 
 #### Capacity Heatmap Table
 Similar structure to the client overview, but one row per resource.

@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import StatCard from './StatCard';
+import StackedPlanBar from '../StackedPlanBar';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { currentMonth } from '../../../lib/dateUtils';
-import { MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
+import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS } from '../../../lib/constants';
 import { availabilityRatio } from '../../../lib/availability';
 import { actualVsPlanColor } from '../../../lib/statusUtils';
 
@@ -51,6 +52,9 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
     const cur = currentMonth();
     let expectedFte = 0;
     let actualHours = 0;
+    // Same population/months split by work type — the KPI's stacked bar
+    // (client + internal count as worked; absences render but don't).
+    const typed = { client: 0, internal: 0, absence: 0 };
     for (const r of teamResources) {
       if (!r.externalWorkId) continue;
       for (const m of months) {
@@ -58,9 +62,16 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
         const ratio = availabilityRatio(actuals?.byResourceType?.[r.id]?.[m], r.capacity);
         expectedFte += (rURealised[r.id]?.[m] || 0) * ratio;
         actualHours += actuals?.byResource?.[r.id]?.[m] || 0;
+        const t = actuals?.byResourceType?.[r.id]?.[m];
+        if (t) {
+          typed.client += t.client || 0;
+          typed.internal += t.internal || 0;
+          typed.absence += t.absence || 0;
+        }
       }
     }
     const actualFte = actualHours / MONTHLY_HOURS_PER_FTE;
+    const expectedHours = expectedFte * MONTHLY_HOURS_PER_FTE;
     const actualVsPlan =
       actualHours > 0 && expectedFte > 0 ? Math.round((actualFte / expectedFte) * 100) : null;
 
@@ -86,7 +97,7 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
       if (hasUnfilledMonth) unfilled++;
     }
 
-    return { activeProjects, teamSize, utilPct, unfilled, actualVsPlan };
+    return { activeProjects, teamSize, utilPct, unfilled, actualVsPlan, expectedHours, typed };
   }, [projects, resources, needs, customers, rURealised, rU, nF, months, includePotential, teamId, actuals]);
 
   const hasActualCard = stats.actualVsPlan != null;
@@ -96,12 +107,22 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
         info="Projects overlapping the selected months. With “Include potential” off, only realised projects under realised customers count." />
       <StatCard icon="◑" value={stats.teamSize} label="People" color="#5BC68A"
         info="People in scope — the whole org, or the selected team." />
-      <StatCard icon="◔" value={`${stats.utilPct}%`} label="Utilization" color="#F5A623"
+      <StatCard icon="◔" value={`${stats.utilPct}%`} label="Planned utilization" color="#F5A623"
         info="Planned utilization averaged over the selected months: Σ allocated FTE ÷ Σ capacity. “Allocated” is realised allocation, or all planned allocation when “Include potential” is on." />
       {hasActualCard && (
         <StatCard icon="⇄" value={`${stats.actualVsPlan}%`} label="Actual vs plan"
           color={actualVsPlanColor(stats.actualVsPlan, 100)}
-          info="Completed months of the window only (the current month is still being logged): logged Tempo hours ÷ expected hours — the realised plan reduced by each person's synced absences, so vacation never reads as underdelivery. Matched people only. 100% = delivered what the plan could deliver; amber = under, red = well over." />
+          bar={
+            <StackedPlanBar
+              plan={stats.expectedHours}
+              segments={[
+                { value: stats.typed.client, color: WORK_TYPE_COLORS.client },
+                { value: stats.typed.internal, color: WORK_TYPE_COLORS.internal },
+                { value: stats.typed.absence, color: WORK_TYPE_COLORS.absence },
+              ]}
+            />
+          }
+          info="Completed months of the window only (the current month is still being logged): logged Tempo hours ÷ expected hours — the realised plan reduced by each person's synced absences, so vacation never reads as underdelivery. Matched people only. 100% = delivered what the plan could deliver; amber = under, red = well over. The bar reads like the heatmap below: soft track with a tick = the expected plan, stacked fill = logged hours by type (green client, violet internal; slate absences render but don't count as worked time)." />
       )}
       <StatCard icon="◌" value={stats.unfilled} label="Unfilled" color="#E8636F"
         info="Needs with at least one selected month where filled < needed. “Include potential” off limits it to realised needs/projects/customers." />
