@@ -8,6 +8,10 @@ import Tip from './Tip';
  * absolute values live in the label and the tooltip.
  *
  *  plan        planned magnitude this month (FTE or % of capacity)
+ *  planOff     part of the booking that falls into planned leave: rendered as
+ *              a slate hatch continuing the track, with the tick at the FULL
+ *              booking (plan + planOff) — so an overextended plan stays
+ *              visible while the workable plan line shrinks
  *  act         actual magnitude; null = no actual layer for this cell
  *  actSegments stacked breakdown of `act` as [{ value, color }] (e.g. client
  *              vs internal hours) — falls back to a single fill when absent;
@@ -24,6 +28,7 @@ import Tip from './Tip';
  */
 export default function BulletCell({
   plan = 0,
+  planOff = 0,
   act = null,
   actSegments = null,
   extra = 0,
@@ -40,9 +45,11 @@ export default function BulletCell({
   const scale = Math.max(max, 0.0001);
   const w = (v) => Math.min(USABLE, Math.max(0, (v / scale) * USABLE));
   const hasPlan = plan > 0.0001;
+  // The full booking incl. the part clipped by planned leave — tick anchor.
+  const hasBooking = plan + planOff > 0.0001;
   const hasAct = act != null && act > 0.0001;
   const showActLayer = act != null;
-  const empty = !hasPlan && !hasAct && extra <= 0;
+  const empty = !hasBooking && !hasAct && extra <= 0;
 
   if (empty) {
     return (
@@ -56,10 +63,10 @@ export default function BulletCell({
   const tickColor = alert ? '#E8636F' : muted ? '#9CA3AF' : `color-mix(in srgb, ${accent} 82%, black)`;
   const fillBg = inProgress
     ? '#CBD8E2'
-    : hasPlan
+    : hasBooking
       ? 'linear-gradient(100deg, #34C98E, color-mix(in srgb, #34C98E 78%, white))'
       : 'linear-gradient(100deg, #F5A623, color-mix(in srgb, #F5A623 78%, white))'; // unplanned work
-  const fillShadow = inProgress ? 'none' : hasPlan ? '0 3px 7px -2px #34C98E80' : '0 3px 7px -2px #F5A62380';
+  const fillShadow = inProgress ? 'none' : hasBooking ? '0 3px 7px -2px #34C98E80' : '0 3px 7px -2px #F5A62380';
 
   return (
     <Tip content={tip} className="w-[82px] shrink-0 h-[44px] flex flex-col items-stretch justify-center">
@@ -68,11 +75,19 @@ export default function BulletCell({
         {hasPlan && (
           <span className="absolute rounded-md" style={{ left: 5, top: 4, height: 16, width: w(plan), background: trackColor }} />
         )}
+        {/* the booked-but-on-leave remainder: slate hatch up to the tick */}
+        {planOff > 0.0001 && (
+          <span className="absolute rounded-md" style={{
+            left: 5 + w(plan), top: 4, height: 16,
+            width: Math.max(2, w(plan + planOff) - w(plan)),
+            background: 'repeating-linear-gradient(45deg, rgba(148,163,184,0.4) 0 3px, rgba(148,163,184,0.12) 3px 6px)',
+          }} />
+        )}
         {extra > 0 && (
-          <span className="absolute rounded-md" style={{ left: 5 + w(plan), top: 7, height: 10, width: Math.max(0, w(plan + extra) - w(plan)), background: '#EDF1F5' }} />
+          <span className="absolute rounded-md" style={{ left: 5 + w(plan + planOff), top: 7, height: 10, width: Math.max(0, w(plan + planOff + extra) - w(plan + planOff)), background: '#EDF1F5' }} />
         )}
         {/* "no plan" baseline under unplanned work */}
-        {!hasPlan && (
+        {!hasBooking && (
           <span className="absolute" style={{ left: 6, right: 6, top: 11, height: 2, background: 'repeating-linear-gradient(90deg,#E4EDF2 0 6px,transparent 6px 11px)' }} />
         )}
         {/* actual fill — stacked segments when a breakdown is given */}
@@ -100,9 +115,9 @@ export default function BulletCell({
         ) : hasAct ? (
           <span className="absolute rounded" style={{ left: 5, top: 8, height: 8, width: Math.max(3, w(act)), background: fillBg, boxShadow: fillShadow }} />
         ) : null}
-        {/* plan tick */}
-        {hasPlan && (
-          <span className="absolute rounded-sm" style={{ left: 3.5 + w(plan), top: 1, width: 3, height: 22, background: tickColor }} />
+        {/* plan tick — at the full booking, past any on-leave hatch */}
+        {hasBooking && (
+          <span className="absolute rounded-sm" style={{ left: 3.5 + w(plan + planOff), top: 1, width: 3, height: 22, background: tickColor }} />
         )}
       </div>
       {(labelAct || labelPlan) && (
