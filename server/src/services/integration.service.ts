@@ -534,6 +534,42 @@ export const integrationService = {
   },
 
   /**
+   * Org-wide logged hours per month split into the four buckets the home
+   * dashboard chart stacks: client (mapped work), unmapped (client-type hours
+   * with no customer/project), internal, and absence. Only hours resolved to a
+   * person count (an account only resolves once it's matched), scoped to the
+   * caller's visible people; null = all (admin).
+   * Returned as { [month]: { client, unmapped, internal, absence } } in hours.
+   */
+  async actualsWorkBuckets(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null) {
+    const where: any = { orgId, month: { gte: fromMonth, lte: toMonth } };
+    where.resourceId = visibleIds ? { in: visibleIds } : { not: null };
+    const [byType, unmappedRows] = await Promise.all([
+      prisma.worklog.groupBy({ by: ['month', 'workType'], where, _sum: { seconds: true } }),
+      prisma.worklog.groupBy({
+        by: ['month'],
+        where: { ...where, workType: 'client', customerId: null, projectId: null },
+        _sum: { seconds: true },
+      }),
+    ]);
+    const h = (s: number | null) => Math.round(((s || 0) / 3600) * 10) / 10;
+    const out: Record<string, { client: number; unmapped: number; internal: number; absence: number }> = {};
+    const bucket = (m: string) => (out[m] = out[m] || { client: 0, unmapped: 0, internal: 0, absence: 0 });
+    for (const r of byType) {
+      const b = bucket(r.month);
+      if (r.workType === 'internal') b.internal += h(r._sum.seconds);
+      else if (r.workType === 'absence') b.absence += h(r._sum.seconds);
+      else b.client += h(r._sum.seconds);
+    }
+    for (const r of unmappedRows) {
+      const b = bucket(r.month);
+      b.unmapped = h(r._sum.seconds);
+      b.client = Math.round((b.client - b.unmapped) * 10) / 10;
+    }
+    return out;
+  },
+
+  /**
    * Actual hours per customer per month over [fromMonth, toMonth], scoped to the
    * given customer ids (caller's visible customers); null = all (admin).
    * Returned as { [customerId]: { [month]: hours } }.

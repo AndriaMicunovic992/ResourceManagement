@@ -6,7 +6,7 @@ import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import { utilColor } from '../../../lib/statusUtils';
 import { MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
-import { hoursForFilter, segmentsForFilter } from '../workTypeLens';
+import { hoursForFilter, segmentsForFilter, stackTotalForFilter } from '../workTypeLens';
 import { useComputed } from '../../../hooks/useComputed';
 
 export default function ResourceHeatmapRow({ resource, months, onOpen, includePotential, typedHours, workTypeFilter = 'work', window: win }) {
@@ -42,7 +42,10 @@ export default function ResourceHeatmapRow({ resource, months, onOpen, includePo
         ? segmentsForFilter(types, workTypeFilter).map((s) => ({ ...s, value: toPct(s.value) }))
         : null;
       data[m] = { realisedPct: realised, potentialPct: potential, actualPct: actual, actSegments: segments, actualPartial: m === cur };
-      max = Math.max(max, includePotential ? realised + potential : realised, actual || 0);
+      // The stack can be longer than the Actual number (absences render but
+      // don't count as worked time) — scale the row to the full stack.
+      const stackPct = actual != null ? toPct(stackTotalForFilter(types, workTypeFilter)) : 0;
+      max = Math.max(max, includePotential ? realised + potential : realised, actual || 0, stackPct);
       if (realised > 0 || total > 0) { sum += realised; count++; }
       // The act average covers completed months only — the in-progress month
       // would drag it down while hours are still being logged.

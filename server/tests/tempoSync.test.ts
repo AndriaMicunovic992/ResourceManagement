@@ -143,5 +143,10 @@ describe.skipIf(!HAS_DB)('Tempo sync', () => {
 
     const unmapped = await integrationService.actualsForResourceUnmapped(orgId, personId, '2026-03', '2026-03');
     expect(unmapped).toEqual([{ key: 'ZZZ', name: 'ZZZ', stale: false, months: { '2026-03': 1.5 } }]);
+
+    // The dashboard's four buckets: mapped client, unmapped client, internal,
+    // absence — over the same month.
+    const bucketsRes = await integrationService.actualsWorkBuckets(orgId, '2026-03', '2026-03', null);
+    expect(bucketsRes['2026-03']).toEqual({ client: 0.5, unmapped: 1.5, internal: 0, absence: 1 });
   });
 });
