@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { canView } from '../lib/permissions.js';
 import { resourceService } from '../services/resource.service.js';
-import { createResourceSchema, updateResourceSchema } from '../schemas/resource.schema.js';
+import { createResourceSchema, updateResourceSchema, setAbsencesSchema } from '../schemas/resource.schema.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { requirePermission } from '../middleware/requirePermission.js';
 import {
@@ -136,6 +136,14 @@ export const resourceRoutes: FastifyPluginAsync = async (app) => {
       await assertManagerUsersAllowed(req.orgId, data.directManagerUserIds);
     }
     return resourceService.update(req.orgId, id, data);
+  });
+
+  // Planned absences (days off per month), entered in the planner — so the
+  // gate is the planner segment, like assignments, not the people record.
+  app.patch('/resources/:id/absences', { preHandler: requirePermission('planner', 'edit') }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { months } = setAbsencesSchema.parse(req.body);
+    return resourceService.setAbsences(req.orgId, id, months);
   });
 
   app.delete('/resources/:id', { preHandler: requirePermission('people', 'delete') }, async (req, reply) => {

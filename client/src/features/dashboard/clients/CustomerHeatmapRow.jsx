@@ -6,7 +6,7 @@ import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { ACCENT_COLORS, hoursToFte } from '../../../lib/constants';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
-import { availabilityRatio } from '../../../lib/availability';
+import { availabilityRatio, plannedAvailabilityRatio } from '../../../lib/availability';
 import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 
@@ -31,12 +31,17 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
       return true;
     });
     const cur = currentMonth();
-    const capById = new Map(resources.map((r) => [r.id, r.capacity || 1]));
-    // What the plan can deliver given each assignee's synced absences —
-    // vacation shrinks every client's expectation by the person's planned
-    // share. Future months (no absence actuals) ride at full availability.
-    const ratioFor = (rid, m) =>
-      m <= cur ? availabilityRatio(actuals?.byResourceType?.[rid]?.[m], capById.get(rid)) : 1;
+    const resById = new Map(resources.map((r) => [r.id, r]));
+    // What the plan can deliver given each assignee's absences — vacation
+    // shrinks every client's expectation by the person's planned share.
+    // Elapsed months use synced Tempo absences; months ahead use the planned
+    // days off entered in the planner.
+    const ratioFor = (rid, m) => {
+      const r = resById.get(rid);
+      return m <= cur
+        ? availabilityRatio(actuals?.byResourceType?.[rid]?.[m], r?.capacity || 1)
+        : plannedAvailabilityRatio(r, m);
+    };
     for (const m of months) {
       let totalNeeded = 0, totalFilled = 0, totalExpected = 0;
       let hasPotential = false;

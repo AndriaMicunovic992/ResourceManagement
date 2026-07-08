@@ -78,6 +78,29 @@ describe.skipIf(!HAS_DB)('DB invariants', () => {
     await expect(getLog(orgId, r2, log.id, userId, 'owner')).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it('setAbsences merges per-month days; 0 clears the month instead of storing it', async () => {
+    await resourceService.setAbsences(orgId, r1, { '2026-08': 10, '2026-09': 21.5 });
+    // A second write to a different month must not clobber the first.
+    await resourceService.setAbsences(orgId, r1, { '2026-10': 3.25 });
+    let row = await prisma.resource.findUniqueOrThrow({ where: { id: r1 } });
+    let abs = row.plannedAbsences as Record<string, number>;
+    expect(abs['2026-08']).toBe(10);
+    expect(abs['2026-09']).toBe(21.5);
+    expect(abs['2026-10']).toBe(3.5); // rounded to the half-day grain
+
+    // Clearing a month removes the key entirely (no lingering zeros).
+    await resourceService.setAbsences(orgId, r1, { '2026-08': 0 });
+    row = await prisma.resource.findUniqueOrThrow({ where: { id: r1 } });
+    abs = row.plannedAbsences as Record<string, number>;
+    expect(abs['2026-08']).toBeUndefined();
+    expect(abs['2026-09']).toBe(21.5);
+
+    // Cross-org: the person must not be reachable from another org.
+    const otherOrg = await prisma.organization.create({ data: { name: 'Other', slug: `${tag}-other` } });
+    await expect(resourceService.setAbsences(otherOrg.id, r1, { '2026-09': 1 })).rejects.toBeInstanceOf(NotFoundError);
+    await prisma.organization.delete({ where: { id: otherOrg.id } });
+  });
+
   it('deleting a person with history is blocked (Restrict), not a silent cascade', async () => {
     // r1 now has a 1:1 and a log → the delete must be refused.
     await expect(resourceService.delete(orgId, r1)).rejects.toBeInstanceOf(ConflictError);

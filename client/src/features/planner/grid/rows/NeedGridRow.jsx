@@ -5,6 +5,7 @@ import { computeNeedFulfillment } from '../../../../lib/gridUtils';
 import { resourceMatchesNeed } from '../../../../lib/resourceUtils';
 import { monthRange } from '../../../../lib/dateUtils';
 import { CW } from '../../../../lib/constants';
+import { effectiveCapacity } from '../../../../lib/availability';
 import { useData } from '../../../../contexts/DataContext';
 
 export default function NeedGridRow({ need, project, months, periods, heldResource, rowHeight, onCellClick, onBarClick, onPaintNeed, onPaintAssign, onUndoable }) {
@@ -195,12 +196,15 @@ export default function NeedGridRow({ need, project, months, periods, heldResour
         const resource = resources.find((r) => r.id === a.resourceId);
         if (!resource) return null;
         // Months where this person's TOTAL load (all projects) exceeds their
-        // capacity — surfaced as a red tick on the bar.
-        const cap = resource.capacity ?? 1;
+        // EFFECTIVE capacity (planned days off subtracted) — surfaced as a red
+        // tick on the bar. A month fully on leave flags any allocation at all,
+        // which is exactly the "needs a substitute" signal.
         const own = assignments.filter((x) => x.resourceId === a.resourceId);
         const overloadMonths = new Set(
           months.filter(
-            (m) => own.reduce((s, x) => s + ((x.monthAllocations || {})[m] || 0), 0) > cap + 0.001
+            (m) =>
+              own.reduce((s, x) => s + ((x.monthAllocations || {})[m] || 0), 0) >
+              effectiveCapacity(resource, m) + 0.001
           )
         );
         return (

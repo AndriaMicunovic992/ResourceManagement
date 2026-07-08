@@ -3,6 +3,7 @@ import { formatMonth, currentMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { domainColor, seniorityShort } from '../../../lib/taxonomy';
+import { effectiveCapacity } from '../../../lib/availability';
 import InfoDot from '../../../components/ui/InfoDot';
 
 export default function FreeCapacity({ months, includePotential, teamId }) {
@@ -86,7 +87,9 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
     return demand;
   }, [needs, projects, customers, includePotential]);
 
-  // Compute free FTE for a set of resource IDs per month (realised usage only)
+  // Compute free FTE for a set of resource IDs per month (realised usage only).
+  // Capacity is EFFECTIVE capacity — someone on planned leave stops showing up
+  // as staffable spare capacity.
   const computeFree = (resourceIds, month) => {
     let free = 0;
     const seen = new Set();
@@ -96,7 +99,7 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
       const r = resources.find((x) => x.id === id);
       if (!r) continue;
       const used = rURealised[r.id]?.[month] || 0;
-      free += Math.max(0, r.capacity - used);
+      free += Math.max(0, effectiveCapacity(r, month) - used);
     }
     return Math.round(free * 100) / 100;
   };
@@ -119,7 +122,7 @@ export default function FreeCapacity({ months, includePotential, teamId }) {
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
       <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">
         Free Capacity (FTE){' '}
-        <InfoDot text="Each cell = spare FTE for the group that month: Σ max(0, capacity − realised allocation) over its people. With Include potential on, potential demand at that domain/role/seniority is subtracted. The “Total Free” footer is the same across everyone." />
+        <InfoDot text="Each cell = spare FTE for the group that month: Σ max(0, capacity − planned days off − realised allocation) over its people, so someone on leave doesn’t show as staffable. With Include potential on, potential demand at that domain/role/seniority is subtracted. The “Total Free” footer is the same across everyone." />
       </h3>
       <div className="flex items-center border-b-2 border-border sticky top-0 bg-white z-10">
         <div className="w-[270px] shrink-0 px-3 py-2">

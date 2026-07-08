@@ -4,7 +4,7 @@ import { seniorityFromShort } from '../../../lib/taxonomy';
 import { resourcePrimaryDomain, domainColor } from '../../../lib/resourceUtils';
 import { useData } from '../../../contexts/DataContext';
 
-export default function ResourceList({ resources, filters, heldResource, onHold, timeRange }) {
+export default function ResourceList({ resources, filters, heldResource, onHold, timeRange, onAbsence }) {
   const { teams } = useData();
   const filtered = useMemo(() => {
     const teamIdByName = new Map(teams.map((t) => [t.name, t.id]));
@@ -57,6 +57,7 @@ export default function ResourceList({ resources, filters, heldResource, onHold,
               selected={heldResource?.id === r.id}
               onSelect={(res) => onHold(heldResource?.id === res.id ? null : res)}
               timeRange={timeRange}
+              onAbsence={onAbsence}
             />
           ))}
         </div>

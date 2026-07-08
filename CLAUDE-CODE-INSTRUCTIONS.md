@@ -675,6 +675,7 @@ DELETE /api/projects/:id
 GET    /api/resources
 POST   /api/resources                # Includes roles array
 PATCH  /api/resources/:id
+PATCH  /api/resources/:id/absences   # Planned days off { months: { "YYYY-MM": days } } — per-month merge, 0 clears (planner-edit gated)
 DELETE /api/resources/:id
 
 GET    /api/needs

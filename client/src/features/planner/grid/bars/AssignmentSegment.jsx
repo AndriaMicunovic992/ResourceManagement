@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { shortName, initials } from '../../../../lib/resourceUtils';
 import { CW } from '../../../../lib/constants';
+import { plannedAbsenceDays } from '../../../../lib/availability';
 
 /** Hero pill segment: saturated gradient, white label, avatar inside,
  * white FTE chip. contLeft/contRight mark continuation beyond the window. */
@@ -27,14 +28,38 @@ function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, rou
         <div className="absolute left-0 top-[4px] bottom-[4px] w-[1px] bg-white/40" />
       )}
       {/* Per-month click zones */}
-      {segment.months.map((m, mi) => (
-        <div
-          key={m}
-          className="absolute top-0 bottom-0 cursor-pointer hover:bg-white/10 transition-colors"
-          style={{ left: mi * CW, width: CW }}
-          onClick={(e) => { e.stopPropagation(); onClickMonth(m, e); }}
-        />
-      ))}
+      {segment.months.map((m, mi) => {
+        const offDays = plannedAbsenceDays(resource, m);
+        return (
+          <div
+            key={m}
+            className="absolute top-0 bottom-0 cursor-pointer hover:bg-white/10 transition-colors"
+            style={{ left: mi * CW, width: CW }}
+            title={offDays > 0 ? `${resource.name}: ${offDays}d planned off in ${m} — click to adjust or substitute` : undefined}
+            onClick={(e) => { e.stopPropagation(); onClickMonth(m, e); }}
+          />
+        );
+      })}
+      {/* Planned-absence hatch: a slate strip along the bottom of months where
+          this person has days off, so a bar running through a leave is visible
+          right on the plan (the red tick fires when the leave makes the month
+          overbooked). */}
+      {segment.months.map((m, mi) => {
+        const offDays = plannedAbsenceDays(resource, m);
+        if (!(offDays > 0)) return null;
+        return (
+          <div
+            key={`ab-${m}`}
+            className="absolute pointer-events-none"
+            style={{
+              left: mi * CW + 3, width: CW - 6, bottom: 2, height: 5,
+              borderRadius: 3,
+              background: 'repeating-linear-gradient(45deg, #64748B 0 3px, #E2E8F0 3px 6px)',
+              boxShadow: '0 0 0 1px rgba(255,255,255,0.75)',
+            }}
+          />
+        );
+      })}
       {/* Cross-project overload ticks */}
       {segment.months.map((m, mi) =>
         overloadMonths?.has(m) ? (
@@ -42,7 +67,7 @@ function AssignmentSegment({ segment, resource, domainColor, barHeight = 24, rou
             key={`ov-${m}`}
             className="absolute w-1.5 h-1.5 rounded-full bg-danger pointer-events-none"
             style={{ left: mi * CW + CW - 8, top: 2, boxShadow: '0 0 0 1.5px #fff' }}
-            title="Over capacity this month across all projects"
+            title="Over this person's available capacity this month (all projects, planned absences counted)"
           />
         ) : null
       )}

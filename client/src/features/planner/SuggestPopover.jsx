@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { resourceMatchesNeed } from '../../lib/resourceUtils';
+import { effectiveCapacity } from '../../lib/availability';
 import Avatar from '../../components/ui/Avatar';
 
 /**
@@ -37,7 +38,8 @@ export default function SuggestPopover({ need, customer, x, y, onAssign, onClose
         let coverSum = 0;
         for (const m of needMonths) {
           const used = own.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
-          const free = Math.max(0, (r.capacity ?? 1) - used);
+          // Effective capacity: someone on leave doesn't rank as free cover.
+          const free = Math.max(0, effectiveCapacity(r, m) - used);
           const filled = needAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
           const gap = Math.max(0, (needAllocs[m] || 0) - filled);
           freeSum += free;

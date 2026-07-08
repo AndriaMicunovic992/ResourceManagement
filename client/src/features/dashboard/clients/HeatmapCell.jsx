@@ -41,7 +41,7 @@ function HeatmapCell({ title, plan, expected, needed, act, max, accent, isPotent
       ) : (
         hasAct && act > 0 && <TipRow swatch={accent} label="Planned" value="none" />
       )}
-      {hasAct && plan > 0 && absenceGap > 0.05 && (
+      {plan > 0 && absenceGap > 0.05 && (
         <TipRow label="Expected" value={`${fmt(expectedFte)} FTE · after absences`} />
       )}
       {hasAct && (act > 0 || plan > 0) && (
