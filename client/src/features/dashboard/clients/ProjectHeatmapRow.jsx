@@ -4,11 +4,12 @@ import StatusBadge from '../../../components/ui/StatusBadge';
 import { isProjectOk } from '../../../lib/gridUtils';
 import { formatMonth, monthRange, currentMonth } from '../../../lib/dateUtils';
 import { hoursToFte } from '../../../lib/constants';
+import { availabilityRatio } from '../../../lib/availability';
 import { useData } from '../../../contexts/DataContext';
 import { useMemo } from 'react';
 
 export default function ProjectHeatmapRow({ project, customer, months, includePotential, teamResourceIds, actuals, accent }) {
-  const { needs, assignments, members } = useData();
+  const { needs, assignments, members, resources } = useData();
   const ok = useMemo(() => isProjectOk(project, needs, assignments), [project, needs, assignments]);
   const isPotentialProject = customer.status === 'potential' || project.status === 'potential';
   const responsibleMember = project.responsibleUserId ? members.find((m) => m.user?.id === project.responsibleUserId) : null;
@@ -22,24 +23,32 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
       if (!includePotential && n.status !== 'realised') return false;
       return true;
     });
+    const cur = currentMonth();
+    const capById = new Map(resources.map((r) => [r.id, r.capacity || 1]));
+    // Absence-adjusted deliverable plan, like the customer row.
+    const ratioFor = (rid, m) =>
+      m <= cur ? availabilityRatio(actuals?.byResourceType?.[rid]?.[m], capById.get(rid)) : 1;
     for (const m of months) {
-      if (!projMonths.includes(m)) { result[m] = { totalNeeded: 0, totalFilled: 0, isPotential: false }; continue; }
-      let totalNeeded = 0, totalFilled = 0;
+      if (!projMonths.includes(m)) { result[m] = { totalNeeded: 0, totalFilled: 0, totalExpected: 0, isPotential: false }; continue; }
+      let totalNeeded = 0, totalFilled = 0, totalExpected = 0;
       let hasPotential = isPotentialProject;
       for (const n of projNeeds) {
         const needed = (n.monthAllocations || {})[m] || 0;
         if (needed <= 0) continue;
-        const filled = assignments
-          .filter((a) => a.needId === n.id && (!teamResourceIds || teamResourceIds.has(a.resourceId)))
-          .reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+        for (const a of assignments) {
+          if (a.needId !== n.id) continue;
+          if (teamResourceIds && !teamResourceIds.has(a.resourceId)) continue;
+          const fte = (a.monthAllocations || {})[m] || 0;
+          totalFilled += fte;
+          totalExpected += fte * ratioFor(a.resourceId, m);
+        }
         totalNeeded += needed;
-        totalFilled += filled;
         if (n.status === 'potential') hasPotential = true;
       }
-      result[m] = { totalNeeded, totalFilled, isPotential: hasPotential };
+      result[m] = { totalNeeded, totalFilled, totalExpected, isPotential: hasPotential };
     }
     return result;
-  }, [project, needs, assignments, months, projMonths, isPotentialProject, includePotential, teamResourceIds]);
+  }, [project, needs, assignments, resources, months, projMonths, isPotentialProject, includePotential, teamResourceIds, actuals]);
 
   // Hours mapped to this specific project (epic → project mappings). A project
   // with no mapped hours in the window gets no actual layer — its work may
@@ -79,7 +88,7 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
         const act = projHasActuals && m <= cur ? hoursToFte(projActuals[m] || 0) : null;
         return (
           <HeatmapCell key={m} title={`${project.name} · ${formatMonth(m)}`}
-            plan={d.totalFilled} needed={d.totalNeeded} act={act} max={rowMax} accent={accent}
+            plan={d.totalFilled} expected={d.totalExpected} needed={d.totalNeeded} act={act} max={rowMax} accent={accent}
             isPotential={d.isPotential && includePotential} actualPartial={m === cur} />
         );
       })}

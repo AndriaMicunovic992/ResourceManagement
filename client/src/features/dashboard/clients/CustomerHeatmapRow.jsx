@@ -6,12 +6,13 @@ import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { ACCENT_COLORS, hoursToFte } from '../../../lib/constants';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
+import { availabilityRatio } from '../../../lib/availability';
 import { useData } from '../../../contexts/DataContext';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 
 export default function CustomerHeatmapRow({ customer, index, months, includePotential, teamResourceIds, actuals }) {
   const [expanded, setExpanded] = useState(false);
-  const { projects, needs, assignments } = useData();
+  const { projects, needs, assignments, resources } = useData();
   const { canViewCustomer } = useVisibility();
   const navigate = useNavigate();
   const canOpen = canViewCustomer(customer.id);
@@ -29,25 +30,35 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
       if (!includePotential && n.status !== 'realised') return false;
       return true;
     });
+    const cur = currentMonth();
+    const capById = new Map(resources.map((r) => [r.id, r.capacity || 1]));
+    // What the plan can deliver given each assignee's synced absences —
+    // vacation shrinks every client's expectation by the person's planned
+    // share. Future months (no absence actuals) ride at full availability.
+    const ratioFor = (rid, m) =>
+      m <= cur ? availabilityRatio(actuals?.byResourceType?.[rid]?.[m], capById.get(rid)) : 1;
     for (const m of months) {
-      let totalNeeded = 0, totalFilled = 0;
+      let totalNeeded = 0, totalFilled = 0, totalExpected = 0;
       let hasPotential = false;
       for (const n of custNeeds) {
         const needed = (n.monthAllocations || {})[m] || 0;
         if (needed <= 0) continue;
-        const filled = assignments
-          .filter((a) => a.needId === n.id && (!teamResourceIds || teamResourceIds.has(a.resourceId)))
-          .reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
+        for (const a of assignments) {
+          if (a.needId !== n.id) continue;
+          if (teamResourceIds && !teamResourceIds.has(a.resourceId)) continue;
+          const fte = (a.monthAllocations || {})[m] || 0;
+          totalFilled += fte;
+          totalExpected += fte * ratioFor(a.resourceId, m);
+        }
         totalNeeded += needed;
-        totalFilled += filled;
         if (n.status === 'potential') hasPotential = true;
         const proj = projects.find((p) => p.id === n.projectId);
         if (proj?.status === 'potential') hasPotential = true;
       }
-      result[m] = { totalNeeded, totalFilled, isPotential: hasPotential };
+      result[m] = { totalNeeded, totalFilled, totalExpected, isPotential: hasPotential };
     }
     return result;
-  }, [custProjects, needs, assignments, months, includePotential, projects, teamResourceIds]);
+  }, [custProjects, needs, assignments, resources, months, includePotential, projects, teamResourceIds, actuals]);
 
   // Actual FTE logged on this customer per elapsed month. Customers with no
   // synced hours anywhere in the window get no actual layer at all (they're
@@ -102,7 +113,7 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
           const act = custHasActuals && m <= cur ? hoursToFte(custActuals[m] || 0) : null;
           return (
             <HeatmapCell key={m} title={`${customer.name} · ${formatMonth(m)}`}
-              plan={d.totalFilled} needed={d.totalNeeded} act={act} max={rowMax} accent={accent}
+              plan={d.totalFilled} expected={d.totalExpected} needed={d.totalNeeded} act={act} max={rowMax} accent={accent}
               isPotential={d.isPotential && includePotential} actualPartial={m === cur} />
           );
         })}
