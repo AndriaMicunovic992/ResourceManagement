@@ -7,7 +7,7 @@ import { useComputed } from '../../hooks/useComputed';
 import { api } from '../../lib/api';
 import Avatar from '../../components/ui/Avatar';
 import InfoDot from '../../components/ui/InfoDot';
-import { MONTHS, MONTHLY_HOURS_PER_FTE } from '../../lib/constants';
+import { MONTHS, MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS } from '../../lib/constants';
 import { seniorityShort } from '../../lib/taxonomy';
 import { currentMonth, addMonths, monthRange, formatMonth } from '../../lib/dateUtils';
 import { firstName, resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
@@ -266,16 +266,58 @@ export default function HomeDashboard() {
   }, [resources, rU, m0, matchedCapacity]);
   const actualNow = actualPct[m0idx] ?? 0;
   const showActualKpi = hasActual && matchedCapacity > 0;
+
+  // Logged hours per month split into the four buckets the chart stacks:
+  // client / unmapped / internal / absences (matched people only).
+  const [buckets, setBuckets] = useState({});
+  useEffect(() => {
+    if (!windowMonths.length) return;
+    api.getMonthlyWorkBuckets(windowMonths[0], windowMonths[windowMonths.length - 1])
+      .then((d) => setBuckets(d || {}))
+      .catch(() => setBuckets({}));
+  }, [windowMonths]);
+  const BUCKETS = useMemo(() => ([
+    { key: 'client', label: 'Client', color: WORK_TYPE_COLORS.client },
+    { key: 'unmapped', label: 'Unmapped', color: '#F5A623' },
+    { key: 'internal', label: 'Internal', color: WORK_TYPE_COLORS.internal },
+    { key: 'absence', label: 'Absences', color: WORK_TYPE_COLORS.absence },
+  ]), []);
+  const bucketPct = useMemo(() => {
+    const toPct = (h) => (matchedCapacity > 0 ? ((h / MONTHLY_HOURS_PER_FTE) / matchedCapacity) * 100 : 0);
+    return windowMonths.map((m) => {
+      const b = buckets[m] || {};
+      return Object.fromEntries(BUCKETS.map(({ key }) => [key, toPct(b[key] || 0)]));
+    });
+  }, [windowMonths, buckets, matchedCapacity, BUCKETS]);
+  const bucketTotals = bucketPct.map((b) => BUCKETS.reduce((s, { key }) => s + b[key], 0));
+  const hasBuckets = matchedCapacity > 0 && bucketTotals.some((v) => v > 0);
+  // The plan the bars compare against: realised allocations of the matched
+  // people over matched capacity — same population as the bars, so the line
+  // and the stack share a denominator.
+  const plannedMatchedPct = useMemo(
+    () => windowMonths.map((m) => {
+      if (matchedCapacity <= 0) return 0;
+      let fte = 0;
+      for (const r of resources) {
+        if (!r.externalWorkId) continue;
+        fte += rURealised[r.id]?.[m] || 0;
+      }
+      return (fte / matchedCapacity) * 100;
+    }),
+    [windowMonths, resources, rURealised, matchedCapacity]
+  );
+
   const [hover, setHover] = useState(null);
   const tipIdx = hover ?? (m0idx >= 0 ? m0idx : 0);
   const W = 720, H = 150;
-  const maxScale = Math.max(100, Math.ceil(Math.max(...series.plannedPct, ...actualPct, 1) / 20) * 20);
+  const maxScale = Math.max(100, Math.ceil(Math.max(...series.plannedPct, ...actualPct, ...(hasBuckets ? [...bucketTotals, ...plannedMatchedPct] : []), 1) / 20) * 20);
   const x = (i) => (i / 11) * W;
   const y = (pct) => H - 8 - (pct / maxScale) * (H - 28);
   const realisedPts = series.realisedPct.map((v, i) => [x(i), y(v)]);
   const plannedPts = series.plannedPct.map((v, i) => [x(i), y(v)]);
   const actualPts = actualPct.map((v, i) => [x(i), y(v)]);
   const realisedLine = smoothPath(realisedPts);
+  const plannedMatchedLine = smoothPath(plannedMatchedPct.map((v, i) => [x(i), y(v)]));
 
   /* ----- evaluations table ----- */
   const evalRows = useMemo(() => {
@@ -485,8 +527,24 @@ export default function HomeDashboard() {
           <div className="relative bg-white border border-border-light rounded-2xl shadow-card p-4 mb-5">
             <div className="flex items-baseline gap-2 mb-2">
               <h3 className="text-[13px] font-bold text-text m-0">Utilization</h3>
-              <InfoDot text="Monthly % over the year. Blue = realised allocation and orange dashed = all planned allocation — both ÷ the whole team’s capacity. Green = actual logged Tempo hours ÷ 173.33 (hours per FTE), but only for “matched” people (linked to Jira) and ÷ only their capacity — so the actual rate isn’t diluted by people you don’t track yet. That’s why blue/orange span everyone while green covers matched people only." />
-              <span className="text-[10.5px] text-text-light">realised · actual · planned</span>
+              {hasBuckets ? (
+                <>
+                  <InfoDot text="Teal line = realised planned allocation of matched people (linked to Jira) ÷ their capacity. Each month's bar stacks what they actually logged in Tempo — client work, unmapped hours (no customer mapping yet), internal work, and absences — on the same % scale, so the bar meeting the line means the logged time accounts for the plan. Tooltip shows the raw hours per bucket." />
+                  <span className="inline-flex items-center gap-2 text-[10px] text-text-light">
+                    <span className="inline-flex items-center gap-1"><i className="w-3 h-[3px] rounded bg-[#4CBAD4] inline-block" />planned</span>
+                    {BUCKETS.map(({ key, label, color }) => (
+                      <span key={key} className="inline-flex items-center gap-1">
+                        <i className="w-2 h-2 rounded-[3px] inline-block" style={{ background: color }} />{label.toLowerCase()}
+                      </span>
+                    ))}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <InfoDot text="Monthly % over the year. Blue = realised allocation and orange dashed = all planned allocation — both ÷ the whole team’s capacity. Green = actual logged Tempo hours ÷ 173.33 (hours per FTE), but only for “matched” people (linked to Jira) and ÷ only their capacity — so the actual rate isn’t diluted by people you don’t track yet. That’s why blue/orange span everyone while green covers matched people only." />
+                  <span className="text-[10.5px] text-text-light">realised · actual · planned</span>
+                </>
+              )}
               <span className="flex-1" />
               <span className="text-[10.5px] font-semibold text-text-mid bg-primary-bg border border-border-light rounded-full px-2.5 py-1">Jan – Dec {year}</span>
             </div>
@@ -507,12 +565,37 @@ export default function HomeDashboard() {
               {[0.25, 0.5, 0.75].map((f) => (
                 <line key={f} x1="0" y1={y(maxScale * f)} x2={W} y2={y(maxScale * f)} stroke="#EDF2F7" />
               ))}
-              <path d={`${realisedLine} L${W} ${H} L0 ${H}Z`} fill="url(#homeUtilFill)" />
-              <path d={smoothPath(plannedPts)} fill="none" stroke="#F5A623" strokeWidth="2" strokeDasharray="5 4" opacity="0.7" />
-              <path d={realisedLine} fill="none" stroke="#4CBAD4" strokeWidth="2.5" />
-              {hasActual && <path d={smoothPath(actualPts)} fill="none" stroke="#34C98E" strokeWidth="2.5" />}
-              <line x1={x(tipIdx)} y1={y(series.realisedPct[tipIdx] || 0)} x2={x(tipIdx)} y2={H} stroke="#4CBAD4" strokeDasharray="3 3" opacity="0.4" />
-              <circle cx={x(tipIdx)} cy={y(series.realisedPct[tipIdx] || 0)} r="4.5" fill="#4CBAD4" stroke="#fff" strokeWidth="2" />
+              {hasBuckets ? (
+                <>
+                  {/* one stacked bar per month: client / unmapped / internal / absences */}
+                  {windowMonths.map((m, i) => {
+                    if (bucketTotals[i] <= 0) return null;
+                    const bw = 22;
+                    const bx = Math.max(1, Math.min(W - bw - 1, x(i) - bw / 2));
+                    let acc = 0;
+                    return BUCKETS.map(({ key, color }) => {
+                      const v = bucketPct[i][key];
+                      if (v <= 0) return null;
+                      const yTop = y(acc + v);
+                      const height = Math.max(0.5, y(acc) - yTop - 1); // 1px surface gap
+                      acc += v;
+                      return <rect key={`${m}-${key}`} x={bx} y={yTop} width={bw} height={height} rx="2" fill={color} />;
+                    });
+                  })}
+                  <path d={plannedMatchedLine} fill="none" stroke="#4CBAD4" strokeWidth="2.5" />
+                  <line x1={x(tipIdx)} y1={y(Math.max(plannedMatchedPct[tipIdx] || 0, bucketTotals[tipIdx] || 0))} x2={x(tipIdx)} y2={H} stroke="#4CBAD4" strokeDasharray="3 3" opacity="0.4" />
+                  <circle cx={x(tipIdx)} cy={y(plannedMatchedPct[tipIdx] || 0)} r="4.5" fill="#4CBAD4" stroke="#fff" strokeWidth="2" />
+                </>
+              ) : (
+                <>
+                  <path d={`${realisedLine} L${W} ${H} L0 ${H}Z`} fill="url(#homeUtilFill)" />
+                  <path d={smoothPath(plannedPts)} fill="none" stroke="#F5A623" strokeWidth="2" strokeDasharray="5 4" opacity="0.7" />
+                  <path d={realisedLine} fill="none" stroke="#4CBAD4" strokeWidth="2.5" />
+                  {hasActual && <path d={smoothPath(actualPts)} fill="none" stroke="#34C98E" strokeWidth="2.5" />}
+                  <line x1={x(tipIdx)} y1={y(series.realisedPct[tipIdx] || 0)} x2={x(tipIdx)} y2={H} stroke="#4CBAD4" strokeDasharray="3 3" opacity="0.4" />
+                  <circle cx={x(tipIdx)} cy={y(series.realisedPct[tipIdx] || 0)} r="4.5" fill="#4CBAD4" stroke="#fff" strokeWidth="2" />
+                </>
+              )}
             </svg>
             {/* dark tooltip */}
             <div
@@ -520,20 +603,45 @@ export default function HomeDashboard() {
               style={{ left: `clamp(8px, ${8 + (tipIdx / 11) * 84}%, calc(100% - 150px))`, top: 44, width: 140 }}
             >
               <b className="text-[10.5px]">{formatMonth(windowMonths[tipIdx])}</b>
-              <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-1">
-                <i className="w-2 h-2 rounded-full bg-[#4CBAD4]" />Realised
-                <b className="ml-auto">{Math.round(series.realisedPct[tipIdx] || 0)}%</b>
-              </div>
-              {hasActual && (
-                <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
-                  <i className="w-2 h-2 rounded-full bg-[#34C98E]" />Actual
-                  <b className="ml-auto">{Math.round(actualPct[tipIdx] || 0)}%</b>
-                </div>
+              {hasBuckets ? (
+                <>
+                  <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-1">
+                    <i className="w-2 h-2 rounded-full bg-[#4CBAD4]" />Planned
+                    <b className="ml-auto">{Math.round(plannedMatchedPct[tipIdx] || 0)}%</b>
+                  </div>
+                  {BUCKETS.map(({ key, label, color }) => {
+                    const hours = buckets[windowMonths[tipIdx]]?.[key] || 0;
+                    if (hours <= 0) return null;
+                    return (
+                      <div key={key} className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
+                        <i className="w-2 h-2 rounded-full" style={{ background: color }} />{label}
+                        <b className="ml-auto">{Math.round(hours)}h</b>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center gap-1.5 text-[10px] opacity-80 mt-0.5">
+                    Logged total
+                    <b className="ml-auto">{Math.round(bucketTotals[tipIdx] || 0)}%</b>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-1">
+                    <i className="w-2 h-2 rounded-full bg-[#4CBAD4]" />Realised
+                    <b className="ml-auto">{Math.round(series.realisedPct[tipIdx] || 0)}%</b>
+                  </div>
+                  {hasActual && (
+                    <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
+                      <i className="w-2 h-2 rounded-full bg-[#34C98E]" />Actual
+                      <b className="ml-auto">{Math.round(actualPct[tipIdx] || 0)}%</b>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
+                    <i className="w-2 h-2 rounded-full bg-[#F5A623]" />Planned
+                    <b className="ml-auto">{Math.round(series.plannedPct[tipIdx] || 0)}%</b>
+                  </div>
+                </>
               )}
-              <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
-                <i className="w-2 h-2 rounded-full bg-[#F5A623]" />Planned
-                <b className="ml-auto">{Math.round(series.plannedPct[tipIdx] || 0)}%</b>
-              </div>
             </div>
             <div className="flex justify-between mt-1 px-0.5 text-[9.5px] font-mono text-text-light">
               {windowMonths.map((m, i) => (

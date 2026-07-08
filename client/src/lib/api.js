@@ -148,6 +148,7 @@ export const api = {
   getMonthlyActualsByCustomer: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-by-customer?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getMonthlyActualsByProject: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-by-project?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getMonthlyActualsByType: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-by-type?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  getMonthlyWorkBuckets: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-work-buckets?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getResourceActualsByCustomer: (resourceId, from, to) => apiFetch(`/integration/tempo/actuals/resource-by-customer?resourceId=${encodeURIComponent(resourceId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getResourceUnmappedActuals: (resourceId, from, to) => apiFetch(`/integration/tempo/actuals/resource-unmapped?resourceId=${encodeURIComponent(resourceId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getCustomerActualsByResource: (customerId, from, to) => apiFetch(`/integration/tempo/actuals/customer-by-resource?customerId=${encodeURIComponent(customerId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),

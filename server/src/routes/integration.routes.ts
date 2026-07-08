@@ -99,6 +99,18 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.actualsByResourceType(req.orgId, from, to, visibleIds);
   });
 
+  // Org-wide logged hours per month split into client / unmapped / internal /
+  // absence — the home dashboard's stacked bars. Scoped to visible people.
+  app.get('/integration/tempo/actuals/monthly-work-buckets', async (req) => {
+    const q = req.query as { from?: string; to?: string };
+    const cur = new Date().toISOString().slice(0, 7);
+    const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
+    const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
+    const v = req.visibility;
+    const visibleIds = v.isAdmin ? null : [...v.visiblePersonIds];
+    return integrationService.actualsWorkBuckets(req.orgId, from, to, visibleIds);
+  });
+
   // Actual hours per customer per month — scoped to visible customers. Feeds the
   // client-staffing heatmap and the PM-review chart.
   app.get('/integration/tempo/actuals/monthly-by-customer', async (req) => {

@@ -57,7 +57,7 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
       {typeRows.map((k) => (
         <div key={k} className="pl-3">
           <TipRow swatch={WORK_TYPE_COLORS[k]} label={WORK_TYPE_LABELS[k]}
-            value={`${fmtH(typedHours[k] || 0)}${inLens(k) ? '' : ' · excluded'}`} />
+            value={`${fmtH(typedHours[k] || 0)}${inLens(k) ? '' : ' · not counted'}`} />
         </div>
       ))}
       {delta && <TipRow label="Δ" value={delta} />}
