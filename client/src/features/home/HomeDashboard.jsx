@@ -589,7 +589,7 @@ export default function HomeDashboard() {
               <h3 className="text-[13px] font-bold text-text m-0">Utilization</h3>
               {hasBuckets ? (
                 <>
-                  <InfoDot text="Teal line = realised planned allocation of matched people (linked to Jira) ÷ their capacity. Each month's bar stacks what they actually logged in Tempo — client work, unmapped hours (no customer mapping yet), internal work, and absences — on the same % scale, so the bar meeting the line means the logged time accounts for the plan. The tooltip shows hours and the % side by side. With a team selected, the bars sum that team's people and unmapped hours count inside Client (they can't be split per person)." />
+                  <InfoDot text="Teal line = realised planned allocation of matched people (linked to Jira) ÷ their capacity. Each month's bar stacks what they actually logged in Tempo — client work, unmapped hours (no customer mapping yet), internal work, and absences — on the same % scale, so the bar meeting the line means the logged time accounts for the plan. The dashed grey line marks the group's full capacity (100%). The tooltip shows hours and the % side by side. With a team selected, the bars sum that team's people and unmapped hours count inside Client (they can't be split per person)." />
                   <span className="inline-flex items-center gap-2 text-[10px] text-text-light">
                     <span className="inline-flex items-center gap-1"><i className="w-3 h-[3px] rounded bg-[#4CBAD4] inline-block" />planned</span>
                     {BUCKETS.map(({ key, label, color }) => (
@@ -601,13 +601,14 @@ export default function HomeDashboard() {
                 </>
               ) : (
                 <>
-                  <InfoDot text="Monthly % over the year. Blue = realised allocation and orange dashed = all planned allocation — both ÷ the whole team’s capacity. Green = actual logged Tempo hours ÷ 173.33 (hours per FTE), but only for “matched” people (linked to Jira) and ÷ only their capacity — so the actual rate isn’t diluted by people you don’t track yet. That’s why blue/orange span everyone while green covers matched people only." />
+                  <InfoDot text="Monthly % over the year. Blue = realised allocation and orange dashed = all planned allocation — both ÷ the whole team’s capacity. Green = actual logged Tempo hours ÷ 173.33 (hours per FTE), but only for “matched” people (linked to Jira) and ÷ only their capacity — so the actual rate isn’t diluted by people you don’t track yet. That’s why blue/orange span everyone while green covers matched people only. The dashed grey line marks full capacity (100%)." />
                   <span className="text-[10.5px] text-text-light">realised · actual · planned</span>
                 </>
               )}
               <span className="flex-1" />
               <span className="text-[10.5px] font-semibold text-text-mid bg-primary-bg border border-border-light rounded-full px-2.5 py-1">Jan – Dec {year}</span>
             </div>
+            <div className="relative">
             <svg
               viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ height: 170 }} preserveAspectRatio="none"
               onMouseMove={(e) => {
@@ -625,6 +626,8 @@ export default function HomeDashboard() {
               {[0.25, 0.5, 0.75].map((f) => (
                 <line key={f} x1="0" y1={y(maxScale * f)} x2={W} y2={y(maxScale * f)} stroke="#EDF2F7" />
               ))}
+              {/* full capacity of the scoped people = 100% on this scale */}
+              <line x1="0" y1={y(100)} x2={W} y2={y(100)} stroke="#A6B3C0" strokeWidth="1.5" strokeDasharray="7 5" opacity="0.8" />
               {hasBuckets ? (
                 <>
                   {/* one stacked bar per month: client / unmapped / internal / absences */}
@@ -657,6 +660,15 @@ export default function HomeDashboard() {
                 </>
               )}
             </svg>
+            {/* label for the capacity line, pinned to its height (the svg is
+                stretched, so text must live outside it) */}
+            <span
+              className="absolute right-1 text-[8.5px] font-semibold text-slate-400 bg-white/80 rounded px-1 pointer-events-none"
+              style={{ top: (y(100) / H) * 170 - 13 }}
+            >
+              100% capacity
+            </span>
+            </div>
             {/* dark tooltip */}
             <div
               className="absolute pointer-events-none bg-[#16323C] text-white rounded-xl px-3 py-2 shadow-lg"
@@ -675,7 +687,7 @@ export default function HomeDashboard() {
                     return (
                       <div key={key} className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
                         <i className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />{label}
-                        <b className="ml-auto">{Math.round(hours)}h</b>
+                        <b className="ml-auto">{Math.round(hours)}h ({Math.round(bucketPct[tipIdx]?.[key] || 0)}%)</b>
                       </div>
                     );
                   })}
