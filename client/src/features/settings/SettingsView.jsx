@@ -18,7 +18,7 @@ import LogCategoriesSection from './LogCategoriesSection';
 export default function SettingsView() {
   const { currentOrg, role, updateOrg } = useOrg();
   const { user } = useAuth();
-  const { teams, resources, addTeam, updateTeam, deleteTeam, skills, addSkill, updateSkill, deleteSkill } = useData();
+  const { teams, resources, addTeam, updateTeam, deleteTeam, updateResource, skills, addSkill, updateSkill, deleteSkill } = useData();
   const [members, setMembers] = useState([]);
   const [invites, setInvites] = useState([]);
   const [memberNotice, setMemberNotice] = useState('');
@@ -48,6 +48,8 @@ export default function SettingsView() {
   const [editingTeamId, setEditingTeamId] = useState(null);
   const [editingTeamName, setEditingTeamName] = useState('');
   const [editingTeamManagerId, setEditingTeamManagerId] = useState('');
+  // Which team's member list is expanded (add/remove people inline).
+  const [membersTeamId, setMembersTeamId] = useState(null);
   const [skillsError, setSkillsError] = useState('');
   const [seedingSkills, setSeedingSkills] = useState(false);
   const [newSkillName, setNewSkillName] = useState('');
@@ -401,6 +403,30 @@ export default function SettingsView() {
       await deleteTeam(team.id);
     } catch (err) {
       setTeamError(err.message || 'Failed to delete team');
+    }
+  };
+
+  // Membership lives on the person (Resource.teams) — adding/removing here is
+  // the same write as editing the person's teams on their profile.
+  const handleAddToTeam = async (resourceId, team) => {
+    const r = resources.find((x) => x.id === resourceId);
+    if (!r) return;
+    setTeamError('');
+    try {
+      await updateResource(r.id, { teamIds: [...new Set([...(r.teams || []).map((t) => t.id), team.id])] });
+    } catch (err) {
+      setTeamError(err.message || 'Could not add them to the team');
+    }
+  };
+
+  const handleRemoveFromTeam = async (resource, team) => {
+    setTeamError('');
+    try {
+      await updateResource(resource.id, {
+        teamIds: (resource.teams || []).map((t) => t.id).filter((id) => id !== team.id),
+      });
+    } catch (err) {
+      setTeamError(err.message || 'Could not remove them from the team');
     }
   };
 
@@ -1003,7 +1029,7 @@ export default function SettingsView() {
         <div id="teams" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
           <h3 className="text-sm font-bold text-text mb-3">Teams</h3>
           <p className="text-[10px] text-text-light mb-3">
-            Group people into teams. A person can belong to multiple teams. Each team can have a manager whose ownership is inherited by all team members.
+            Group people into teams. A person can belong to multiple teams. Each team can have a manager whose ownership is inherited by all team members. Click a team’s member count to add or remove people.
           </p>
 
           {teamError && (
@@ -1012,8 +1038,15 @@ export default function SettingsView() {
 
           <div className="space-y-1 mb-3">
             {teams.map((t) => {
-              const count = resources.filter((r) => (r.teams || []).some((rt) => rt.id === t.id)).length;
+              const teamMembers = resources
+                .filter((r) => !r.archived && (r.teams || []).some((rt) => rt.id === t.id))
+                .sort((a, b) => a.name.localeCompare(b.name));
+              const nonMembers = resources
+                .filter((r) => !r.archived && !(r.teams || []).some((rt) => rt.id === t.id))
+                .sort((a, b) => a.name.localeCompare(b.name));
+              const count = teamMembers.length;
               const isEditing = editingTeamId === t.id;
+              const membersOpen = membersTeamId === t.id;
               const managerName = t.managerUser?.name || members.find((m) => m.user.id === t.managerUserId)?.user.name;
               return (
                 <div key={t.id} className="py-1.5 px-2 rounded-lg hover:bg-primary-bg/30">
@@ -1059,7 +1092,16 @@ export default function SettingsView() {
                       {managerName && (
                         <span className="text-[10px] text-text-light">Manager: {managerName}</span>
                       )}
-                      <span className="text-[10px] text-text-light">{count === 1 ? '1 person' : `${count} people`}</span>
+                      <button
+                        onClick={() => setMembersTeamId(membersOpen ? null : t.id)}
+                        title="Add or remove people"
+                        className={`text-[10px] bg-transparent border-0 cursor-pointer px-1 inline-flex items-center gap-1 ${
+                          membersOpen ? 'text-primary font-semibold' : 'text-text-light hover:text-primary'
+                        }`}
+                      >
+                        <span className="text-[8px] transition-transform inline-block" style={{ transform: membersOpen ? 'rotate(90deg)' : 'none' }}>▶</span>
+                        {count === 1 ? '1 person' : `${count} people`}
+                      </button>
                       <button
                         onClick={() => handleStartEditTeam(t)}
                         className="text-[10px] text-text-mid bg-transparent border-0 cursor-pointer hover:text-primary px-1"
@@ -1072,6 +1114,37 @@ export default function SettingsView() {
                       >
                         Delete
                       </button>
+                    </div>
+                  )}
+                  {membersOpen && !isEditing && (
+                    <div className="mt-2 pt-2 border-t border-border-light/70 flex flex-wrap items-center gap-1.5">
+                      {teamMembers.map((r) => (
+                        <span key={r.id} className="inline-flex items-center gap-1 text-[10px] font-semibold text-text-mid bg-primary-bg rounded-full pl-2 pr-1 py-0.5">
+                          {r.name}
+                          <button
+                            onClick={() => handleRemoveFromTeam(r, t)}
+                            title={`Remove ${r.name} from ${t.name}`}
+                            className="w-3.5 h-3.5 flex items-center justify-center rounded-full text-[9px] text-text-light bg-transparent border-0 cursor-pointer hover:text-danger hover:bg-white"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                      {teamMembers.length === 0 && (
+                        <span className="text-[10px] text-text-light">No members yet.</span>
+                      )}
+                      {nonMembers.length > 0 && (
+                        <select
+                          value=""
+                          onChange={(e) => e.target.value && handleAddToTeam(e.target.value, t)}
+                          className="text-[10px] font-semibold text-primary border border-primary/30 bg-white rounded-full px-2 py-0.5 outline-none cursor-pointer hover:bg-primary-light"
+                        >
+                          <option value="">+ Add person…</option>
+                          {nonMembers.map((r) => (
+                            <option key={r.id} value={r.id}>{r.name}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   )}
                 </div>

@@ -122,12 +122,21 @@ function RailRow({ to, avatar, title, meta, chip, hot }) {
 export default function HomeDashboard() {
   const { user } = useAuth();
   const { managedPersonIds, isAdmin, selfResourceId } = useVisibility();
-  const { customers, projects, resources, needs, assignments } = useData();
+  const { customers, projects, resources, needs, assignments, teams } = useData();
   const { rU, rURealised } = useComputed();
   const navigate = useNavigate();
 
   const [evals, setEvals] = useState(null);
   const [reminders, setReminders] = useState([]);
+
+  // Team lens: scopes the capacity-side KPIs, the donut and the chart to one
+  // team's people. Demand-side numbers (Unfilled, Active projects, the
+  // greeting) stay org-wide — open needs have no assignee to attribute.
+  const [teamId, setTeamId] = useState('');
+  const teamResources = useMemo(
+    () => (teamId ? resources.filter((r) => (r.teams || []).some((t) => t.id === teamId)) : resources),
+    [resources, teamId]
+  );
 
   useEffect(() => {
     let dead = false;
@@ -151,7 +160,7 @@ export default function HomeDashboard() {
 
   /* ----- per-month series over the year ----- */
   const series = useMemo(() => {
-    const capacity = resources.reduce((s, r) => s + (r.capacity || 1), 0) || 1;
+    const capacity = teamResources.reduce((s, r) => s + (r.capacity || 1), 0) || 1;
     const realisedPct = [], plannedPct = [], gapFte = [], activeCount = [];
     const projectById = new Map(projects.map((p) => [p.id, p]));
     const customerById = new Map(customers.map((c) => [c.id, c]));
@@ -166,7 +175,7 @@ export default function HomeDashboard() {
 
     for (const m of windowMonths) {
       let realised = 0, planned = 0;
-      for (const r of resources) {
+      for (const r of teamResources) {
         realised += rURealised[r.id]?.[m] || 0;
         planned += rU[r.id]?.[m] || 0;
       }
@@ -189,7 +198,7 @@ export default function HomeDashboard() {
       activeCount.push([...active].filter((id) => projectById.get(id)?.status === 'realised').length);
     }
     return { realisedPct, plannedPct, gapFte, activeCount, capacity };
-  }, [windowMonths, resources, needs, assignments, projects, customers, rU, rURealised]);
+  }, [windowMonths, teamResources, needs, assignments, projects, customers, rU, rURealised]);
 
   /* ----- headline insight ----- */
   const insight = useMemo(() => {
@@ -223,12 +232,12 @@ export default function HomeDashboard() {
 
   const domainCounts = useMemo(() => {
     const counts = {};
-    for (const r of resources) {
+    for (const r of teamResources) {
       const d = resourcePrimaryDomain(r);
       counts[d] = (counts[d] || 0) + 1;
     }
     return counts;
-  }, [resources]);
+  }, [teamResources]);
 
   /* ----- chart ----- */
   // Matched people = those linked to the external actual-hours system. Actual
@@ -236,21 +245,21 @@ export default function HomeDashboard() {
   // logged hours ÷ their capacity) rather than being diluted by people we
   // don't yet track in Tempo/Jira.
   const matchedCapacity = useMemo(
-    () => resources.filter((r) => r.externalWorkId).reduce((s, r) => s + (r.capacity || 1), 0),
-    [resources]
+    () => teamResources.filter((r) => r.externalWorkId).reduce((s, r) => s + (r.capacity || 1), 0),
+    [teamResources]
   );
   // Actual utilization % per month: matched-people actual hours → FTE / matched capacity.
   const actualPct = useMemo(
     () => windowMonths.map((m) => {
       if (matchedCapacity <= 0) return 0;
       let hours = 0;
-      for (const r of resources) {
+      for (const r of teamResources) {
         if (!r.externalWorkId) continue;
         hours += actuals[r.id]?.[m] || 0;
       }
       return ((hours / MONTHLY_HOURS_PER_FTE) / matchedCapacity) * 100;
     }),
-    [windowMonths, resources, actuals, matchedCapacity]
+    [windowMonths, teamResources, actuals, matchedCapacity]
   );
   const hasActual = actualPct.some((v) => v > 0);
   // Potential utilization of matched people this month — the baseline the
@@ -258,12 +267,12 @@ export default function HomeDashboard() {
   const potentialMatchedNow = useMemo(() => {
     if (matchedCapacity <= 0) return 0;
     let fte = 0;
-    for (const r of resources) {
+    for (const r of teamResources) {
       if (!r.externalWorkId) continue;
       fte += rU[r.id]?.[m0] || 0;
     }
     return (fte / matchedCapacity) * 100;
-  }, [resources, rU, m0, matchedCapacity]);
+  }, [teamResources, rU, m0, matchedCapacity]);
   const actualNow = actualPct[m0idx] ?? 0;
   const showActualKpi = hasActual && matchedCapacity > 0;
 
@@ -276,21 +285,55 @@ export default function HomeDashboard() {
       .then((d) => setBuckets(d || {}))
       .catch(() => setBuckets({}));
   }, [windowMonths]);
+  // The bucket endpoint is org-wide; per-person-per-type hours let the bars
+  // follow the team filter. Loaded once, on the first team selection. The
+  // unmapped split isn't person-attributable, so team bars fold it into Client.
+  const [typedActuals, setTypedActuals] = useState(null);
+  useEffect(() => {
+    if (!teamId || typedActuals || !windowMonths.length) return;
+    api.getMonthlyActualsByType(windowMonths[0], windowMonths[windowMonths.length - 1])
+      .then((d) => setTypedActuals(d || {}))
+      .catch(() => setTypedActuals({}));
+  }, [teamId, typedActuals, windowMonths]);
+  // Per-month bucket hours under the current lens (org buckets, or the team's
+  // people summed from the typed data).
+  const monthBuckets = useMemo(() => {
+    if (!teamId) return buckets;
+    if (!typedActuals) return {};
+    const out = {};
+    for (const m of windowMonths) {
+      const b = { client: 0, internal: 0, absence: 0 };
+      for (const r of teamResources) {
+        const t = typedActuals[r.id]?.[m];
+        if (!t) continue;
+        b.client += t.client || 0;
+        b.internal += t.internal || 0;
+        b.absence += t.absence || 0;
+      }
+      out[m] = b;
+    }
+    return out;
+  }, [teamId, buckets, typedActuals, windowMonths, teamResources]);
   const BUCKETS = useMemo(() => ([
     { key: 'client', label: 'Client', color: WORK_TYPE_COLORS.client },
-    { key: 'unmapped', label: 'Unmapped', color: '#F5A623' },
+    ...(teamId ? [] : [{ key: 'unmapped', label: 'Unmapped', color: '#F5A623' }]),
     { key: 'internal', label: 'Internal', color: WORK_TYPE_COLORS.internal },
     { key: 'absence', label: 'Absences', color: WORK_TYPE_COLORS.absence },
-  ]), []);
+  ]), [teamId]);
   const bucketPct = useMemo(() => {
     const toPct = (h) => (matchedCapacity > 0 ? ((h / MONTHLY_HOURS_PER_FTE) / matchedCapacity) * 100 : 0);
     return windowMonths.map((m) => {
-      const b = buckets[m] || {};
+      const b = monthBuckets[m] || {};
       return Object.fromEntries(BUCKETS.map(({ key }) => [key, toPct(b[key] || 0)]));
     });
-  }, [windowMonths, buckets, matchedCapacity, BUCKETS]);
+  }, [windowMonths, monthBuckets, matchedCapacity, BUCKETS]);
   const bucketTotals = bucketPct.map((b) => BUCKETS.reduce((s, { key }) => s + b[key], 0));
   const hasBuckets = matchedCapacity > 0 && bucketTotals.some((v) => v > 0);
+  // Raw logged hours per month (all buckets) — the tooltip's total.
+  const loggedHours = useMemo(
+    () => windowMonths.map((m) => BUCKETS.reduce((s, { key }) => s + (monthBuckets[m]?.[key] || 0), 0)),
+    [windowMonths, monthBuckets, BUCKETS]
+  );
   // The plan the bars compare against: realised allocations of the matched
   // people over matched capacity — same population as the bars, so the line
   // and the stack share a denominator.
@@ -298,14 +341,18 @@ export default function HomeDashboard() {
     () => windowMonths.map((m) => {
       if (matchedCapacity <= 0) return 0;
       let fte = 0;
-      for (const r of resources) {
+      for (const r of teamResources) {
         if (!r.externalWorkId) continue;
         fte += rURealised[r.id]?.[m] || 0;
       }
       return (fte / matchedCapacity) * 100;
     }),
-    [windowMonths, resources, rURealised, matchedCapacity]
+    [windowMonths, teamResources, rURealised, matchedCapacity]
   );
+  // Hours behind the planned % — the tooltip shows both so the plan and the
+  // hour buckets read in the same units.
+  const plannedMatchedHours = (i) =>
+    ((plannedMatchedPct[i] || 0) / 100) * matchedCapacity * MONTHLY_HOURS_PER_FTE;
 
   const [hover, setHover] = useState(null);
   const tipIdx = hover ?? (m0idx >= 0 ? m0idx : 0);
@@ -441,7 +488,7 @@ export default function HomeDashboard() {
   const monthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][today.getMonth()];
 
   /* donut geometry */
-  const totalPeople = resources.length || 1;
+  const totalPeople = teamResources.length || 1;
   const CIRC = 2 * Math.PI * 16;
   let acc = 0;
   const donutSegs = Object.entries(domainCounts).map(([d, n]) => {
@@ -470,6 +517,19 @@ export default function HomeDashboard() {
           </p>
         </div>
         <div className="flex-1" />
+        {teams.length > 0 && (
+          <select
+            value={teamId}
+            onChange={(e) => setTeamId(e.target.value)}
+            className={`text-[11px] font-semibold rounded-full px-3 py-1.5 border outline-none cursor-pointer ${
+              teamId ? 'bg-primary-light text-primary border-primary/30' : 'bg-white text-text-mid border-border-light'
+            }`}
+            title="Scope the capacity KPIs and the chart to one team (open demand stays org-wide)"
+          >
+            <option value="">All teams</option>
+            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
         <span className="text-[11px] font-semibold text-text-mid bg-white border border-border-light rounded-full px-3 py-1.5">{dateChip}</span>
         <NotificationBell />
       </div>
@@ -480,7 +540,7 @@ export default function HomeDashboard() {
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
             <Kpi label="Active projects" chip="▦" chipBg="#E7F6FA" chipColor="#4CBAD4" spark={series.activeCount} sparkColor="#4CBAD4"
-              info="Projects active now (status “realised”), out of all projects. Sparkline: per month this year, the realised projects that have any staffing need that month.">
+              info="Projects active now (status “realised”), out of all projects. Sparkline: per month this year, the realised projects that have any staffing need that month. Always org-wide — projects aren’t team-scoped.">
               {activeProjects} <span className="text-[11px] font-medium text-text-light">of {projects.length}</span>
             </Kpi>
             {showActualKpi ? (
@@ -498,7 +558,7 @@ export default function HomeDashboard() {
               </Kpi>
             )}
             <Kpi label={`Unfilled (${MONTHS[today.getMonth()]})`} chip="◌" chipBg="#FDE8EA" chipColor="#E8636F" spark={series.gapFte} sparkColor="#E8636F"
-              info="Open demand this month across realised needs only — potential needs are excluded: Σ max(0, needed − filled) FTE. The chip is the change vs last month (down is good).">
+              info="Open demand this month across realised needs only — potential needs are excluded: Σ max(0, needed − filled) FTE. The chip is the change vs last month (down is good). Always org-wide — an open need has no assignee to attribute to a team.">
               {Math.round(gapNow * 10) / 10} <span className="text-[11px] font-medium text-text-light">FTE</span>
               <Delta value={gapPrev == null ? null : gapNow - gapPrev} goodWhenDown />
             </Kpi>
@@ -519,7 +579,7 @@ export default function HomeDashboard() {
                 </>
               }
             >
-              {resources.length} <span className="text-[11px] font-medium text-text-light">people</span>
+              {teamResources.length} <span className="text-[11px] font-medium text-text-light">people</span>
             </Kpi>
           </div>
 
@@ -529,7 +589,7 @@ export default function HomeDashboard() {
               <h3 className="text-[13px] font-bold text-text m-0">Utilization</h3>
               {hasBuckets ? (
                 <>
-                  <InfoDot text="Teal line = realised planned allocation of matched people (linked to Jira) ÷ their capacity. Each month's bar stacks what they actually logged in Tempo — client work, unmapped hours (no customer mapping yet), internal work, and absences — on the same % scale, so the bar meeting the line means the logged time accounts for the plan. Tooltip shows the raw hours per bucket." />
+                  <InfoDot text="Teal line = realised planned allocation of matched people (linked to Jira) ÷ their capacity. Each month's bar stacks what they actually logged in Tempo — client work, unmapped hours (no customer mapping yet), internal work, and absences — on the same % scale, so the bar meeting the line means the logged time accounts for the plan. The tooltip shows hours and the % side by side. With a team selected, the bars sum that team's people and unmapped hours count inside Client (they can't be split per person)." />
                   <span className="inline-flex items-center gap-2 text-[10px] text-text-light">
                     <span className="inline-flex items-center gap-1"><i className="w-3 h-[3px] rounded bg-[#4CBAD4] inline-block" />planned</span>
                     {BUCKETS.map(({ key, label, color }) => (
@@ -600,28 +660,28 @@ export default function HomeDashboard() {
             {/* dark tooltip */}
             <div
               className="absolute pointer-events-none bg-[#16323C] text-white rounded-xl px-3 py-2 shadow-lg"
-              style={{ left: `clamp(8px, ${8 + (tipIdx / 11) * 84}%, calc(100% - 150px))`, top: 44, width: 140 }}
+              style={{ left: `clamp(8px, ${8 + (tipIdx / 11) * 84}%, calc(100% - 190px))`, top: 44, width: 180 }}
             >
               <b className="text-[10.5px]">{formatMonth(windowMonths[tipIdx])}</b>
               {hasBuckets ? (
                 <>
                   <div className="flex items-center gap-1.5 text-[10px] opacity-95 mt-1">
-                    <i className="w-2 h-2 rounded-full bg-[#4CBAD4]" />Planned
-                    <b className="ml-auto">{Math.round(plannedMatchedPct[tipIdx] || 0)}%</b>
+                    <i className="w-2 h-2 rounded-full bg-[#4CBAD4] shrink-0" />Planned
+                    <b className="ml-auto">{Math.round(plannedMatchedHours(tipIdx))}h ({Math.round(plannedMatchedPct[tipIdx] || 0)}%)</b>
                   </div>
                   {BUCKETS.map(({ key, label, color }) => {
-                    const hours = buckets[windowMonths[tipIdx]]?.[key] || 0;
+                    const hours = monthBuckets[windowMonths[tipIdx]]?.[key] || 0;
                     if (hours <= 0) return null;
                     return (
                       <div key={key} className="flex items-center gap-1.5 text-[10px] opacity-95 mt-0.5">
-                        <i className="w-2 h-2 rounded-full" style={{ background: color }} />{label}
+                        <i className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />{label}
                         <b className="ml-auto">{Math.round(hours)}h</b>
                       </div>
                     );
                   })}
                   <div className="flex items-center gap-1.5 text-[10px] opacity-80 mt-0.5">
                     Logged total
-                    <b className="ml-auto">{Math.round(bucketTotals[tipIdx] || 0)}%</b>
+                    <b className="ml-auto">{Math.round(loggedHours[tipIdx] || 0)}h ({Math.round(bucketTotals[tipIdx] || 0)}%)</b>
                   </div>
                 </>
               ) : (
