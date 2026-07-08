@@ -19,10 +19,14 @@ const fmtH = (h) => `${h >= 9.95 ? Math.round(h) : Math.round(h * 10) / 10}h`;
  * doesn't read as underdelivery. Displayed percentages stay capacity-based so
  * they always match the bar geometry; the tooltip spells out available and
  * expected hours whenever absences reduce them.
+ *
+ * For months ahead, `plannedOffDays`/`plannedAvailPct` carry the days off
+ * entered in the planner: the tick also turns red when the plan exceeds what
+ * the leave leaves available, and the tooltip shows the reduced expectation.
  */
-function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, capacity = 1, workTypeFilter = 'work', max, accent, actualPartial }) {
+function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, capacity = 1, workTypeFilter = 'work', plannedOffDays = 0, plannedAvailPct = null, max, accent, actualPartial }) {
   const hasAct = act != null;
-  const overbooked = plan > 100.001;
+  const overbooked = plan > 100.001 || (plannedAvailPct != null && plan > plannedAvailPct + 0.001);
 
   const pct = (v) => `${Math.round(v)}%`;
   const toHours = (utilPct) => (utilPct / 100) * capacity * MONTHLY_HOURS_PER_FTE;
@@ -53,13 +57,19 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
     : [];
 
   const showExpected = hasAct && plan > 0 && absH > 0.05;
+  // Forward-looking months: planned days off shrink the deliverable plan.
+  const showPlannedOff = !hasAct && plannedOffDays > 0;
 
-  const tip = (plan > 0 || extra > 0 || (hasAct && act > 0)) ? (
+  const tip = (plan > 0 || extra > 0 || (hasAct && act > 0) || showPlannedOff) ? (
     <>
       <b className="text-[11px]">{title}</b>
       {plan > 0 && <TipRow swatch={accent} label="Planned" value={`${fmtH(planHours)} (${pct(plan)})`} />}
       {showExpected && (
         <TipRow label="Expected" value={`${fmtH(expectedHours)} · after ${fmtH(absH)} absence`} />
+      )}
+      {showPlannedOff && (
+        <TipRow swatch="#94A3B8" label="Days off"
+          value={`${plannedOffDays}d planned${plan > 0 && plannedAvailPct != null ? ` · expect ${fmtH(planHours * Math.min(1, plannedAvailPct / 100))}` : ''}`} />
       )}
       {extra > 0 && <TipRow label="+ potential" value={`${fmtH(toHours(extra))} (${pct(extra)})`} />}
       {hasAct && (act > 0 || plan > 0) && (
@@ -75,7 +85,11 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
       {delta && <TipRow label="Δ" value={delta} />}
       {actualPartial && <div className="opacity-80">month in progress</div>}
       {hasAct && act > 0 && plan <= 0 && <div className="opacity-80">unplanned work</div>}
-      {overbooked && <div className="text-[#FBA9B1]">over capacity</div>}
+      {overbooked && (
+        <div className="text-[#FBA9B1]">
+          {plan > 100.001 ? 'over capacity' : `over available capacity — ${plannedOffDays}d off`}
+        </div>
+      )}
     </>
   ) : null;
 

@@ -65,7 +65,7 @@ function QuickChips({ maxFte, onPick }) {
   );
 }
 
-export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, showRemove, showNeedEdit, needFte, onSave, onSaveNeed, onRemove, onClose }) {
+export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, showRemove, showNeedEdit, needFte, onSave, onSaveNeed, onRemove, onSubstitute, onClose }) {
   const [value, setValue] = useState(currentFte || 0.5);
   const [hours, setHours] = useState(fteToHours(currentFte || 0.5));
   const [needValue, setNeedValue] = useState(needFte || 0.5);
@@ -182,6 +182,13 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-end gap-2 -mt-1 -mr-1">
+            {onSubstitute && (
+              <button onClick={onSubstitute}
+                title="Hand the months from here on over to someone else (or clear them)"
+                className="px-2 py-0.5 text-primary text-[10px] font-semibold cursor-pointer border border-primary/30 bg-white rounded-lg hover:bg-primary-light active:scale-95 transition">
+                Substitute…
+              </button>
+            )}
             {showRemove && (
               <button onClick={() => { if (onRemove) onRemove(); else onSave(0); }}
                 className="px-2 py-0.5 text-danger text-[10px] font-semibold cursor-pointer border border-danger/30 bg-white rounded-lg hover:bg-danger-bg active:scale-95 transition">

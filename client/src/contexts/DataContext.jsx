@@ -176,6 +176,12 @@ export function DataProvider({ children }) {
     await api.deleteResource(id);
     invalidate('resources', 'assignments');
   }, [invalidate]);
+  // Planned absences (planner): per-month days delta, merged server-side.
+  const setResourceAbsences = useCallback(async (id, months) => {
+    const updated = await api.setResourceAbsences(id, months);
+    invalidate('resources');
+    return updated;
+  }, [invalidate]);
 
   // Team CRUD — membership changes are reflected on resources too.
   const addTeam = useCallback(async (data) => {
@@ -294,7 +300,7 @@ export function DataProvider({ children }) {
     addSeniority, updateSeniority, moveSeniority, deleteSeniority,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
-    addResource, updateResource, deleteResource,
+    addResource, updateResource, deleteResource, setResourceAbsences,
     addTeam, updateTeam, deleteTeam,
     addSkill, updateSkill, deleteSkill,
     addLogCategory, updateLogCategory, deleteLogCategory,

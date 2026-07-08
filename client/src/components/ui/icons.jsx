@@ -124,3 +124,21 @@ export const UndoIcon = (p) => (
     <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
   </Icon>
 );
+
+// Calendar with a minus — planned days off (leave/vacation).
+export const CalendarMinusIcon = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <path d="M16 2v4M8 2v4M3 10h18M9 16h6" />
+  </Icon>
+);
+
+// Two-person swap — hand an assignment over to a substitute.
+export const SwapIcon = (p) => (
+  <Icon {...p}>
+    <path d="M16 3h5v5" />
+    <path d="M21 3l-7 7" />
+    <path d="M8 21H3v-5" />
+    <path d="M3 21l7-7" />
+  </Icon>
+);

@@ -89,6 +89,7 @@ Organization (tenant boundary)
     ├── capacity: number (0.1–1.0 FTE)
     ├── userId: string?            // optional link to a login User (self-service)
     ├── externalWorkId: string?    // Jira accountId when matched for actual-hours sync
+    ├── plannedAbsences: { "YYYY-MM": days }  // planned days off per month (planner; 1 d = 8 h)
     └── roles: [{ domain, role, seniority }]  // a resource can have multiple roles
 ```
 
@@ -164,6 +165,7 @@ White background with a thin right border separating it from the grid.
 - When selected: 2px colored border (primary), gradient background, subtle colored shadow, checkmark badge in corner
 - When fully booked: 40% opacity, "full" text instead of available, not clickable
 - Hover reveals edit/delete buttons in the top-right corner
+- **Planned days off:** utilization/free numbers use **effective capacity** (capacity − planned absence; 1 day = 8 h). A slate **"N d off" chip** appears when the person has days off in the window; a person fully away shows **"off"** instead of a free number. A calendar icon button (always visible with a chip, hover-revealed otherwise; editors only) opens the **days-off popover**: one row per visible month with a number input (step 0.5), an "all" toggle (≈ whole month), the resulting effective FTE, and Save/Cancel. Saving sends only changed months (server merges per month; 0 clears).
 
 ### Planner Toolbar
 
@@ -300,6 +302,8 @@ A single assignment is displayed as one bar if all its active months have the sa
 
 **Drag behavior:** Dragging the left or right resize handles extends/contracts the bar across columns, automatically distributing FTE to new months based on the reference FTE of the existing segment.
 
+**Absence & overload marks on bars:** a month where the person has planned days off gets a **slate hatched strip** along the bar's bottom edge (tooltip: "N d planned off — click to adjust or substitute"). The **red overload dot** in a month's top-right corner fires when the person's total allocation exceeds their **effective** capacity (capacity − planned absence) — so a fully-off month flags any allocation, cueing a substitution.
+
 ---
 
 ## FTE Popover
@@ -321,6 +325,22 @@ A small floating popup that appears near the clicked cell or bar segment.
 - If opened from a cell (placement flow) and an assignment already exists for that resource + need → updates the existing assignment's monthAllocations[month].
 - If opened from a cell and no assignment exists → creates a new assignment with zeros everywhere and the FTE in this one month.
 - If opened from a bar segment (edit flow) → updates that month's FTE in the existing assignment.
+
+The bar-edit variant also offers **Remove** (delete the whole assignment) and **Substitute…** (open the substitution popover below).
+
+---
+
+## Substitute Popover
+
+Opened from a bar's FTE popover — the long-leave workflow ("this person is away; someone else takes over").
+
+**Structure:**
+- Header: "Substitute" + the original person's name and the need's role
+- **"Hand over from"** month select, defaulting to the clicked month (options = the months the person actually holds); below it a summary line "Sep '26 – Dec '26 · 4 months · avg 1.00 FTE"
+- Candidate list (top 6): role-matched people (same matching rule as placement), each with avatar, name, **free effective capacity** over the handover months ("+0.8 free", amber when less than the handover needs), "N d off" note, "already on this need" note, "knows <customer>" badge, and a **Hand over** button
+- Footer: **"No substitute — leave the months open"**
+
+**Behavior:** Hand over zeroes the original person's months from the chosen month onward and re-creates them at the same FTE on the substitute's assignment for the same need (merged on top of anything they already hold there; substitute is written first so a failure can't leave the need uncovered). "No substitute" just zeroes the months, so the need reopens (dashed amber "open" run). Either way it's a single undoable action ("Nikola → Milan from Sep '26").
 
 ---
 

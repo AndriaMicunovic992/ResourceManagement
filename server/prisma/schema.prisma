@@ -307,6 +307,10 @@ model Resource {
   // active people list but keeps all their history (the non-destructive
   // alternative to deleting, which is now blocked when history exists).
   archived  Boolean  @default(false)
+  // Planned absences entered in the planner: { "YYYY-MM": days } (workdays off
+  // that month, halves allowed). Drives effective capacity when planning ahead;
+  // synced Tempo absence hours remain the truth for elapsed months.
+  plannedAbsences Json @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

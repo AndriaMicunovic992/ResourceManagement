@@ -34,7 +34,13 @@ function handleUnauthorized(path) {
 }
 
 async function apiFetch(path, options = {}) {
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  // Only claim a JSON body when there is one: Fastify rejects a body-less
+  // DELETE that carries Content-Type: application/json ("Body cannot be empty
+  // when content-type is set"), which silently broke every in-app delete.
+  const headers = {
+    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...options.headers,
+  };
   const token = getToken();
   if (token) headers['Authorization'] = 'Bearer ' + token;
 
@@ -106,6 +112,8 @@ export const api = {
   getResources: () => apiFetch('/resources'),
   createResource: (data) => apiFetch('/resources', { method: 'POST', body: JSON.stringify(data) }),
   updateResource: (id, data) => apiFetch('/resources/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
+  // months is a per-month delta { "YYYY-MM": days } — merged server-side, 0 clears.
+  setResourceAbsences: (id, months) => apiFetch('/resources/' + id + '/absences', { method: 'PATCH', body: JSON.stringify({ months }) }),
   deleteResource: (id) => apiFetch('/resources/' + id, { method: 'DELETE' }),
 
   // Teams

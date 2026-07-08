@@ -7,6 +7,7 @@ import { utilColor } from '../../../lib/statusUtils';
 import { MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
 import { hoursForFilter, segmentsForFilter, stackTotalForFilter } from '../workTypeLens';
+import { plannedAbsenceDays, plannedAvailabilityRatio } from '../../../lib/availability';
 import { useComputed } from '../../../hooks/useComputed';
 
 export default function ResourceHeatmapRow({ resource, months, onOpen, includePotential, typedHours, workTypeFilter = 'work', window: win }) {
@@ -85,11 +86,17 @@ export default function ResourceHeatmapRow({ resource, months, onOpen, includePo
         </div>
         {months.map((m) => {
           const d = monthData[m];
+          // Planned days off matter for the months AHEAD (elapsed months judge
+          // against synced absences instead): the tick turns red when the plan
+          // exceeds what's left of the month after the leave.
+          const offDays = m >= cur ? plannedAbsenceDays(resource, m) : 0;
           return (
             <ResourceUtilCell key={m} title={`${resource.name} · ${formatMonth(m)}`}
               plan={d.realisedPct} extra={includePotential ? d.potentialPct : 0} act={d.actualPct}
               actSegments={d.actSegments} typedHours={typedHours?.[m]}
               capacity={resource.capacity || 1} workTypeFilter={workTypeFilter}
+              plannedOffDays={offDays}
+              plannedAvailPct={offDays > 0 ? plannedAvailabilityRatio(resource, m) * 100 : null}
               max={rowMax} accent={color} actualPartial={d.actualPartial} />
           );
         })}

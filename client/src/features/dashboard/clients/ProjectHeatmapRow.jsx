@@ -4,7 +4,7 @@ import StatusBadge from '../../../components/ui/StatusBadge';
 import { isProjectOk } from '../../../lib/gridUtils';
 import { formatMonth, monthRange, currentMonth } from '../../../lib/dateUtils';
 import { hoursToFte } from '../../../lib/constants';
-import { availabilityRatio } from '../../../lib/availability';
+import { availabilityRatio, plannedAvailabilityRatio } from '../../../lib/availability';
 import { useData } from '../../../contexts/DataContext';
 import { useMemo } from 'react';
 
@@ -24,10 +24,15 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
       return true;
     });
     const cur = currentMonth();
-    const capById = new Map(resources.map((r) => [r.id, r.capacity || 1]));
-    // Absence-adjusted deliverable plan, like the customer row.
-    const ratioFor = (rid, m) =>
-      m <= cur ? availabilityRatio(actuals?.byResourceType?.[rid]?.[m], capById.get(rid)) : 1;
+    const resById = new Map(resources.map((r) => [r.id, r]));
+    // Absence-adjusted deliverable plan, like the customer row: synced
+    // absences for elapsed months, planned days off for months ahead.
+    const ratioFor = (rid, m) => {
+      const r = resById.get(rid);
+      return m <= cur
+        ? availabilityRatio(actuals?.byResourceType?.[rid]?.[m], r?.capacity || 1)
+        : plannedAvailabilityRatio(r, m);
+    };
     for (const m of months) {
       if (!projMonths.includes(m)) { result[m] = { totalNeeded: 0, totalFilled: 0, totalExpected: 0, isPotential: false }; continue; }
       let totalNeeded = 0, totalFilled = 0, totalExpected = 0;

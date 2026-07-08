@@ -193,6 +193,29 @@ export const resourceService = {
     return this.getById(orgId, id);
   },
 
+  /**
+   * Merge a per-month delta of planned-absence days into the stored map.
+   * Same concurrency contract as assignment months: the merge happens in the
+   * database (jsonb concat), so two planners editing different months never
+   * clobber each other. Months set to 0 are dropped entirely (null-merge +
+   * strip) rather than stored as zeros.
+   */
+  async setAbsences(orgId: string, id: string, months: Record<string, number>) {
+    await this.getById(orgId, id);
+    const merge: Record<string, number | null> = {};
+    for (const [m, days] of Object.entries(months)) {
+      merge[m] = days > 0 ? Math.round(days * 2) / 2 : null; // half-day grain
+    }
+    await prisma.$executeRaw`
+      UPDATE "Resource"
+      SET "plannedAbsences" = jsonb_strip_nulls(
+            COALESCE("plannedAbsences", '{}'::jsonb) || ${JSON.stringify(merge)}::jsonb
+          ),
+          "updatedAt" = now()
+      WHERE "id" = ${id} AND "orgId" = ${orgId}`;
+    return this.getById(orgId, id);
+  },
+
   async delete(orgId: string, id: string) {
     await this.getById(orgId, id);
     try {

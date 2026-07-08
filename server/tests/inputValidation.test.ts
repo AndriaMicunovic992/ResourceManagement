@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { monthKey, fteValue, monthAllocations, httpUrl } from '../src/schemas/common.js';
 import { upsertAssignmentSchema } from '../src/schemas/assignment.schema.js';
+import { setAbsencesSchema } from '../src/schemas/resource.schema.js';
 import { createLogSchema } from '../src/schemas/log.schema.js';
 import { outboundUrlProblem } from '../src/utils/ssrf.js';
 
@@ -41,6 +42,19 @@ describe('monthAllocations', () => {
     const base = { needId: 'n1', resourceId: 'r1' };
     expect(upsertAssignmentSchema.safeParse({ ...base, monthAllocations: { '2026-07': 0.5 } }).success).toBe(true);
     expect(upsertAssignmentSchema.safeParse({ ...base, monthAllocations: { bad: -5 } }).success).toBe(false);
+  });
+});
+
+describe('setAbsencesSchema', () => {
+  it('accepts per-month day counts incl. halves and 0 (= clear)', () => {
+    expect(setAbsencesSchema.safeParse({ months: { '2026-09': 15, '2026-10': 2.5, '2026-11': 0 } }).success).toBe(true);
+  });
+  it('rejects empty maps, bad month keys, and out-of-range days', () => {
+    expect(setAbsencesSchema.safeParse({ months: {} }).success).toBe(false);
+    expect(setAbsencesSchema.safeParse({ months: { '2026-13': 1 } }).success).toBe(false);
+    expect(setAbsencesSchema.safeParse({ months: { garbage: 1 } }).success).toBe(false);
+    expect(setAbsencesSchema.safeParse({ months: { '2026-09': -1 } }).success).toBe(false);
+    expect(setAbsencesSchema.safeParse({ months: { '2026-09': 40 } }).success).toBe(false);
   });
 });
 

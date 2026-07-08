@@ -5,6 +5,7 @@ import ResourcePool from './pool/ResourcePool';
 import PlannerToolbar from './toolbar/PlannerToolbar';
 import PlannerGrid from './grid/PlannerGrid';
 import SuggestPopover from './SuggestPopover';
+import SubstitutePopover from './SubstitutePopover';
 import FtePopover from '../../components/popovers/FtePopover';
 import CustomerForm from '../../components/forms/CustomerForm';
 import ProjectForm from '../../components/forms/ProjectForm';
@@ -13,10 +14,13 @@ import EmptyState from '../../components/ui/EmptyState';
 import { useData } from '../../contexts/DataContext';
 import { useOrg } from '../../contexts/OrgContext';
 import { currentMonth, addMonths } from '../../lib/dateUtils';
+import { effectiveCapacity } from '../../lib/availability';
 
 /**
  * Smart auto-fill: per month, assign min(remaining gap on the need, the
- * person's remaining capacity). Returns null when nothing can be placed.
+ * person's remaining capacity). Capacity is EFFECTIVE capacity — a month with
+ * planned days off offers only what's left of it, and a fully-off month gets
+ * skipped. Returns null when nothing can be placed.
  */
 function buildAutoFill(need, resource, assignments) {
   const needAllocs = need.monthAllocations || {};
@@ -31,7 +35,7 @@ function buildAutoFill(need, resource, assignments) {
     const filled = needAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
     const gap = needed - filled;
     const used = resourceAssigns.reduce((s, a) => s + ((a.monthAllocations || {})[m] || 0), 0);
-    const cap = Math.max(0, (resource.capacity ?? 1.0) - used);
+    const cap = Math.max(0, effectiveCapacity(resource, m) - used);
     const fte = Math.round(Math.max(0, Math.min(gap, cap)) * 100) / 100;
     monthAllocations[m] = fte;
     if (fte > 0) hasAny = true;
@@ -336,6 +340,10 @@ export default function PlannerView() {
     });
   }, [heldResource, assignments]);
 
+  // Substitution: hand an assignment's remaining months to someone else (or
+  // nobody). Opened from the bar's FTE popover.
+  const [substitute, setSubstitute] = useState(null);
+
   // "Suggest people" popover for an unfilled need.
   const [suggest, setSuggest] = useState(null);
   const handleSuggestNeed = useCallback((need, project, customer, e) => {
@@ -374,7 +382,7 @@ export default function PlannerView() {
   return (
     <div className="flex h-full gap-3 p-3">
       <div className="flex rounded-2xl bg-white border border-border-light shadow-card overflow-hidden">
-        <ResourcePool heldResource={heldResource} onHold={setHeldResource} timeRange={timeRange} />
+        <ResourcePool heldResource={heldResource} onHold={setHeldResource} timeRange={timeRange} onError={notifyError} />
       </div>
       <div className="flex-1 min-w-0 flex flex-col rounded-2xl bg-white border border-border-light shadow-card overflow-hidden" onClick={() => setPopover(null)}>
         <PlannerToolbar
@@ -414,7 +422,24 @@ export default function PlannerView() {
           needFte={popover.needFte}
           onSave={handleFteSave}
           onSaveNeed={handleNeedFteSave}
+          onSubstitute={popover.type === 'edit' ? () => {
+            const { needId, resourceId, month, x, y } = popover;
+            setPopover(null);
+            setSubstitute({ needId, resourceId, fromMonth: month, x, y });
+          } : undefined}
           onClose={() => setPopover(null)}
+        />
+      )}
+
+      {substitute && (
+        <SubstitutePopover
+          needId={substitute.needId}
+          resourceId={substitute.resourceId}
+          fromMonth={substitute.fromMonth}
+          x={substitute.x} y={substitute.y}
+          onUndoable={pushUndo}
+          onError={notifyError}
+          onClose={() => setSubstitute(null)}
         />
       )}
 
