@@ -332,15 +332,17 @@ The bar-edit variant also offers **Remove** (delete the whole assignment) and **
 
 ## Substitute Popover
 
-Opened from a bar's FTE popover — the long-leave workflow ("this person is away; someone else takes over").
+Opened from a bar's FTE popover — covers both the short-leave/rebalance case ("take 40h of September off my plate") and the long-leave workflow ("someone else takes over from here").
 
 **Structure:**
 - Header: "Substitute" + the original person's name and the need's role
-- **"Hand over from"** month select, defaulting to the clicked month (options = the months the person actually holds); below it a summary line "Sep '26 – Dec '26 · 4 months · avg 1.00 FTE"
-- Candidate list (top 6): role-matched people (same matching rule as placement), each with avatar, name, **free effective capacity** over the handover months ("+0.8 free", amber when less than the handover needs), "N d off" note, "already on this need" note, "knows <customer>" badge, and a **Hand over** button
-- Footer: **"No substitute — leave the months open"**
+- **"Month"** select, defaulting to the clicked month (options = the months the person actually holds)
+- **Scope toggle** (segmented): **"Only Sep '26"** (default) vs **"Sep '26 → end"**
+- **"Hand over"** amount — twin inputs in **FTE** and **h/mo** (kept in sync), defaulting to the person's full allocation for the selected month; a "split" chip appears when the amount is partial. Below, a summary line: "Sep '26 · hands over 0.50 of 1.00 FTE · Nikola keeps 0.50" (single month) or "Sep '26 – Dec '26 · 4 months · avg 1.00 FTE" (range; "up to X FTE each" when partial)
+- Candidate list (top 6): role-matched people (same matching rule as placement), each with avatar, name, **free effective capacity** over the handed months ("+0.8 free", amber when less than the handover needs), "N d off" note, "already on this need" note, "knows <customer>" badge, and a **Hand over** button
+- Footer: **"No substitute — leave Sep '26 open"** (or "just reduce …" when partial)
 
-**Behavior:** Hand over zeroes the original person's months from the chosen month onward and re-creates them at the same FTE on the substitute's assignment for the same need (merged on top of anything they already hold there; substitute is written first so a failure can't leave the need uncovered). "No substitute" just zeroes the months, so the need reopens (dashed amber "open" run). Either way it's a single undoable action ("Nikola → Milan from Sep '26").
+**Behavior:** Hand over subtracts the amount from the original person's month(s) — capped per month at what they hold — and re-creates it on the substitute's assignment for the same need (merged on top of anything they already hold there; substitute is written first so a failure can't leave the need uncovered). A partial amount splits the month between the two bars; a full amount leaves a gap/truncation exactly as before. "No substitute" just subtracts, so the need reopens (dashed amber "open" run). Either way it's a single undoable action ("Nikola → Milan for Sep '26" / "… from Sep '26").
 
 ---
 
