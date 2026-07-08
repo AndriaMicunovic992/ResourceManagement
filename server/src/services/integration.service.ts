@@ -629,21 +629,28 @@ export const integrationService = {
       byKey.set(key, months);
     }
     if (byKey.size === 0) return [];
-    const names = await prisma.jiraWorkItem.findMany({
+    const items = await prisma.jiraWorkItem.findMany({
       where: { orgId, externalKey: { in: [...byKey.keys()] } },
-      select: { externalKey: true, name: true },
+      select: { externalKey: true, name: true, customerId: true, projectId: true, workType: true },
     });
-    const nameByKey = new Map(names.map((n) => [n.externalKey, n.name]));
+    const itemByKey = new Map(items.map((n) => [n.externalKey, n]));
     const total = (months: Record<string, number>) => Object.values(months).reduce((s, v) => s + v, 0);
     return [...byKey.entries()]
       .sort((a, b) => total(b[1]) - total(a[1]))
-      .map(([key, secondsByMonth]) => ({
-        key,
-        name: nameByKey.get(key) || key,
-        months: Object.fromEntries(
-          Object.entries(secondsByMonth).map(([m, s]) => [m, Math.round((s / 3600) * 10) / 10])
-        ),
-      }));
+      .map(([key, secondsByMonth]) => {
+        const wi = itemByKey.get(key);
+        // The Jira project IS mapped/classified but these hours predate it —
+        // the stale-attribution case a "Re-apply mappings" run fixes.
+        const stale = !!wi && (!!wi.customerId || !!wi.projectId || wi.workType !== 'client');
+        return {
+          key,
+          name: wi?.name || key,
+          stale,
+          months: Object.fromEntries(
+            Object.entries(secondsByMonth).map(([m, s]) => [m, Math.round((s / 3600) * 10) / 10])
+          ),
+        };
+      });
   },
 
   /**
@@ -709,6 +716,18 @@ export const integrationService = {
       },
     });
     return this.getConnection(orgId);
+  },
+
+  /**
+   * Re-resolve every stored worklog through the current mappings, on demand.
+   * The same pass runs automatically after mapping edits and at the end of
+   * each sync, but the explicit lever matters when history predates those
+   * hooks (e.g. projects classified before this feature deployed) or when a
+   * broken sync keeps the automatic pass from running.
+   */
+  async restampAll(orgId: string) {
+    const restamped = await restampWorklogs(orgId);
+    return { restamped };
   },
 
   // --- Work items (Jira hierarchy → our customers/projects) ---

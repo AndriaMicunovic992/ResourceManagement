@@ -97,9 +97,13 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
       .map((u) => ({
         key: `jira:${u.key}`,
         name: u.name === u.key ? u.key : `${u.name} (${u.key})`,
-        badge: 'not mapped',
+        // "stale mapping" = the Jira project IS mapped/classified, but these
+        // hours were attributed before that — Re-apply mappings moves them.
+        badge: u.stale ? 'stale mapping' : 'not mapped',
         color: '#F5A623',
-        note: `Jira ${u.key} isn’t mapped to a customer — map or classify it under Settings → Integrations.`,
+        note: u.stale
+          ? `Jira ${u.key} is mapped, but these hours were synced before that — run “Re-apply mappings” under Settings → Integrations to move them.`
+          : `Jira ${u.key} isn’t mapped to a customer — map or classify it under Settings → Integrations.`,
         plan: () => 0,
         act: (m) => (m <= cur ? u.months?.[m] || 0 : null),
       }));

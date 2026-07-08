@@ -167,6 +167,12 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.listWorkItems(req.orgId);
   });
 
+  // Re-attribute all stored worklogs through the current mappings, on demand.
+  // Rate-limited like the sync — it's a full pass over the org's worklogs.
+  app.post('/integration/jira/restamp', { preHandler: requireRole('admin'), config: { rateLimit: { max: 6, timeWindow: '1 minute' } } }, async (req) => {
+    return integrationService.restampAll(req.orgId);
+  });
+
   app.post('/integration/jira/work-items', { preHandler: requireRole('admin') }, async (req) => {
     const data = createWorkItemSchema.parse(req.body);
     return integrationService.createWorkItem(req.orgId, data);

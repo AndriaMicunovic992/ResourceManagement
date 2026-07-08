@@ -118,6 +118,19 @@ describe.skipIf(!HAS_DB)('Tempo sync', () => {
     expect(row.customerId).toBe(customerId);
   });
 
+  it('the on-demand restamp heals stale attribution and reports the count', async () => {
+    // Simulate history stamped before the classification existed (the state a
+    // delta sync can never fix on its own).
+    await prisma.worklog.updateMany({
+      where: { orgId, tempoWorklogId: '2' },
+      data: { workType: 'client', customerId: null, projectId: null },
+    });
+    const r = await integrationService.restampAll(orgId);
+    expect(r.restamped).toBeGreaterThanOrEqual(1);
+    const row = await prisma.worklog.findFirstOrThrow({ where: { orgId, tempoWorklogId: '2' } });
+    expect(row.workType).toBe('absence');
+  });
+
   it('unmapped client hours group by Jira project for the drill-down', async () => {
     (jiraClient.fetchIssues as any).mockResolvedValue([
       { id: '33', key: 'ZZZ-9', projectKey: 'ZZZ', epicKey: null },
@@ -129,6 +142,6 @@ describe.skipIf(!HAS_DB)('Tempo sync', () => {
     await integrationService.syncHours(orgId, '2026-03-01');
 
     const unmapped = await integrationService.actualsForResourceUnmapped(orgId, personId, '2026-03', '2026-03');
-    expect(unmapped).toEqual([{ key: 'ZZZ', name: 'ZZZ', months: { '2026-03': 1.5 } }]);
+    expect(unmapped).toEqual([{ key: 'ZZZ', name: 'ZZZ', stale: false, months: { '2026-03': 1.5 } }]);
   });
 });

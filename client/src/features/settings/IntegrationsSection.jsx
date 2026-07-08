@@ -191,6 +191,19 @@ export default function IntegrationsSection() {
     { key: 'absence', label: 'Absences', hint: 'vacation & sick — excluded from actuals' },
   ];
 
+  // Re-attribute all stored worklogs through the current mappings. Mapping
+  // edits do this automatically, but the explicit lever heals history that
+  // predates a mapping (or a stretch of failed syncs) — and says what moved.
+  const restamp = () => run(async () => {
+    setBusy('restamp'); setStatus('');
+    try {
+      const r = await api.restampWorklogs();
+      setStatus(r.restamped > 0
+        ? `Re-attributed ${r.restamped} worklog${r.restamped === 1 ? '' : 's'} to the current mappings.`
+        : 'All synced hours already match the current mappings.');
+    } finally { setBusy(''); }
+  })();
+
   const [expanded, setExpanded] = useState(() => new Set());
   const toggle = (id) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -351,9 +364,18 @@ export default function IntegrationsSection() {
 
       {/* Customer / project mapping — a table; expand a customer to its projects */}
       <div id="integrations-mapping" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
-        <h3 className="text-sm font-bold text-text mb-1">Customer / project mapping</h3>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h3 className="text-sm font-bold text-text">Customer / project mapping</h3>
+          <button
+            type="button" onClick={restamp} disabled={busy === 'restamp'}
+            title="Re-attribute every already-synced worklog through the current mappings (runs automatically on mapping edits and after each sync)"
+            className="text-[11px] font-semibold text-primary bg-primary-light border border-primary/30 rounded-lg px-2.5 py-1.5 cursor-pointer hover:bg-primary hover:text-white disabled:opacity-50 whitespace-nowrap"
+          >
+            {busy === 'restamp' ? 'Re-applying…' : 'Re-apply mappings'}
+          </button>
+        </div>
         <p className="text-[10px] text-text-light mb-3">
-          Pick one or more Jira projects/epics for each customer or project. A Jira project pulls in everything under it (epics &amp; issues); a customer covers all its projects. Jira projects that aren&apos;t client work go under <b>Internal work</b> or <b>Absences</b> — absence hours never count as logged work. {items.length === 0 && <span className="text-warning">Refresh from Jira to load projects &amp; epics.</span>}
+          Pick one or more Jira projects/epics for each customer or project. A Jira project pulls in everything under it (epics &amp; issues); a customer covers all its projects. Jira projects that aren&apos;t client work go under <b>Internal work</b> or <b>Absences</b> — absence hours never count as logged work. Changing a mapping re-attributes already-synced hours; <b>Re-apply mappings</b> runs the same pass on demand. {items.length === 0 && <span className="text-warning">Refresh from Jira to load projects &amp; epics.</span>}
         </p>
 
         <div className={`${COLS} text-[10px] font-semibold text-text-light uppercase tracking-wider px-2 pb-1 border-b border-border-light`}>

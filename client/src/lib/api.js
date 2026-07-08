@@ -152,6 +152,7 @@ export const api = {
   getResourceUnmappedActuals: (resourceId, from, to) => apiFetch(`/integration/tempo/actuals/resource-unmapped?resourceId=${encodeURIComponent(resourceId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getCustomerActualsByResource: (customerId, from, to) => apiFetch(`/integration/tempo/actuals/customer-by-resource?customerId=${encodeURIComponent(customerId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getJiraWorkItems: () => apiFetch('/integration/jira/work-items'),
+  restampWorklogs: () => apiFetch('/integration/jira/restamp', { method: 'POST', body: '{}' }),
   createJiraWorkItem: (data) => apiFetch('/integration/jira/work-items', { method: 'POST', body: JSON.stringify(data) }),
   updateJiraWorkItem: (id, data) => apiFetch('/integration/jira/work-items/' + id, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteJiraWorkItem: (id) => apiFetch('/integration/jira/work-items/' + id, { method: 'DELETE' }),
