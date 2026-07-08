@@ -1,15 +1,16 @@
 import { MONTHLY_HOURS_PER_FTE } from './constants';
 
 /**
- * Absence-adjusted availability. Planning someone 1.0 on a client means "all
- * their working time", so synced absence hours shrink what any plan can
- * deliver that month. Expectations are judged against available hours —
- * plan × availabilityRatio — never against raw capacity.
+ * Absence-adjusted availability. Absences subtract from MAX capacity, and
+ * they eat the person's SLACK (capacity − plan) first: while the hours left
+ * after a leave still cover the plan, the expectation IS the plan. Only once
+ * available hours fall below the plan does the expectation shrink — to the
+ * available hours, spread pro-rata across the person's engagements
+ * (deliverableRatio below).
  *
  * `typedMonth` is one person-month of per-work-type hours
  * ({ client?, internal?, absence? }); missing data means full availability,
- * so months without synced absences behave exactly as before. Future months
- * always ride at full capacity (no absence actuals exist yet, by decision).
+ * so months without synced absences behave exactly as before.
  */
 export function capacityHours(capacity) {
   return (capacity || 1) * MONTHLY_HOURS_PER_FTE;
@@ -26,6 +27,17 @@ export function availableHours(typedMonth, capacity) {
 export function availabilityRatio(typedMonth, capacity) {
   const cap = capacityHours(capacity);
   return cap > 0 ? availableHours(typedMonth, capacity) / cap : 1;
+}
+
+/**
+ * The share of a person's total plan that still fits into their available
+ * hours. 1 while the whole plan fits (absence only ate slack); below 1 the
+ * shortfall is spread pro-rata across their engagements. Multiply any single
+ * engagement's planned amount by this to get its expectation.
+ */
+export function deliverableRatio(planTotalHours, availH) {
+  if (!(planTotalHours > 0.0001)) return 1;
+  return Math.min(1, Math.max(0, availH) / planTotalHours);
 }
 
 /**

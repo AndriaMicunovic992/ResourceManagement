@@ -5,7 +5,7 @@ import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { currentMonth } from '../../../lib/dateUtils';
 import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS } from '../../../lib/constants';
-import { availabilityRatio } from '../../../lib/availability';
+import { availableHours } from '../../../lib/availability';
 import { actualVsPlanColor } from '../../../lib/statusUtils';
 
 export default function StatsCards({ months, includePotential, teamId, actuals }) {
@@ -59,8 +59,11 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
       if (!r.externalWorkId) continue;
       for (const m of months) {
         if (m >= cur) break; // months are ascending; completed months only
-        const ratio = availabilityRatio(actuals?.byResourceType?.[r.id]?.[m], r.capacity);
-        expectedFte += (rURealised[r.id]?.[m] || 0) * ratio;
+        // Absence eats slack first: the expectation is the plan capped at the
+        // hours the person actually had left that month.
+        const planFte = rURealised[r.id]?.[m] || 0;
+        const availFte = availableHours(actuals?.byResourceType?.[r.id]?.[m], r.capacity) / MONTHLY_HOURS_PER_FTE;
+        expectedFte += Math.min(planFte, availFte);
         actualHours += actuals?.byResource?.[r.id]?.[m] || 0;
         const t = actuals?.byResourceType?.[r.id]?.[m];
         if (t) {
@@ -110,7 +113,9 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
       <StatCard icon="◔" value={`${stats.utilPct}%`} label="Planned utilization" color="#F5A623"
         info="Planned utilization averaged over the selected months: Σ allocated FTE ÷ Σ capacity. “Allocated” is realised allocation, or all planned allocation when “Include potential” is on." />
       {hasActualCard && (
-        <StatCard icon="⇄" value={`${stats.actualVsPlan}%`} label="Actual vs plan"
+        <StatCard icon="⇄"
+          value={`${stats.actualVsPlan - 100 >= 0 ? '+' : '−'}${Math.abs(stats.actualVsPlan - 100)}%`}
+          label="Actual vs plan"
           color={actualVsPlanColor(stats.actualVsPlan, 100)}
           bar={
             <StackedPlanBar
@@ -122,7 +127,7 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
               ]}
             />
           }
-          info="Completed months of the window only (the current month is still being logged): logged Tempo hours ÷ expected hours — the realised plan reduced by each person's synced absences, so vacation never reads as underdelivery. Matched people only. 100% = delivered what the plan could deliver; amber = under, red = well over. The bar reads like the heatmap below: soft track with a tick = the expected plan, stacked fill = logged hours by type (green client, violet internal; slate absences render but don't count as worked time)." />
+          info="Deviation of logged Tempo hours from the expected plan, over the completed months of the window (the current month is still being logged): +10% = a tenth more hours than planned, −10% = a tenth less. Expected = the realised plan capped at each person's hours left after absences — absence eats free capacity first, so a leave that fits into slack doesn't lower the bar. Matched people only. The bar reads like the heatmap below: soft track with a tick = the expected plan, stacked fill = logged hours by type (green client, violet internal; slate absences render but don't count as worked time)." />
       )}
       <StatCard icon="◌" value={stats.unfilled} label="Unfilled" color="#E8636F"
         info="Needs with at least one selected month where filled < needed. “Include potential” off limits it to realised needs/projects/customers." />

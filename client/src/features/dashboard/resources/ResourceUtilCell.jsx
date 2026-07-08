@@ -15,10 +15,11 @@ const fmtH = (h) => `${h >= 9.95 ? Math.round(h) : Math.round(h * 10) / 10}h`;
  * work-type lens, stacked by `actSegments` (client/internal/absences).
  *
  * Judgments are absence-adjusted: the Δ and its verdict compare worked hours
- * to *expected* hours — plan × (available ÷ capacity) — so a vacation month
- * doesn't read as underdelivery. Displayed percentages stay capacity-based so
- * they always match the bar geometry; the tooltip spells out available and
- * expected hours whenever absences reduce them.
+ * to *expected* hours — the plan capped at the hours left after absences
+ * (absence eats slack first, so a leave that fits into free capacity doesn't
+ * move the expectation at all). Displayed percentages stay capacity-based so
+ * they always match the bar geometry; the tooltip spells out the expected
+ * hours whenever the absence actually bites into the plan.
  *
  * For months ahead, `plannedOffDays`/`plannedAvailPct` carry the days off
  * entered in the planner: the tick also turns red when the plan exceeds what
@@ -43,9 +44,9 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
   const actHours = hasAct ? toHours(act) : 0;
   const absH = hasAct ? absenceHours(typedHours) : 0;
   const availH = hasAct ? availableHours(typedHours, capacity) : toHours(100);
-  // What the plan can actually deliver this month, given the absences.
-  const capH = toHours(100);
-  const expectedHours = capH > 0 ? planHours * (availH / capH) : planHours;
+  // What the plan can actually deliver this month: absences eat slack first,
+  // so the expectation only drops once the hours left fall below the plan.
+  const expectedHours = Math.min(planHours, availH);
 
   // Δ in hours against the absence-adjusted expectation.
   let delta = null;
@@ -62,7 +63,8 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
     ? ['client', 'internal', 'absence'].filter((k) => (typedHours[k] || 0) > 0)
     : [];
 
-  const showExpected = hasAct && plan > 0 && absH > 0.05;
+  // Only when the absence actually bites into the plan (not just the slack).
+  const showExpected = hasAct && plan > 0 && absH > 0.05 && expectedHours < planHours - 0.5;
   // Forward-looking months (incl. the one in progress): planned days off
   // shrink the deliverable plan.
   const showPlannedOff = plannedOffDays > 0 && (!hasAct || actualPartial);
