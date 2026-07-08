@@ -3,13 +3,15 @@ import AssignedTeamChips from './AssignedTeamChips';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { isProjectOk } from '../../../lib/gridUtils';
 import { formatMonth, monthRange, currentMonth } from '../../../lib/dateUtils';
-import { hoursToFte } from '../../../lib/constants';
-import { availabilityRatio, plannedAvailabilityRatio } from '../../../lib/availability';
+import { hoursToFte, MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
+import { availableHours, deliverableRatio, effectiveCapacity } from '../../../lib/availability';
 import { useData } from '../../../contexts/DataContext';
+import { useComputed } from '../../../hooks/useComputed';
 import { useMemo } from 'react';
 
 export default function ProjectHeatmapRow({ project, customer, months, includePotential, teamResourceIds, actuals, accent }) {
   const { needs, assignments, members, resources } = useData();
+  const { rURealised } = useComputed();
   const ok = useMemo(() => isProjectOk(project, needs, assignments), [project, needs, assignments]);
   const isPotentialProject = customer.status === 'potential' || project.status === 'potential';
   const responsibleMember = project.responsibleUserId ? members.find((m) => m.user?.id === project.responsibleUserId) : null;
@@ -25,13 +27,16 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
     });
     const cur = currentMonth();
     const resById = new Map(resources.map((r) => [r.id, r]));
-    // Absence-adjusted deliverable plan, like the customer row: synced
-    // absences for elapsed months, planned days off for months ahead.
+    // Absence-adjusted deliverable plan, like the customer row: the plan only
+    // shrinks (pro-rata) once the person's TOTAL plan exceeds the hours left
+    // — synced absences for elapsed months, planned days off ahead.
     const ratioFor = (rid, m) => {
       const r = resById.get(rid);
-      return m <= cur
-        ? availabilityRatio(actuals?.byResourceType?.[rid]?.[m], r?.capacity || 1)
-        : plannedAvailabilityRatio(r, m);
+      const planTotalH = (rURealised[rid]?.[m] || 0) * MONTHLY_HOURS_PER_FTE;
+      const availH = m <= cur
+        ? availableHours(actuals?.byResourceType?.[rid]?.[m], r?.capacity || 1)
+        : effectiveCapacity(r, m) * MONTHLY_HOURS_PER_FTE;
+      return deliverableRatio(planTotalH, availH);
     };
     for (const m of months) {
       if (!projMonths.includes(m)) { result[m] = { totalNeeded: 0, totalFilled: 0, totalExpected: 0, isPotential: false }; continue; }
@@ -53,7 +58,7 @@ export default function ProjectHeatmapRow({ project, customer, months, includePo
       result[m] = { totalNeeded, totalFilled, totalExpected, isPotential: hasPotential };
     }
     return result;
-  }, [project, needs, assignments, resources, months, projMonths, isPotentialProject, includePotential, teamResourceIds, actuals]);
+  }, [project, needs, assignments, resources, rURealised, months, projMonths, isPotentialProject, includePotential, teamResourceIds, actuals]);
 
   // Hours mapped to this specific project (epic → project mappings). A project
   // with no mapped hours in the window gets no actual layer — its work may

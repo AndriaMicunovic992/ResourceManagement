@@ -1,13 +1,14 @@
 /**
  * The heatmap bullet at card size: a soft plan track with a tick at the plan
  * value, and the logged time stacked on top by work type (green = client,
- * violet = internal, slate = absences). Widths are fractions of `max` — pass
- * the capacity to anchor the scale, or leave it null to fit plan/stack.
+ * violet = internal, slate = absences). Pass `max` (e.g. the capacity) to FIX
+ * the scale — full width then always means exactly that value (100%), and
+ * anything beyond clamps at the edge. Without `max` the bar fits plan/stack.
  * Units are the caller's business (hours or FTE); everything just scales.
  */
 export default function StackedPlanBar({ plan = 0, segments = [], max = null, accent = '#6366f1', className = '' }) {
   const stack = segments.reduce((s, x) => s + (x.value || 0), 0);
-  const scale = Math.max(max ?? 0, plan, stack, 0.0001);
+  const scale = max != null ? Math.max(max, 0.0001) : Math.max(plan, stack, 0.0001);
   const pct = (v) => Math.min(100, Math.max(0, (v / scale) * 100));
   const visible = segments.filter((s) => (s.value || 0) > 0.0001);
   let acc = 0;

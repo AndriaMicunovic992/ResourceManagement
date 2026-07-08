@@ -5,7 +5,7 @@ import { api } from '../../../lib/api';
 import { useData } from '../../../contexts/DataContext';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
 import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS, WORK_TYPE_LABELS } from '../../../lib/constants';
-import { availabilityRatio, verdictWord } from '../../../lib/availability';
+import { availableHours, deliverableRatio, verdictWord } from '../../../lib/availability';
 
 /**
  * The expanded person row: their hours per client (plan vs logged, in hours),
@@ -58,6 +58,16 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
     }
     return out;
   }, [assignments, needs, projects, customers, resource.id]);
+
+  // The person's total realised plan per month (all customers) — the base for
+  // spreading an absence shortfall pro-rata across their engagements.
+  const totalPlannedByMonth = useMemo(() => {
+    const out = {};
+    for (const byMonth of Object.values(plannedByCustomer)) {
+      for (const [m, h] of Object.entries(byMonth)) out[m] = (out[m] || 0) + h;
+    }
+    return out;
+  }, [plannedByCustomer]);
 
   const rows = useMemo(() => {
     if (byCustomer == null) return null; // still loading
@@ -155,9 +165,12 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
           const plan = row.plan(m);
           const act = row.act(m);
           const partial = m === cur;
-          // The plan reduced by the person's synced absences that month —
-          // vacation shrinks every client's expectation proportionally.
-          const ratio = m <= cur ? availabilityRatio(typedHours?.[m], resource.capacity) : 1;
+          // Absences eat the person's slack first: only when their TOTAL plan
+          // no longer fits into the hours left does each client's expectation
+          // shrink, pro-rata across their engagements.
+          const ratio = m <= cur
+            ? deliverableRatio(totalPlannedByMonth[m] || 0, availableHours(typedHours?.[m], resource.capacity))
+            : 1;
           const expected = plan * ratio;
           // Δ in hours against the expectation — ratios read as noise when the
           // plan is small.
