@@ -86,6 +86,7 @@ export default function ResourceHeatmapRow({ resource, months, onOpen, includePo
             <ResourceUtilCell key={m} title={`${resource.name} · ${formatMonth(m)}`}
               plan={d.realisedPct} extra={includePotential ? d.potentialPct : 0} act={d.actualPct}
               actSegments={d.actSegments} typedHours={typedHours?.[m]}
+              capacity={resource.capacity || 1} workTypeFilter={workTypeFilter}
               max={rowMax} accent={color} actualPartial={d.actualPartial} />
           );
         })}

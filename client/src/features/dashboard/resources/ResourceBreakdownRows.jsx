@@ -154,10 +154,13 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
           const plan = row.plan(m);
           const act = row.act(m);
           const partial = m === cur;
+          // Δ in hours — ratios read as noise when the plan is small.
           let delta = null;
           if (act != null && !partial && plan > 0 && act > 0) {
-            const d = Math.round((act / plan - 1) * 100);
-            delta = `${d >= 0 ? '+' : ''}${d}% · ${Math.abs(d) <= 15 ? 'on plan' : d < 0 ? 'under plan' : 'over plan'}`;
+            const r = Math.round((act / plan - 1) * 100);
+            const word = Math.abs(r) <= 15 ? 'on plan' : r < 0 ? 'under plan' : 'over plan';
+            const d = act - plan;
+            delta = `${d >= 0 ? '+' : '−'}${Math.round(Math.abs(d))}h · ${word}`;
           }
           const tip = plan > 0 || (act || 0) > 0 ? (
             <>
