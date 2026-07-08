@@ -30,8 +30,14 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
 
   const pct = (v) => `${Math.round(v)}%`;
   const toHours = (utilPct) => (utilPct / 100) * capacity * MONTHLY_HOURS_PER_FTE;
+  // The workable part of the booking: planned leave clips the plan line to
+  // capacity − days off. The clipped remainder renders as a slate hatch up to
+  // the (red) tick, so the overextension stays visible while the plan line
+  // matches what the person can actually deliver.
+  const planWorkable = plannedAvailPct != null ? Math.max(0, Math.min(plan, plannedAvailPct)) : plan;
+  const planOff = plan - planWorkable;
   const labelAct = hasAct && (act > 0 || plan > 0) ? `${Math.round(act)}` : null;
-  const labelPlan = plan > 0 ? pct(plan) : null;
+  const labelPlan = plan > 0 ? pct(planWorkable) : null;
 
   const planHours = toHours(plan);
   const actHours = hasAct ? toHours(act) : 0;
@@ -57,8 +63,9 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
     : [];
 
   const showExpected = hasAct && plan > 0 && absH > 0.05;
-  // Forward-looking months: planned days off shrink the deliverable plan.
-  const showPlannedOff = !hasAct && plannedOffDays > 0;
+  // Forward-looking months (incl. the one in progress): planned days off
+  // shrink the deliverable plan.
+  const showPlannedOff = plannedOffDays > 0 && (!hasAct || actualPartial);
 
   const tip = (plan > 0 || extra > 0 || (hasAct && act > 0) || showPlannedOff) ? (
     <>
@@ -69,7 +76,7 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
       )}
       {showPlannedOff && (
         <TipRow swatch="#94A3B8" label="Days off"
-          value={`${plannedOffDays}d planned${plan > 0 && plannedAvailPct != null ? ` · expect ${fmtH(planHours * Math.min(1, plannedAvailPct / 100))}` : ''}`} />
+          value={`${plannedOffDays}d planned${plan > 0 && planOff > 0.001 ? ` · workable ${fmtH(toHours(planWorkable))}` : ''}`} />
       )}
       {extra > 0 && <TipRow label="+ potential" value={`${fmtH(toHours(extra))} (${pct(extra)})`} />}
       {hasAct && (act > 0 || plan > 0) && (
@@ -95,7 +102,8 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
 
   return (
     <BulletCell
-      plan={plan}
+      plan={planWorkable}
+      planOff={planOff}
       act={hasAct ? act : null}
       actSegments={actSegments}
       extra={extra}

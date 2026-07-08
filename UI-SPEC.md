@@ -466,6 +466,7 @@ Columns: Name | Roles | one column per month
 - Row of role badges
 - Per-month cells: realised utilization percentage, colored by threshold, background also tinted
 - If a month has additional "potential" FTE beyond the realised amount, show "+X%p" in small orange text below the realised percentage
+- **Months ahead with planned days off:** the plan line clips to the workable part (capacity − days off; the % label follows). The clipped remainder — the booking that falls into the leave — renders as a **slate hatch** continuing the track up to the tick, which stays at the **full booking** and turns **red** ("over available capacity — N d off"): the overextension stays visible while the plan line matches what the person can actually deliver. The tooltip adds "Days off: N d planned · workable X h".
 
 ### Resource Profile Modal
 
