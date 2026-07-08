@@ -184,7 +184,7 @@ export default function FtePopover({ x, y, maxFte = 1, currentFte = 0, title, sh
           <div className="flex items-center justify-end gap-2 -mt-1 -mr-1">
             {onSubstitute && (
               <button onClick={onSubstitute}
-                title="Hand the months from here on over to someone else (or clear them)"
+                title="Hand this month — or everything from here on — over to someone else, fully or in part (or just clear it)"
                 className="px-2 py-0.5 text-primary text-[10px] font-semibold cursor-pointer border border-primary/30 bg-white rounded-lg hover:bg-primary-light active:scale-95 transition">
                 Substitute…
               </button>
