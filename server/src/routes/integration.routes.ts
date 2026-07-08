@@ -137,6 +137,18 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.actualsForResourceByCustomer(req.orgId, q.resourceId, from, to, visibleCustomerIds);
   });
 
+  // A person's unmapped client hours grouped by Jira project — the drill-down's
+  // per-project "not mapped" rows. Person-visibility gated like resource-by-customer.
+  app.get('/integration/tempo/actuals/resource-unmapped', async (req) => {
+    const q = req.query as { resourceId?: string; from?: string; to?: string };
+    if (!q.resourceId) throw new BadRequestError('resourceId is required');
+    assertCanViewPerson(req.visibility, q.resourceId);
+    const cur = new Date().toISOString().slice(0, 7);
+    const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
+    const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
+    return integrationService.actualsForResourceUnmapped(req.orgId, q.resourceId, from, to);
+  });
+
   // Actual hours for one customer, broken down by person + month. Feeds the
   // PM-review chart when a person is focused.
   app.get('/integration/tempo/actuals/customer-by-resource', async (req) => {

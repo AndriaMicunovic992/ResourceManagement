@@ -143,6 +143,95 @@ async function ensureCustomerOrProject(
   }
 }
 
+// --- Worklog attribution (shared by the sync and the restamp pass) ---
+
+type ResolvedTarget = { customerId: string | null; projectId: string | null; workType: string };
+type MappingLookup = {
+  workItemByKey: Map<string, { customerId: string | null; projectId: string | null; workType: string }>;
+  customerByProject: Map<string, string | null>;
+};
+
+async function loadMappingLookup(orgId: string): Promise<MappingLookup> {
+  const [workItems, projectRows] = await Promise.all([
+    prisma.jiraWorkItem.findMany({ where: { orgId }, select: { externalKey: true, customerId: true, projectId: true, workType: true } }),
+    prisma.project.findMany({ where: { orgId }, select: { id: true, customerId: true } }),
+  ]);
+  return {
+    workItemByKey: new Map(workItems.map((w) => [w.externalKey, w])),
+    customerByProject: new Map(projectRows.map((p) => [p.id, p.customerId])),
+  };
+}
+
+// Resolve to our entity, most-specific (epic) first, then the Jira project.
+// Internal/absence buckets classify the hours without a customer/project.
+function resolveByKeys(lookup: MappingLookup, epicKey: string | null, projectKey: string | null): ResolvedTarget {
+  for (const key of [epicKey, projectKey]) {
+    if (!key) continue;
+    const wi = lookup.workItemByKey.get(key);
+    if (!wi) continue;
+    if (wi.workType && wi.workType !== 'client') return { customerId: null, projectId: null, workType: wi.workType };
+    if (wi.projectId) return { projectId: wi.projectId, customerId: lookup.customerByProject.get(wi.projectId) ?? null, workType: 'client' };
+    if (wi.customerId) return { projectId: null, customerId: wi.customerId, workType: 'client' };
+  }
+  return { customerId: null, projectId: null, workType: 'client' };
+}
+
+// Jira issue keys are "PROJECTKEY-123" — the prefix identifies the Jira project.
+function issueProjectKey(issueKey: string | null): string | null {
+  if (!issueKey) return null;
+  const i = issueKey.lastIndexOf('-');
+  return i > 0 ? issueKey.slice(0, i) : null;
+}
+
+/**
+ * Re-resolve every stored worklog through the current mappings and rewrite the
+ * rows whose target changed. The sync stamps rows as it pulls them, but a
+ * delta sync never re-pulls old worklogs — so without this, reclassifying a
+ * Jira project (e.g. as absences) or remapping it to another customer would
+ * leave all history under the old attribution forever. Runs after mapping
+ * edits and at the end of each sync. Rows with no Jira keys at all can't be
+ * re-attributed and are left alone; grouped updateMany writes keep the pass
+ * to a handful of queries even on large orgs.
+ */
+async function restampWorklogs(orgId: string): Promise<number> {
+  const lookup = await loadMappingLookup(orgId);
+  const changedByTarget = new Map<string, { target: ResolvedTarget; ids: string[] }>();
+  const PAGE = 5000;
+  let cursor: string | undefined;
+  for (;;) {
+    const page: { id: string; jiraIssueKey: string | null; jiraEpicKey: string | null; customerId: string | null; projectId: string | null; workType: string }[] =
+      await prisma.worklog.findMany({
+        where: { orgId },
+        select: { id: true, jiraIssueKey: true, jiraEpicKey: true, customerId: true, projectId: true, workType: true },
+        orderBy: { id: 'asc' },
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        take: PAGE,
+      });
+    if (page.length === 0) break;
+    for (const w of page) {
+      const projectKey = issueProjectKey(w.jiraIssueKey);
+      if (!w.jiraEpicKey && !projectKey) continue;
+      const next = resolveByKeys(lookup, w.jiraEpicKey, projectKey);
+      if (next.customerId === w.customerId && next.projectId === w.projectId && next.workType === w.workType) continue;
+      const key = `${next.customerId}|${next.projectId}|${next.workType}`;
+      const bucket = changedByTarget.get(key) || { target: next, ids: [] };
+      bucket.ids.push(w.id);
+      changedByTarget.set(key, bucket);
+    }
+    if (page.length < PAGE) break;
+    cursor = page[page.length - 1].id;
+  }
+  let changed = 0;
+  for (const { target, ids } of changedByTarget.values()) {
+    for (let i = 0; i < ids.length; i += 5000) {
+      const chunk = ids.slice(i, i + 5000);
+      await prisma.worklog.updateMany({ where: { id: { in: chunk } }, data: target });
+      changed += chunk.length;
+    }
+  }
+  return changed;
+}
+
 // Reject a parent that is the item itself or one of its descendants (cycle).
 async function assertNoCycle(orgId: string, itemId: string, parentId: string) {
   if (itemId === parentId) throw new BadRequestError('A work item cannot be its own parent');
@@ -228,31 +317,12 @@ export const integrationService = {
     const issueById = new Map(issues.map((i) => [i.id, i]));
 
     // Mapping lookups.
-    const [workItems, mappedResources, projectRows] = await Promise.all([
-      prisma.jiraWorkItem.findMany({ where: { orgId }, select: { externalKey: true, customerId: true, projectId: true, workType: true } }),
+    const [lookup, mappedResources] = await Promise.all([
+      loadMappingLookup(orgId),
       prisma.resource.findMany({ where: { orgId, externalWorkId: { not: null } }, select: { id: true, externalWorkId: true } }),
-      prisma.project.findMany({ where: { orgId }, select: { id: true, customerId: true } }),
     ]);
-    const workItemByKey = new Map(workItems.map((w) => [w.externalKey, w]));
     const resourceByAccount = new Map(mappedResources.map((r) => [r.externalWorkId as string, r.id]));
-    const customerByProject = new Map(projectRows.map((p) => [p.id, p.customerId]));
-
-    // Resolve to our entity, most-specific (epic) first, then the Jira project.
-    // Internal/absence buckets classify the hours without a customer/project.
-    const resolveEntity = (
-      epicKey: string | null,
-      projectKey: string | null
-    ): { customerId: string | null; projectId: string | null; workType: string } => {
-      for (const key of [epicKey, projectKey]) {
-        if (!key) continue;
-        const wi = workItemByKey.get(key);
-        if (!wi) continue;
-        if (wi.workType && wi.workType !== 'client') return { customerId: null, projectId: null, workType: wi.workType };
-        if (wi.projectId) return { projectId: wi.projectId, customerId: customerByProject.get(wi.projectId) ?? null, workType: 'client' };
-        if (wi.customerId) return { projectId: null, customerId: wi.customerId, workType: 'client' };
-      }
-      return { customerId: null, projectId: null, workType: 'client' };
-    };
+    const resolveEntity = (epicKey: string | null, projectKey: string | null) => resolveByKeys(lookup, epicKey, projectKey);
 
     let totalSeconds = 0;
     let mapped = 0;
@@ -350,6 +420,12 @@ export const integrationService = {
       deleted = res.count;
     }
 
+    // Heal older rows the delta didn't re-pull: mappings may have changed since
+    // they were stamped (a Jira project reclassified as absences, a remapped
+    // customer). The rows written above already match, so this only touches
+    // genuinely stale history.
+    const restamped = await restampWorklogs(orgId);
+
     // Advance the delta cursor only when this pull actually covers everything
     // since the previous cursor and wasn't truncated. A narrow manual re-pull
     // that starts after the cursor must not jump it forward (that would leave
@@ -367,6 +443,7 @@ export const integrationService = {
       worklogs: worklogs.length,
       createdWorklogs: toCreate.length,
       updatedWorklogs: toUpdate.length,
+      restampedWorklogs: restamped,
       hours: Math.round((totalSeconds / 3600) * 10) / 10,
       matchedPeople: matchedResourceIds.size,
       unmatchedAccounts: unmatchedAccounts.size,
@@ -528,6 +605,48 @@ export const integrationService = {
   },
 
   /**
+   * A person's client-type hours that resolve to no customer/project, grouped
+   * by Jira project (from the issue-key prefix) per month — the drill-down's
+   * per-project "not mapped" rows, so unmapped time is inspectable by name
+   * instead of one opaque bucket. Named from the cached JiraWorkItem when the
+   * project was pulled from Jira; hours whose issue lookup failed at sync time
+   * land under "(no Jira issue)".
+   * Returned as [{ key, name, months: { [month]: hours } }], largest first.
+   */
+  async actualsForResourceUnmapped(orgId: string, resourceId: string, fromMonth: string, toMonth: string) {
+    const rows = await prisma.worklog.findMany({
+      where: {
+        orgId, resourceId, month: { gte: fromMonth, lte: toMonth },
+        workType: 'client', customerId: null, projectId: null,
+      },
+      select: { jiraIssueKey: true, month: true, seconds: true },
+    });
+    const byKey = new Map<string, Record<string, number>>();
+    for (const w of rows) {
+      const key = issueProjectKey(w.jiraIssueKey) || '(no Jira issue)';
+      const months = byKey.get(key) || {};
+      months[w.month] = (months[w.month] || 0) + w.seconds;
+      byKey.set(key, months);
+    }
+    if (byKey.size === 0) return [];
+    const names = await prisma.jiraWorkItem.findMany({
+      where: { orgId, externalKey: { in: [...byKey.keys()] } },
+      select: { externalKey: true, name: true },
+    });
+    const nameByKey = new Map(names.map((n) => [n.externalKey, n.name]));
+    const total = (months: Record<string, number>) => Object.values(months).reduce((s, v) => s + v, 0);
+    return [...byKey.entries()]
+      .sort((a, b) => total(b[1]) - total(a[1]))
+      .map(([key, secondsByMonth]) => ({
+        key,
+        name: nameByKey.get(key) || key,
+        months: Object.fromEntries(
+          Object.entries(secondsByMonth).map(([m, s]) => [m, Math.round((s / 3600) * 10) / 10])
+        ),
+      }));
+  },
+
+  /**
    * Actual hours for one customer, broken down by person + month. Feeds the
    * PM-review chart when a person is focused.
    * Returned as { [resourceId]: { [month]: hours } }.
@@ -638,6 +757,8 @@ export const integrationService = {
     } catch (e) {
       throw new ConflictError('A work item with that key already exists');
     }
+    // Attribution may have changed for already-synced hours under this key.
+    await restampWorklogs(orgId);
     return this.listWorkItems(orgId);
   },
 
@@ -685,6 +806,10 @@ export const integrationService = {
     } catch (e) {
       throw new ConflictError('A work item with that key already exists');
     }
+    // Apply the new mapping/classification to already-synced hours immediately
+    // — a delta sync would never re-pull them, so the stamped attribution
+    // would otherwise stay stale forever.
+    await restampWorklogs(orgId);
     return this.listWorkItems(orgId);
   },
 
@@ -692,6 +817,8 @@ export const integrationService = {
     const item = await prisma.jiraWorkItem.findFirst({ where: { id, orgId }, select: { id: true } });
     if (!item) throw new NotFoundError('Work item not found');
     await prisma.jiraWorkItem.delete({ where: { id } });
+    // Hours attributed through this item fall back to unmapped.
+    await restampWorklogs(orgId);
     return this.listWorkItems(orgId);
   },
 };

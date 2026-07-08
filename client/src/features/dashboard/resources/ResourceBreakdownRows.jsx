@@ -16,16 +16,23 @@ import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS, WORK_TYPE_LABELS } from '../..
 export default function ResourceBreakdownRows({ resource, months, typedHours, window: win, accent }) {
   const { customers, needs, projects, assignments } = useData();
   const cur = currentMonth();
-  const [byCustomer, setByCustomer] = useState(null); // { [customerId]: { [month]: hours } }
+  // { byCustomer: { [customerId]: { [month]: hours } },
+  //   unmapped: [{ key, name, months }] } — per-Jira-project rows for client
+  // hours that resolve to no customer.
+  const [actualsData, setActualsData] = useState(null);
 
   useEffect(() => {
-    if (!win?.from || !win?.to) { setByCustomer({}); return; }
+    if (!win?.from || !win?.to) { setActualsData({ byCustomer: {}, unmapped: [] }); return; }
     let dead = false;
-    api.getResourceActualsByCustomer(resource.id, win.from, win.to)
-      .then((d) => { if (!dead) setByCustomer(d || {}); })
-      .catch(() => { if (!dead) setByCustomer({}); });
+    Promise.all([
+      api.getResourceActualsByCustomer(resource.id, win.from, win.to).catch(() => ({})),
+      api.getResourceUnmappedActuals(resource.id, win.from, win.to).catch(() => []),
+    ]).then(([byCustomer, unmapped]) => {
+      if (!dead) setActualsData({ byCustomer: byCustomer || {}, unmapped: unmapped || [] });
+    });
     return () => { dead = true; };
   }, [resource.id, win?.from, win?.to]);
+  const byCustomer = actualsData?.byCustomer ?? null;
 
   // This person's realised planned hours per customer per month, from their
   // assignments (need → project → customer, realised chains only — matching
@@ -73,19 +80,32 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
       }))
       .sort((a, b) => sumAct(byCustomer[b.key]) - sumAct(byCustomer[a.key]) || a.name.localeCompare(b.name));
 
-    // Bucket rows: internal / absences / client hours not mapped to a customer.
+    // Bucket rows: internal work and absences (from the per-type data).
     const typeSum = (m, k) => typedHours?.[m]?.[k] || 0;
-    const mappedClient = (m) => Object.values(byCustomer).reduce((s, byMonth) => s + (byMonth[m] || 0), 0);
     const buckets = [
       { key: 'internal', name: WORK_TYPE_LABELS.internal, color: WORK_TYPE_COLORS.internal, hours: (m) => typeSum(m, 'internal') },
       { key: 'absence', name: WORK_TYPE_LABELS.absence, color: WORK_TYPE_COLORS.absence, hours: (m) => typeSum(m, 'absence') },
-      { key: 'unmapped', name: 'Unmapped hours', color: '#F5A623', hours: (m) => Math.max(0, typeSum(m, 'client') - mappedClient(m)) },
     ]
       .filter((b) => months.some((m) => m <= cur && b.hours(m) > 0.05))
       .map((b) => ({ key: b.key, name: b.name, color: b.color, plan: () => 0, act: (m) => (m <= cur ? b.hours(m) : null) }));
 
-    return [...custRows, ...buckets];
-  }, [byCustomer, plannedByCustomer, customers, months, typedHours, cur]);
+    // Client hours that resolve to no customer, one row per Jira project —
+    // flagged so it's obvious this time was neither planned nor mapped, but
+    // still inspectable by name instead of one opaque bucket.
+    const unmappedRows = (actualsData?.unmapped || [])
+      .filter((u) => Object.entries(u.months || {}).some(([m, v]) => monthSet.has(m) && v > 0.05))
+      .map((u) => ({
+        key: `jira:${u.key}`,
+        name: u.name === u.key ? u.key : `${u.name} (${u.key})`,
+        badge: 'not mapped',
+        color: '#F5A623',
+        note: `Jira ${u.key} isn’t mapped to a customer — map or classify it under Settings → Integrations.`,
+        plan: () => 0,
+        act: (m) => (m <= cur ? u.months?.[m] || 0 : null),
+      }));
+
+    return [...custRows, ...buckets, ...unmappedRows];
+  }, [byCustomer, actualsData, plannedByCustomer, customers, months, typedHours, cur]);
 
   // Shared hour scale across the breakdown, floored so small values stay small.
   const scaleMax = useMemo(() => {
@@ -118,7 +138,12 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
       <div key={row.key} className="flex items-center border-b border-border-light/60 bg-[#FAFBFD]">
         <div className="w-[270px] shrink-0 pl-12 pr-3 py-1 flex items-center gap-2 min-w-0">
           <span className="w-2 h-2 rounded-[3px] shrink-0" style={{ background: row.color }} />
-          <span className="text-[11px] font-semibold text-text-mid truncate">{row.name}</span>
+          <span className="text-[11px] font-semibold text-text-mid truncate" title={row.name}>{row.name}</span>
+          {row.badge && (
+            <span className="text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-warning-bg text-warning shrink-0">
+              {row.badge}
+            </span>
+          )}
           <span className="text-[9px] font-mono text-text-light ml-auto shrink-0">Σ {Math.round(totalAct)}h</span>
         </div>
         {months.map((m) => {
@@ -139,6 +164,7 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
               )}
               {delta && <TipRow label="Δ" value={delta} />}
               {partial && <div className="opacity-80">month in progress</div>}
+              {row.note && <div className="opacity-80 mt-0.5 max-w-[210px]">{row.note}</div>}
             </>
           ) : null;
           return (

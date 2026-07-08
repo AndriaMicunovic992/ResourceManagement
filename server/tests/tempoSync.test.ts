@@ -100,4 +100,35 @@ describe.skipIf(!HAS_DB)('Tempo sync', () => {
     const byResource = await integrationService.actualsByResource(orgId, '2026-03', '2026-03', null);
     expect(byResource[personId]?.['2026-03']).toBe(0.5);
   });
+
+  it('reclassifying a work item restamps stored history immediately (no sync needed)', async () => {
+    const cli = await prisma.jiraWorkItem.findFirstOrThrow({ where: { orgId, externalKey: 'CLI' } });
+
+    // A delta sync never re-pulls old worklogs, so the mapping edit itself
+    // must rewrite the stored attribution.
+    await integrationService.updateWorkItem(orgId, cli.id, { workType: 'internal' });
+    let row = await prisma.worklog.findFirstOrThrow({ where: { orgId, tempoWorklogId: '1' } });
+    expect(row.workType).toBe('internal');
+    expect(row.customerId).toBeNull();
+
+    // …and mapping it back to a customer restores the client attribution.
+    await integrationService.updateWorkItem(orgId, cli.id, { workType: 'client', customerId });
+    row = await prisma.worklog.findFirstOrThrow({ where: { orgId, tempoWorklogId: '1' } });
+    expect(row.workType).toBe('client');
+    expect(row.customerId).toBe(customerId);
+  });
+
+  it('unmapped client hours group by Jira project for the drill-down', async () => {
+    (jiraClient.fetchIssues as any).mockResolvedValue([
+      { id: '33', key: 'ZZZ-9', projectKey: 'ZZZ', epicKey: null },
+    ]);
+    (tempoClient.fetchWorklogs as any).mockResolvedValue({
+      worklogs: [wl(3, 'acc-1', '33', 5400, '2026-03-12')],
+      truncated: false,
+    });
+    await integrationService.syncHours(orgId, '2026-03-01');
+
+    const unmapped = await integrationService.actualsForResourceUnmapped(orgId, personId, '2026-03', '2026-03');
+    expect(unmapped).toEqual([{ key: 'ZZZ', name: 'ZZZ', months: { '2026-03': 1.5 } }]);
+  });
 });
