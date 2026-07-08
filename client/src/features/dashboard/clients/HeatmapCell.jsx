@@ -8,21 +8,27 @@ import { TipRow } from '../Tip';
  * `needed` only drives the red understaffed tick and the tooltip, `act` is
  * logged Tempo FTE (null = no actual layer for this row/month).
  */
-function HeatmapCell({ title, plan, needed, act, max, accent, isPotential, actualPartial }) {
+function HeatmapCell({ title, plan, expected, needed, act, max, accent, isPotential, actualPartial }) {
   const hasAct = act != null;
   const understaffed = !isPotential && needed > 0 && plan + 0.001 < needed;
+  // What the plan can deliver after the assignees' absences; equals the plan
+  // when no absences are synced for the month.
+  const expectedFte = expected != null ? expected : plan;
+  const absenceGap = plan - expectedFte;
 
   const fmt = (v) => (Math.round(v * 10) / 10).toFixed(1);
   const labelAct = hasAct && (act > 0 || plan > 0) ? fmt(act) : null;
   const labelPlan = plan > 0 ? fmt(plan) : null;
 
-  // Δ as an absolute FTE difference — a ratio blows up into noise when the
-  // plan is small; the qualitative word still comes from the ratio.
+  // Δ as an absolute FTE difference against the absence-adjusted expectation —
+  // a vacation month must not read as underdelivery. The qualitative word
+  // still comes from the ±15% ratio.
   let delta = null;
   if (hasAct && !actualPartial && plan > 0 && act > 0) {
-    const r = Math.round((act / plan - 1) * 100);
+    const base = expectedFte > 0.01 ? expectedFte : plan;
+    const r = Math.round((act / base - 1) * 100);
     const word = Math.abs(r) <= 15 ? 'on plan' : r < 0 ? 'under plan' : 'over plan';
-    const d = act - plan;
+    const d = act - base;
     delta = `${d >= 0 ? '+' : '−'}${fmt(Math.abs(d))} FTE · ${word}`;
   }
 
@@ -34,6 +40,9 @@ function HeatmapCell({ title, plan, needed, act, max, accent, isPotential, actua
         <TipRow swatch={accent} label="Planned" value={`${fmt(plan)} FTE`} />
       ) : (
         hasAct && act > 0 && <TipRow swatch={accent} label="Planned" value="none" />
+      )}
+      {hasAct && plan > 0 && absenceGap > 0.05 && (
+        <TipRow label="Expected" value={`${fmt(expectedFte)} FTE · after absences`} />
       )}
       {hasAct && (act > 0 || plan > 0) && (
         <TipRow swatch="#34C98E" label="Actual" value={`${fmt(act)} FTE${actualPartial ? ' so far' : ''}`} />

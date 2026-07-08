@@ -2,6 +2,7 @@ import { memo } from 'react';
 import BulletCell from '../BulletCell';
 import { TipRow } from '../Tip';
 import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS, WORK_TYPE_LABELS } from '../../../lib/constants';
+import { availableHours, absenceHours, verdictWord } from '../../../lib/availability';
 
 // Hours, compact: one decimal under 10h, whole above ("8.5h", "174h").
 const fmtH = (h) => `${h >= 9.95 ? Math.round(h) : Math.round(h * 10) / 10}h`;
@@ -11,10 +12,13 @@ const fmtH = (h) => `${h >= 9.95 ? Math.round(h) : Math.round(h * 10) / 10}h`;
  * allocation as % of capacity (track + tick, red when over 100%), `extra` is
  * additional potential allocation (faint track extension, only when the
  * potential toggle is on), `act` is logged utilization % under the current
- * work-type lens, stacked by `actSegments` (client/internal). `typedHours`
- * (this month's raw hours per work type) feeds the tooltip breakdown; the
- * tooltip leads with hours and keeps % as context so units never mix mid-list.
- * The row `max` is anchored at 100% so capacity renders the same width everywhere.
+ * work-type lens, stacked by `actSegments` (client/internal/absences).
+ *
+ * Judgments are absence-adjusted: the Δ and its verdict compare worked hours
+ * to *expected* hours — plan × (available ÷ capacity) — so a vacation month
+ * doesn't read as underdelivery. Displayed percentages stay capacity-based so
+ * they always match the bar geometry; the tooltip spells out available and
+ * expected hours whenever absences reduce them.
  */
 function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, capacity = 1, workTypeFilter = 'work', max, accent, actualPartial }) {
   const hasAct = act != null;
@@ -27,16 +31,19 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
 
   const planHours = toHours(plan);
   const actHours = hasAct ? toHours(act) : 0;
+  const absH = hasAct ? absenceHours(typedHours) : 0;
+  const availH = hasAct ? availableHours(typedHours, capacity) : toHours(100);
+  // What the plan can actually deliver this month, given the absences.
+  const capH = toHours(100);
+  const expectedHours = capH > 0 ? planHours * (availH / capH) : planHours;
 
-  // Δ as an hours difference — a ratio explodes into noise ("+1902%") when the
-  // plan is tiny. The qualitative word still comes from the ratio when a real
-  // plan exists.
+  // Δ in hours against the absence-adjusted expectation.
   let delta = null;
   if (hasAct && !actualPartial && plan > 0 && act > 0) {
-    const d = actHours - planHours;
-    const r = Math.round((act / plan - 1) * 100);
-    const word = Math.abs(r) <= 15 ? 'on plan' : r < 0 ? 'under plan' : 'over plan';
-    delta = `${d >= 0 ? '+' : '−'}${fmtH(Math.abs(d))} · ${word}`;
+    const base = expectedHours > 1 ? expectedHours : planHours;
+    const d = actHours - base;
+    const word = verdictWord(actHours, base);
+    delta = `${d >= 0 ? '+' : '−'}${fmtH(Math.abs(d))}${word ? ` · ${word}` : ''}`;
   }
 
   // Which work types the current lens counts toward "Actual".
@@ -45,10 +52,15 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
     ? ['client', 'internal', 'absence'].filter((k) => (typedHours[k] || 0) > 0)
     : [];
 
+  const showExpected = hasAct && plan > 0 && absH > 0.05;
+
   const tip = (plan > 0 || extra > 0 || (hasAct && act > 0)) ? (
     <>
       <b className="text-[11px]">{title}</b>
       {plan > 0 && <TipRow swatch={accent} label="Planned" value={`${fmtH(planHours)} (${pct(plan)})`} />}
+      {showExpected && (
+        <TipRow label="Expected" value={`${fmtH(expectedHours)} · after ${fmtH(absH)} absence`} />
+      )}
       {extra > 0 && <TipRow label="+ potential" value={`${fmtH(toHours(extra))} (${pct(extra)})`} />}
       {hasAct && (act > 0 || plan > 0) && (
         <TipRow swatch="#34C98E" label="Actual"

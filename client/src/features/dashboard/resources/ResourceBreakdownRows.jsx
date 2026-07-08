@@ -5,6 +5,7 @@ import { api } from '../../../lib/api';
 import { useData } from '../../../contexts/DataContext';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
 import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS, WORK_TYPE_LABELS } from '../../../lib/constants';
+import { availabilityRatio, verdictWord } from '../../../lib/availability';
 
 /**
  * The expanded person row: their hours per client (plan vs logged, in hours),
@@ -154,18 +155,26 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
           const plan = row.plan(m);
           const act = row.act(m);
           const partial = m === cur;
-          // Δ in hours — ratios read as noise when the plan is small.
+          // The plan reduced by the person's synced absences that month —
+          // vacation shrinks every client's expectation proportionally.
+          const ratio = m <= cur ? availabilityRatio(typedHours?.[m], resource.capacity) : 1;
+          const expected = plan * ratio;
+          // Δ in hours against the expectation — ratios read as noise when the
+          // plan is small.
           let delta = null;
           if (act != null && !partial && plan > 0 && act > 0) {
-            const r = Math.round((act / plan - 1) * 100);
-            const word = Math.abs(r) <= 15 ? 'on plan' : r < 0 ? 'under plan' : 'over plan';
-            const d = act - plan;
-            delta = `${d >= 0 ? '+' : '−'}${Math.round(Math.abs(d))}h · ${word}`;
+            const base = expected > 1 ? expected : plan;
+            const word = verdictWord(act, base);
+            const d = act - base;
+            delta = `${d >= 0 ? '+' : '−'}${Math.round(Math.abs(d))}h${word ? ` · ${word}` : ''}`;
           }
           const tip = plan > 0 || (act || 0) > 0 ? (
             <>
               <b className="text-[11px]">{resource.name} · {row.name} · {formatMonth(m)}</b>
               {plan > 0 && <TipRow swatch={accent} label="Planned" value={`${Math.round(plan)}h`} />}
+              {act != null && plan > 0 && plan - expected > 1 && (
+                <TipRow label="Expected" value={`${Math.round(expected)}h · after absences`} />
+              )}
               {act != null && (act > 0 || plan > 0) && (
                 <TipRow swatch={row.color} label="Logged" value={`${Math.round(act * 10) / 10}h${partial ? ' so far' : ''}`} />
               )}

@@ -4,6 +4,7 @@ import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { currentMonth } from '../../../lib/dateUtils';
 import { MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
+import { availabilityRatio } from '../../../lib/availability';
 import { actualVsPlanColor } from '../../../lib/statusUtils';
 
 export default function StatsCards({ months, includePotential, teamId, actuals }) {
@@ -41,24 +42,27 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
     const utilPct = totalCapacity > 0 ? Math.round((totalUsedFte / totalCapacity) * 100) : 0;
 
     // Actual vs plan over the completed months of the window: logged Tempo
-    // hours vs realised planned FTE (→ hours), counting only matched people
+    // hours vs the absence-adjusted *expected* plan (realised planned FTE ×
+    // each person's availability that month), counting only matched people
     // (linked to a Jira account) so untracked people don't drag the rate down.
     // The current month is excluded — it's still being logged, so comparing it
-    // to a full-month plan would always read "under". 100% = delivered to plan.
+    // to a full-month plan would always read "under". 100% = delivered what
+    // the plan could deliver given absences.
     const cur = currentMonth();
-    let plannedFte = 0;
+    let expectedFte = 0;
     let actualHours = 0;
     for (const r of teamResources) {
       if (!r.externalWorkId) continue;
       for (const m of months) {
         if (m >= cur) break; // months are ascending; completed months only
-        plannedFte += rURealised[r.id]?.[m] || 0;
+        const ratio = availabilityRatio(actuals?.byResourceType?.[r.id]?.[m], r.capacity);
+        expectedFte += (rURealised[r.id]?.[m] || 0) * ratio;
         actualHours += actuals?.byResource?.[r.id]?.[m] || 0;
       }
     }
     const actualFte = actualHours / MONTHLY_HOURS_PER_FTE;
     const actualVsPlan =
-      actualHours > 0 && plannedFte > 0 ? Math.round((actualFte / plannedFte) * 100) : null;
+      actualHours > 0 && expectedFte > 0 ? Math.round((actualFte / expectedFte) * 100) : null;
 
     // Unfilled needs within the selected time range
     let unfilled = 0;
@@ -97,7 +101,7 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
       {hasActualCard && (
         <StatCard icon="⇄" value={`${stats.actualVsPlan}%`} label="Actual vs plan"
           color={actualVsPlanColor(stats.actualVsPlan, 100)}
-          info="Completed months of the window only (the current month is still being logged): logged Tempo hours ÷ realised planned hours, over people linked to a Jira account. 100% = delivered to plan; amber = under, red = well over." />
+          info="Completed months of the window only (the current month is still being logged): logged Tempo hours ÷ expected hours — the realised plan reduced by each person's synced absences, so vacation never reads as underdelivery. Matched people only. 100% = delivered what the plan could deliver; amber = under, red = well over." />
       )}
       <StatCard icon="◌" value={stats.unfilled} label="Unfilled" color="#E8636F"
         info="Needs with at least one selected month where filled < needed. “Include potential” off limits it to realised needs/projects/customers." />
