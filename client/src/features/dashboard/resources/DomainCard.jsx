@@ -11,7 +11,7 @@ import InfoDot from '../../../components/ui/InfoDot';
 
 /**
  * One domain's (or, with domain = null, everyone's) capacity summary. The bar
- * reads like the heatmap rows below: soft track with a tick = average planned
+ * reads like the capacity-table rows below: soft track with a tick = average planned
  * FTE, stacked fill = the average FTE actually logged per completed month
  * (green client / violet internal / slate absences). The scale is FIXED at
  * the group's capacity — full width is exactly 100% — and hovering the bar
@@ -117,7 +117,7 @@ export default function DomainCard({ domain, months, includePotential, teamId, a
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded" style={{ backgroundColor: accent }} />
           <span className="text-[13px] font-bold text-text">{name}</span>
-          <InfoDot text={`${domain ? 'Average utilization of this domain’s people' : 'Average utilization of everyone in scope'} over the selected months: mean used FTE ÷ mean capacity per month. “Used” is realised allocation, or all planned with Include potential on. The bar reads like the heatmap below — soft track with a tick = the plan, stacked fill = logged hours by type (green client, violet internal, slate absences), averaged over completed months. Full bar width = the group’s capacity (100%); hover the bar for the numbers. The number on the right is the headcount.`} />
+          <InfoDot text={`${domain ? 'Average utilization of this domain’s people' : 'Average utilization of everyone in scope'} over the selected months: mean used FTE ÷ mean capacity per month. “Used” is realised allocation, or all planned with Include potential on. The bar reads like the capacity table below — soft track with a tick = the plan, stacked fill = logged hours by type (green client, violet internal, slate absences), averaged over completed months. Full bar width = the group’s capacity (100%); hover the bar for the numbers. The number on the right is the headcount.`} />
         </div>
         <span className="text-xs font-mono text-text-mid">{count}</span>
       </div>

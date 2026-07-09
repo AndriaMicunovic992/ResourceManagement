@@ -69,9 +69,10 @@ export default function PlanningSegment() {
   // Which logged hours the People-capacity actual layer shows: worked time
   // (client + internal, the default), a single work type, or absences.
   const [workTypeFilter, setWorkTypeFilter] = useState('work');
-  // Synced Tempo hours for the elapsed part of the window — the heatmaps and
+  // Synced Tempo hours for the elapsed part of the window — the tables and
   // KPI row show them next to the plan so both are comparable at a glance.
-  const actuals = useWindowActuals(months);
+  // The per-customer/project slices follow the team lens.
+  const actuals = useWindowActuals(months, teamId);
 
   return (
     <>

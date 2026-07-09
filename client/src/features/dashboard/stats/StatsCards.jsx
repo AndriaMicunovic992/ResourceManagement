@@ -127,7 +127,7 @@ export default function StatsCards({ months, includePotential, teamId, actuals }
               ]}
             />
           }
-          info="Deviation of logged Tempo hours from the expected plan, over the completed months of the window (the current month is still being logged): +10% = a tenth more hours than planned, −10% = a tenth less. Expected = the realised plan capped at each person's hours left after absences — absence eats free capacity first, so a leave that fits into slack doesn't lower the bar. Matched people only. The bar reads like the heatmap below: soft track with a tick = the expected plan, stacked fill = logged hours by type (green client, violet internal; slate absences render but don't count as worked time)." />
+          info="Deviation of logged Tempo hours from the expected plan, over the completed months of the window (the current month is still being logged): +10% = a tenth more hours than planned, −10% = a tenth less. Expected = the realised plan capped at each person's hours left after absences — absence eats free capacity first, so a leave that fits into slack doesn't lower the bar. Matched people only. The bar reads like the capacity table below: soft track with a tick = the expected plan, stacked fill = logged hours by type (green client, violet internal; slate absences render but don't count as worked time)." />
       )}
       <StatCard icon="◌" value={stats.unfilled} label="Unfilled" color="#E8636F"
         info="Needs with at least one selected month where filled < needed. “Include potential” off limits it to realised needs/projects/customers." />

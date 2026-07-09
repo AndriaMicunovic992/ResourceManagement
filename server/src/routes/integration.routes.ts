@@ -112,27 +112,30 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Actual hours per customer per month — scoped to visible customers. Feeds the
-  // client-staffing heatmap and the PM-review chart.
+  // client-staffing table and the PM-review chart. Optional teamId narrows the
+  // hours to that team's people (the Insights team lens).
   app.get('/integration/tempo/actuals/monthly-by-customer', async (req) => {
-    const q = req.query as { from?: string; to?: string };
+    const q = req.query as { from?: string; to?: string; teamId?: string };
     const cur = new Date().toISOString().slice(0, 7);
     const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
     const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
     const v = req.visibility;
     const visibleIds = v.isAdmin ? null : [...v.visibleCustomerIds];
-    return integrationService.actualsByCustomer(req.orgId, from, to, visibleIds);
+    const resourceIds = q.teamId ? await integrationService.resourceIdsForTeam(req.orgId, q.teamId) : null;
+    return integrationService.actualsByCustomer(req.orgId, from, to, visibleIds, resourceIds);
   });
 
   // Actual hours per project per month — scoped to visible projects. Feeds the
-  // client-staffing heatmap's expanded project rows.
+  // client-staffing table's expanded project rows. Optional teamId as above.
   app.get('/integration/tempo/actuals/monthly-by-project', async (req) => {
-    const q = req.query as { from?: string; to?: string };
+    const q = req.query as { from?: string; to?: string; teamId?: string };
     const cur = new Date().toISOString().slice(0, 7);
     const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
     const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
     const v = req.visibility;
     const visibleIds = v.isAdmin ? null : [...v.visibleProjectIds];
-    return integrationService.actualsByProject(req.orgId, from, to, visibleIds);
+    const resourceIds = q.teamId ? await integrationService.resourceIdsForTeam(req.orgId, q.teamId) : null;
+    return integrationService.actualsByProject(req.orgId, from, to, visibleIds, resourceIds);
   });
 
   // Actual hours for one person, broken down by customer + month. Feeds the
@@ -182,6 +185,20 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
       ? { customerId: q.customerId }
       : { bucket: q.bucket as 'internal' | 'absence' | 'unmapped', projectKey: q.projectKey };
     return integrationService.actualsForResourceEpics(req.orgId, q.resourceId, from, to, scope);
+  });
+
+  // A customer's hours grouped by Jira epic → issue — the Client-Staffing
+  // drill. Actual hours only; optional teamId narrows to that team's people.
+  // Customer-visibility gated like customer-by-resource.
+  app.get('/integration/tempo/actuals/customer-epics', async (req) => {
+    const q = req.query as { customerId?: string; from?: string; to?: string; teamId?: string };
+    if (!q.customerId) throw new BadRequestError('customerId is required');
+    assertCanViewCustomer(req.visibility, q.customerId);
+    const cur = new Date().toISOString().slice(0, 7);
+    const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
+    const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
+    const resourceIds = q.teamId ? await integrationService.resourceIdsForTeam(req.orgId, q.teamId) : null;
+    return integrationService.actualsForCustomerEpics(req.orgId, q.customerId, from, to, resourceIds);
   });
 
   // Actual hours for one customer, broken down by person + month. Feeds the

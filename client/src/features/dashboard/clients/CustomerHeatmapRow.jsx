@@ -2,16 +2,18 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HeatmapCell from './HeatmapCell';
 import ProjectHeatmapRow from './ProjectHeatmapRow';
+import EpicDrillRows from '../EpicDrillRows';
 import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
-import { ACCENT_COLORS, hoursToFte, MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
+import { api } from '../../../lib/api';
+import { ACCENT_COLORS, hoursToFte, MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS } from '../../../lib/constants';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
 import { availableHours, deliverableRatio, effectiveCapacity } from '../../../lib/availability';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
 import { useVisibility } from '../../../contexts/VisibilityContext';
 
-export default function CustomerHeatmapRow({ customer, index, months, includePotential, teamResourceIds, actuals }) {
+export default function CustomerHeatmapRow({ customer, index, months, includePotential, teamResourceIds, teamId, actuals }) {
   const [expanded, setExpanded] = useState(false);
   const { projects, needs, assignments, resources } = useData();
   const { rURealised } = useComputed();
@@ -131,6 +133,25 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
         <ProjectHeatmapRow key={p.id} project={p} customer={customer} months={months} includePotential={includePotential}
           teamResourceIds={teamResourceIds} actuals={actuals} accent={accent} />
       ))}
+      {/* The Jira epics behind this customer's logged hours (→ issues). Hours
+          only — no plan exists at that depth — so they sit under a divider to
+          separate them from the plan-vs-actual project rows above. */}
+      {expanded && custHasActuals && (
+        <>
+          <div className="flex items-center border-b border-border-light/50 bg-[#F6F9FC] pl-[46px] py-1 text-[8.5px] font-bold uppercase tracking-wider text-text-light">
+            Logged hours · Jira epics
+          </div>
+          <EpicDrillRows
+            load={() => (actuals?.window?.from && actuals?.window?.to
+              ? api.getCustomerEpicActuals(customer.id, actuals.window.from, actuals.window.to, teamId)
+              : Promise.resolve([]))}
+            loadKey={`${customer.id}:${actuals?.window?.from}:${actuals?.window?.to}:${teamId || ''}`}
+            months={months} cur={cur}
+            color={WORK_TYPE_COLORS.client} accent={accent}
+            tipPrefix={customer.name}
+          />
+        </>
+      )}
     </>
   );
 }
