@@ -187,9 +187,10 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.actualsForResourceEpics(req.orgId, q.resourceId, from, to, scope);
   });
 
-  // A customer's hours grouped by Jira epic → issue — the Client-Staffing
-  // drill. Actual hours only; optional teamId narrows to that team's people.
-  // Customer-visibility gated like customer-by-resource.
+  // A customer's hours grouped by Jira epic → issue → person — the
+  // Client-Staffing drill. Actual hours only; optional teamId narrows to that
+  // team's people. Customer-visibility gated like customer-by-resource, and
+  // the person level names only people visible to the requester.
   app.get('/integration/tempo/actuals/customer-epics', async (req) => {
     const q = req.query as { customerId?: string; from?: string; to?: string; teamId?: string };
     if (!q.customerId) throw new BadRequestError('customerId is required');
@@ -198,7 +199,9 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
     const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
     const resourceIds = q.teamId ? await integrationService.resourceIdsForTeam(req.orgId, q.teamId) : null;
-    return integrationService.actualsForCustomerEpics(req.orgId, q.customerId, from, to, resourceIds);
+    const v = req.visibility;
+    const visiblePersonIds = v.isAdmin ? null : [...v.visiblePersonIds];
+    return integrationService.actualsForCustomerEpics(req.orgId, q.customerId, from, to, resourceIds, visiblePersonIds);
   });
 
   // Actual hours for one customer, broken down by person + month. Feeds the

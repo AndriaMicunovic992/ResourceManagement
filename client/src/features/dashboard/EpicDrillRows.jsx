@@ -73,26 +73,53 @@ function EpicRow({ epic, months, cur, color, scaleMax, accent, tipPrefix }) {
         tipTitle={(m) => `${tipPrefix} · ${epic.name} · ${formatMonth(m)}`}
       />
       {open && epic.issues.map((i) => (
-        <ActRow key={i.key}
-          level={3}
-          name={i.key}
-          desc={i.description}
-          titleText={i.description ? `${i.key} · ${i.description}` : i.key}
+        <IssueRow key={i.key} issue={i} months={months} cur={cur}
+          color={color} scaleMax={scaleMax} accent={accent} />
+      ))}
+    </>
+  );
+}
+
+/* One issue — when the payload carries who logged it (the customer drill),
+   it expands one level further into those people. */
+function IssueRow({ issue, months, cur, color, scaleMax, accent }) {
+  const [open, setOpen] = useState(false);
+  const people = issue.people || [];
+  return (
+    <>
+      <ActRow
+        level={3}
+        name={issue.key}
+        desc={issue.description}
+        titleText={issue.description ? `${issue.key} · ${issue.description}` : issue.key}
+        caret={people.length > 0}
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        months={months} cur={cur}
+        hoursByMonth={issue.months || {}}
+        color={color} scaleMax={scaleMax} accent={accent}
+        tipTitle={(m) => `${issue.key} · ${formatMonth(m)}`}
+      />
+      {open && people.map((p) => (
+        <ActRow key={p.resourceId}
+          level={4}
+          name={p.name}
+          titleText={p.name}
           months={months} cur={cur}
-          hoursByMonth={i.months || {}}
+          hoursByMonth={p.months || {}}
           color={color} scaleMax={scaleMax} accent={accent}
-          tipTitle={(m) => `${i.key} · ${formatMonth(m)}`}
+          tipTitle={(m) => `${p.name} · ${issue.key} · ${formatMonth(m)}`}
         />
       ))}
     </>
   );
 }
 
-/* An actuals-only drill row (epic or issue): no plan track at this depth,
-   just the logged bar. */
+/* An actuals-only drill row (epic, issue or person): no plan track at this
+   depth, just the logged bar. */
 function ActRow({ level, name, desc, titleText, caret = false, open = false, onToggle, months, cur, hoursByMonth, color, scaleMax, accent, tipTitle }) {
-  const indent = level === 3 ? 'pl-[88px]' : 'pl-[68px]';
-  const bg = level === 3 ? 'bg-[#F2F6FA]' : 'bg-[#F6F9FC]';
+  const indent = level === 4 ? 'pl-[108px]' : level === 3 ? 'pl-[88px]' : 'pl-[68px]';
+  const bg = level === 4 ? 'bg-[#EEF3F8]' : level === 3 ? 'bg-[#F2F6FA]' : 'bg-[#F6F9FC]';
   const total = months.reduce((s, m) => s + (hoursByMonth[m] || 0), 0);
   return (
     <div
