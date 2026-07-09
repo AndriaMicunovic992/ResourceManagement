@@ -92,7 +92,7 @@ export default function ClientHeatmap({ months, includePotential, teamId, actual
 
   return (
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
-      <h3 className="text-[15px] font-bold text-text px-5 pt-4 pb-2">
+      <h3 className="text-[17px] font-bold text-text px-5 pt-4 pb-2">
         Client Staffing{' '}
         <InfoDot text="Each month is a small bullet: the soft track is the planned (filled) staffing with a tick at its target, the solid bar is what was actually logged in Tempo, and the label underneath reads actual/planned. Once hours are synced the whole table reads in hours — same unit as the epic/task drill — with the FTE equivalents in the tooltip; without synced hours it reads in plain FTE. The Δ and its on/under/over verdict compare against the expected FTE — absences eat each assignee's free capacity first, so the plan only shrinks (pro-rata) once someone's total plan no longer fits their remaining hours; the tooltip shows the expected value whenever it differs. A red tick means the month is understaffed (planned < needed); an amber bar over a dashed baseline is unplanned work; a grey bar is the current month, still being logged. Bar lengths compare within a row. Expanding a customer drills into where the logged time actually went: the Jira epics behind its hours → their tasks → the people who logged them (actual hours only, on their own hour scale — Jira work rarely maps 1:1 onto planned needs, so the drill follows the hours instead). The plan side lives in the planner: use the plan → link under a customer’s name; profile → (or the name itself) opens the customer page. With a team selected, plan and logged hours both count only that team’s people (hours of people not matched to a Jira account can’t be attributed and drop out). Realised-only unless Include potential is on." />
         <ActualsLegend showAct={showActuals} />
@@ -105,8 +105,8 @@ export default function ClientHeatmap({ months, includePotential, teamId, actual
       {/* Totals row — same bullet language (and unit) as the rows above */}
       <div className="flex items-center border-t-2 border-border bg-[#F7FAFC] sticky bottom-0">
         <div className="w-[270px] shrink-0 px-3 py-2">
-          <span className="text-[13px] font-bold text-text">{showActuals ? 'Total hours' : 'Total FTE'}</span>
-          {showActuals && <span className="block text-[10px] font-semibold text-text-light">plan / act</span>}
+          <span className="text-[14px] font-bold text-text">{showActuals ? 'Total hours' : 'Total FTE'}</span>
+          {showActuals && <span className="block text-[11px] font-semibold text-text-light">plan / act</span>}
         </div>
         {months.map((m) => (
           <HeatmapCell key={m} title={`All customers · ${formatMonth(m)}`}

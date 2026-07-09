@@ -55,7 +55,7 @@ export default function BulletCell({
   if (empty) {
     return (
       <Tip content={tip} className="w-[82px] shrink-0 flex items-center justify-center h-[44px]">
-        <span className="text-[12px] font-mono text-text-light">—</span>
+        <span className="text-[13px] font-mono text-text-light">—</span>
       </Tip>
     );
   }
@@ -122,7 +122,7 @@ export default function BulletCell({
         )}
       </div>
       {(labelAct || labelPlan) && (
-        <div className="text-center text-[10px] font-mono leading-[13px] whitespace-nowrap">
+        <div className="text-center text-[11px] font-mono leading-[14px] whitespace-nowrap">
           {labelAct && (
             // An act value with no plan reads amber (unplanned) only when no
             // segment breakdown names the hours — typed segments (internal,

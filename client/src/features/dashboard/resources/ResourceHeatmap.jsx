@@ -86,17 +86,17 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
 
   return (
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
-      <h3 className="text-[15px] font-bold text-text px-5 pt-4 pb-2">
+      <h3 className="text-[17px] font-bold text-text px-5 pt-4 pb-2">
         People Capacity{' '}
         <InfoDot text="Each month is a small bullet: the soft track is the person’s realised allocation as % of capacity with a tick at its target (red when over what they can deliver), the solid bar is the time they actually logged in Tempo — stacked by work type (green = client, violet = internal, slate = absences). Absences render in the stack so time off is visible where it explains a plan shortfall, but the “act” number counts worked time only. The tooltip’s Δ and verdict compare worked hours to the expected hours — the plan capped at the hours left after absences (a leave that fits into free capacity doesn’t lower the bar) — so vacation never reads as underdelivery. For months ahead, planned days off clip the plan line to what’s left of the month: the track is the workable part (also the % label), the slate hatch is the booking that falls into the leave, and the red tick marks the full booking that needs re-staffing. The Hours filter switches the lens to one work type or absences alone. Click a row to break the person’s hours down per client, internal work and absences; those rows drill two levels further — the Jira epics behind the hours, then the individual issues (actual hours only; no plan exists at that depth). Click a name to open the profile. Rows share a scale anchored at 100% capacity; people without synced hours get no actual layer. A grey bar is the current month, still being logged." />
         <ActualsLegend showAct={showActuals} types={showActuals ? typesForFilter(workTypeFilter) : null} />
       </h3>
       <div className="flex items-center border-b-2 border-border sticky top-0 bg-white z-10">
         <div className="w-[270px] shrink-0 px-3 py-2">
-          <span className="text-[13px] font-semibold text-text-mid">Name</span>
+          <span className="text-[14px] font-semibold text-text-mid">Name</span>
         </div>
         {months.map((m) => (
-          <div key={m} className="w-[82px] shrink-0 text-center text-[11px] font-mono font-bold text-primary py-2">
+          <div key={m} className="w-[82px] shrink-0 text-center text-[12px] font-mono font-bold text-primary py-2">
             <span className={m === cur ? 'bg-primary-light rounded-md px-1.5 py-0.5' : ''}>{formatMonth(m)}</span>
           </div>
         ))}
@@ -111,8 +111,8 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
       {/* Totals row — same bullet language as the rows above */}
       <div className="flex items-center border-t-2 border-border bg-[#F7FAFC] sticky bottom-0">
         <div className="w-[270px] shrink-0 px-3 py-2">
-          <span className="text-[13px] font-bold text-text">Avg Utilization</span>
-          {hasActualTotals && <span className="block text-[10px] font-semibold text-text-light">plan / act (matched people)</span>}
+          <span className="text-[14px] font-bold text-text">Avg Utilization</span>
+          {hasActualTotals && <span className="block text-[11px] font-semibold text-text-light">plan / act (matched people)</span>}
         </div>
         {months.map((m) => {
           const pct = totals[m] || 0;
