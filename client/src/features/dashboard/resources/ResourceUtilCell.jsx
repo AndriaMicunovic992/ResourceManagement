@@ -3,6 +3,7 @@ import BulletCell from '../BulletCell';
 import { TipRow } from '../Tip';
 import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS, WORK_TYPE_LABELS } from '../../../lib/constants';
 import { availableHours, absenceHours, verdictWord } from '../../../lib/availability';
+import { planTickColor } from '../../../lib/statusUtils';
 
 // Hours, compact: one decimal under 10h, whole above ("8.5h", "174h").
 const fmtH = (h) => `${h >= 9.95 ? Math.round(h) : Math.round(h * 10) / 10}h`;
@@ -72,7 +73,7 @@ function ResourceUtilCell({ title, plan, extra, act, actSegments, typedHours, ca
   const tip = (plan > 0 || extra > 0 || (hasAct && act > 0) || showPlannedOff) ? (
     <>
       <b className="text-[11px]">{title}</b>
-      {plan > 0 && <TipRow swatch={accent} label="Planned" value={`${fmtH(planHours)} (${pct(plan)})`} />}
+      {plan > 0 && <TipRow swatch={planTickColor(accent, { alert: overbooked })} label="Planned" value={`${fmtH(planHours)} (${pct(plan)})`} />}
       {showExpected && (
         <TipRow label="Expected" value={`${fmtH(expectedHours)} · after ${fmtH(absH)} absence`} />
       )}

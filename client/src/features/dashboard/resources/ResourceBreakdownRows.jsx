@@ -7,6 +7,7 @@ import { useData } from '../../../contexts/DataContext';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
 import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS, WORK_TYPE_LABELS } from '../../../lib/constants';
 import { availableHours, deliverableRatio, verdictWord } from '../../../lib/availability';
+import { planTickColor } from '../../../lib/statusUtils';
 
 /**
  * The expanded person row: their hours per client (plan vs logged, in hours),
@@ -210,7 +211,7 @@ function BreakdownRow({ row, resource, months, cur, typedHours, totalPlannedByMo
           const tip = plan > 0 || (act || 0) > 0 ? (
             <>
               <b className="text-[11px]">{resource.name} · {row.name} · {formatMonth(m)}</b>
-              {plan > 0 && <TipRow swatch={accent} label="Planned" value={`${Math.round(plan)}h`} />}
+              {plan > 0 && <TipRow swatch={planTickColor(accent)} label="Planned" value={`${Math.round(plan)}h`} />}
               {act != null && plan > 0 && plan - expected > 1 && (
                 <TipRow label="Expected" value={`${Math.round(expected)}h · after absences`} />
               )}

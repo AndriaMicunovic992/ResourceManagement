@@ -2,6 +2,7 @@ import { memo } from 'react';
 import BulletCell from '../BulletCell';
 import { TipRow } from '../Tip';
 import { MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
+import { planTickColor } from '../../../lib/statusUtils';
 
 /**
  * One customer × month cell: adapts row staffing data to the shared bullet
@@ -51,9 +52,9 @@ function HeatmapCell({ title, plan, expected, needed, act, max, accent, isPotent
       <b className="text-[11px]">{title}</b>
       {needed > 0 && <TipRow label="Needed" value={val(needed)} />}
       {plan > 0 ? (
-        <TipRow swatch={accent} label="Planned" value={val(plan)} />
+        <TipRow swatch={planTickColor(accent, { alert: understaffed, muted: isPotential })} label="Planned" value={val(plan)} />
       ) : (
-        hasAct && act > 0 && <TipRow swatch={accent} label="Planned" value="none" />
+        hasAct && act > 0 && <TipRow swatch={planTickColor(accent, { muted: isPotential })} label="Planned" value="none" />
       )}
       {plan > 0 && absenceGap > 0.05 && (
         <TipRow label="Expected" value={`${inHours ? `${fmtH(expectedFte)}h` : `${fmt(expectedFte)} FTE`} · after absences`} />

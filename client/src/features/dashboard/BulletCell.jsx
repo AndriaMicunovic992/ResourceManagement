@@ -1,4 +1,5 @@
 import Tip from './Tip';
+import { planTickColor } from '../../lib/statusUtils';
 
 /**
  * One month cell of the plan-vs-actual heatmaps: a bullet — soft track sized
@@ -54,13 +55,13 @@ export default function BulletCell({
   if (empty) {
     return (
       <Tip content={tip} className="w-[82px] shrink-0 flex items-center justify-center h-[44px]">
-        <span className="text-[11px] font-mono text-text-light">—</span>
+        <span className="text-[12px] font-mono text-text-light">—</span>
       </Tip>
     );
   }
 
   const trackColor = muted ? '#E5E7EB' : `color-mix(in srgb, ${accent} 16%, white)`;
-  const tickColor = alert ? '#E8636F' : muted ? '#9CA3AF' : `color-mix(in srgb, ${accent} 82%, black)`;
+  const tickColor = planTickColor(accent, { alert, muted });
   const fillBg = inProgress
     ? '#CBD8E2'
     : hasBooking
@@ -121,7 +122,7 @@ export default function BulletCell({
         )}
       </div>
       {(labelAct || labelPlan) && (
-        <div className="text-center text-[9px] font-mono leading-[12px] whitespace-nowrap">
+        <div className="text-center text-[10px] font-mono leading-[13px] whitespace-nowrap">
           {labelAct && (
             // An act value with no plan reads amber (unplanned) only when no
             // segment breakdown names the hours — typed segments (internal,
