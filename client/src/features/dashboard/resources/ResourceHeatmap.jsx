@@ -1,13 +1,18 @@
 import { useMemo } from 'react';
 import ResourceHeatmapRow from './ResourceHeatmapRow';
+import BulletCell from '../BulletCell';
+import { TipRow } from '../Tip';
 import { formatMonth, currentMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
 import { useComputed } from '../../../hooks/useComputed';
-import { utilColor } from '../../../lib/statusUtils';
-import { MONTHLY_HOURS_PER_FTE } from '../../../lib/constants';
-import { hoursForFilter, typesForFilter } from '../workTypeLens';
+import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS, WORK_TYPE_LABELS } from '../../../lib/constants';
+import { hoursForFilter, segmentsForFilter, stackTotalForFilter, typesForFilter } from '../workTypeLens';
 import InfoDot from '../../../components/ui/InfoDot';
 import ActualsLegend from '../ActualsLegend';
+
+// Totals-row accent: a neutral slate so the footer reads as an aggregate of
+// the rows above, not as another person.
+const FOOTER_ACCENT = '#64748B';
 
 export default function ResourceHeatmap({ months, onResourceClick, includePotential, teamId, actuals, workTypeFilter = 'work' }) {
   const { resources } = useData();
@@ -36,25 +41,47 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
     return result;
   }, [visibleResources, months, rURealised, rU, includePotential]);
 
-  // Actual utilization per elapsed month under the work-type lens — matched
-  // people (linked to a Jira account) over matched capacity only, so untracked
+  // Matched people's logged hours per elapsed month, summed by work type —
+  // the totals-row equivalent of each row's typedHours. Matched people
+  // (linked to a Jira account) over matched capacity only, so untracked
   // people don't dilute it. Same convention as the home dashboard.
   const actualTotals = useMemo(() => {
-    if (!showActuals) return {};
+    if (!showActuals) return null;
     const byType = actuals?.byResourceType || {};
     const matched = visibleResources.filter((r) => r.externalWorkId);
     const matchedCap = matched.reduce((s, r) => s + (r.capacity || 1), 0);
-    if (matchedCap <= 0) return {};
-    const result = {};
+    if (matchedCap <= 0) return null;
+    const types = {};
     for (const m of months) {
       if (m > cur) continue;
-      let hours = 0;
-      for (const r of matched) hours += hoursForFilter(byType[r.id]?.[m], workTypeFilter);
-      result[m] = Math.round(((hours / MONTHLY_HOURS_PER_FTE) / matchedCap) * 100);
+      const t = { client: 0, internal: 0, absence: 0 };
+      for (const r of matched) {
+        const h = byType[r.id]?.[m];
+        if (!h) continue;
+        t.client += h.client || 0;
+        t.internal += h.internal || 0;
+        t.absence += h.absence || 0;
+      }
+      types[m] = t;
     }
-    return result;
-  }, [showActuals, actuals, visibleResources, months, cur, workTypeFilter]);
-  const hasActualTotals = Object.keys(actualTotals).length > 0;
+    return { types, matchedCap, matchedCount: matched.length };
+  }, [showActuals, actuals, visibleResources, months, cur]);
+  const hasActualTotals = !!actualTotals;
+
+  // Summed hours → % of matched capacity.
+  const totalPct = (h) => ((h / MONTHLY_HOURS_PER_FTE) / (actualTotals?.matchedCap || 1)) * 100;
+
+  // Footer scale: anchored at 100% capacity like the rows above; only an
+  // overbooked average or a heavy logged stack stretches it further.
+  const footerMax = useMemo(() => {
+    let max = 100;
+    for (const m of months) {
+      max = Math.max(max, totals[m] || 0);
+      const t = actualTotals?.types?.[m];
+      if (t) max = Math.max(max, totalPct(stackTotalForFilter(t, workTypeFilter)));
+    }
+    return max;
+  }, [months, totals, actualTotals, workTypeFilter]);
 
   return (
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
@@ -80,25 +107,57 @@ export default function ResourceHeatmap({ months, onResourceClick, includePotent
           workTypeFilter={workTypeFilter}
           window={actuals?.window} />
       ))}
-      {/* Totals row */}
-      <div className="flex items-center border-t-2 border-border bg-primary-bg/30 sticky bottom-0">
+      {/* Totals row — same bullet language as the rows above */}
+      <div className="flex items-center border-t-2 border-border bg-[#F7FAFC] sticky bottom-0">
         <div className="w-[270px] shrink-0 px-3 py-2">
           <span className="text-xs font-bold text-text">Avg Utilization</span>
           {hasActualTotals && <span className="block text-[9px] font-semibold text-text-light">plan / act (matched people)</span>}
         </div>
         {months.map((m) => {
-          const pct = totals[m];
-          const color = utilColor(pct);
-          return (
-            <div key={m} className="w-[82px] shrink-0 flex flex-col items-center justify-center py-0.5">
-              <span className="text-[11px] font-mono font-bold" style={{ color }}>{pct}%</span>
-              {hasActualTotals && m <= cur && (
-                <span className="text-[9px] font-mono font-semibold leading-tight"
-                  style={{ color: m === cur ? '#9CA3AF' : '#34C98E' }}>
-                  act {actualTotals[m] ?? 0}%
-                </span>
+          const pct = totals[m] || 0;
+          const t = actualTotals?.types?.[m] || null;
+          const actPct = t ? totalPct(hoursForFilter(t, workTypeFilter)) : null;
+          const partial = m === cur;
+          const segs = t && !partial
+            ? segmentsForFilter(t, workTypeFilter).map((s) => ({ ...s, value: totalPct(s.value) }))
+            : null;
+          const inLens = (k) => (workTypeFilter === 'work' ? k !== 'absence' : k === workTypeFilter);
+          const typeRows = t ? ['client', 'internal', 'absence'].filter((k) => (t[k] || 0) > 0) : [];
+          const overbooked = pct > 100.001;
+          const tip = (pct > 0 || (actPct != null && actPct > 0)) ? (
+            <>
+              <b className="text-[11px]">Avg utilization · {formatMonth(m)}</b>
+              {pct > 0 && (
+                <TipRow swatch={FOOTER_ACCENT} label="Planned"
+                  value={`${Math.round(pct)}% avg of ${visibleResources.length} people`} />
               )}
-            </div>
+              {actPct != null && (
+                <TipRow swatch="#34C98E" label="Actual"
+                  value={`${Math.round(actPct)}%${partial ? ' so far' : ''} · ${actualTotals.matchedCount} matched`} />
+              )}
+              {typeRows.map((k) => (
+                <div key={k} className="pl-3">
+                  <TipRow swatch={WORK_TYPE_COLORS[k]} label={WORK_TYPE_LABELS[k]}
+                    value={`${Math.round(t[k])}h${inLens(k) ? '' : ' · not counted'}`} />
+                </div>
+              ))}
+              {partial && t && <div className="opacity-80">month in progress</div>}
+              {overbooked && <div className="text-[#FBA9B1]">over capacity</div>}
+            </>
+          ) : null;
+          return (
+            <BulletCell key={m}
+              plan={pct}
+              act={actPct}
+              actSegments={segs}
+              max={footerMax}
+              accent={FOOTER_ACCENT}
+              alert={overbooked}
+              inProgress={actPct != null && partial}
+              labelAct={actPct != null && (actPct > 0 || pct > 0) ? `${Math.round(actPct)}` : null}
+              labelPlan={pct > 0 ? `${Math.round(pct)}%` : null}
+              tip={tip}
+            />
           );
         })}
       </div>
