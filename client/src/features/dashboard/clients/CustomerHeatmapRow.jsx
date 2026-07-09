@@ -4,6 +4,7 @@ import HeatmapCell from './HeatmapCell';
 import EpicDrillRows from '../EpicDrillRows';
 import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
+import PopoverMenu from '../../../components/ui/PopoverMenu';
 import { api } from '../../../lib/api';
 import { ACCENT_COLORS, hoursToFte, MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS } from '../../../lib/constants';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
@@ -99,40 +100,28 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
           <span className="text-[10px] text-text-mid transition-transform" style={{ transform: expanded ? 'rotate(90deg)' : 'none' }}>▶</span>
           <Avatar name={customer.name} color={customer.status === 'potential' ? '#9CA3AF' : accent} size={28} className="rounded-lg text-[11px]" />
           <div className="flex-1 min-w-0">
+            {/* Clicking the name opens a small menu to jump to the planner
+                (staffing plan) or the customer profile — the plan is no longer
+                a drill level here. */}
             <div className="flex items-center gap-1">
-              {canOpen ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/customers/${customer.id}`);
-                  }}
-                  className="text-[15px] font-bold text-text truncate bg-transparent border-0 p-0 cursor-pointer hover:text-primary hover:underline text-left"
-                >
-                  {customer.name}
-                </button>
-              ) : (
-                <span className="text-[15px] font-bold text-text truncate">{customer.name}</span>
-              )}
+              <PopoverMenu
+                trigger={
+                  <span className="flex items-center gap-1 text-[15px] font-bold text-text truncate hover:text-primary">
+                    {customer.name}
+                    <span className="text-[9px] text-text-light leading-none">▾</span>
+                  </span>
+                }
+                items={[
+                  { label: 'Open planner', icon: '📅', onClick: () => navigate(`/planner?customerId=${customer.id}`) },
+                  ...(canOpen
+                    ? [{ label: 'Open profile', icon: '↗', onClick: () => navigate(`/customers/${customer.id}`) }]
+                    : []),
+                ]}
+              />
               <StatusBadge status={customer.status} />
             </div>
-            {/* The plan (needs/projects) is no longer a drill level here —
-                jump to it instead; profile mirrors the name click. */}
-            <div className="flex items-center gap-2 text-[12px]">
-              <button
-                onClick={(e) => { e.stopPropagation(); navigate(`/planner?customerId=${customer.id}`); }}
-                className="text-primary font-semibold bg-transparent border-0 p-0 cursor-pointer hover:underline"
-              >
-                plan →
-              </button>
-              {canOpen && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); navigate(`/customers/${customer.id}`); }}
-                  className="text-text-light font-semibold bg-transparent border-0 p-0 cursor-pointer hover:underline hover:text-text-mid"
-                >
-                  profile →
-                </button>
-              )}
-              <span className="text-text-light">· {custProjects.length} project{custProjects.length === 1 ? '' : 's'}</span>
+            <div className="text-[12px] text-text-light">
+              {custProjects.length} project{custProjects.length === 1 ? '' : 's'}
             </div>
           </div>
         </div>
