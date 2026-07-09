@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HeatmapCell from './HeatmapCell';
-import ProjectHeatmapRow from './ProjectHeatmapRow';
 import EpicDrillRows from '../EpicDrillRows';
 import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -116,7 +115,25 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
               )}
               <StatusBadge status={customer.status} />
             </div>
-            <div className="text-[10px] text-text-light">{custProjects.length} projects</div>
+            {/* The plan (needs/projects) is no longer a drill level here —
+                jump to it instead; profile mirrors the name click. */}
+            <div className="flex items-center gap-2 text-[10px]">
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate(`/planner?customerId=${customer.id}`); }}
+                className="text-primary font-semibold bg-transparent border-0 p-0 cursor-pointer hover:underline"
+              >
+                plan →
+              </button>
+              {canOpen && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate(`/customers/${customer.id}`); }}
+                  className="text-text-light font-semibold bg-transparent border-0 p-0 cursor-pointer hover:underline hover:text-text-mid"
+                >
+                  profile →
+                </button>
+              )}
+              <span className="text-text-light">· {custProjects.length} project{custProjects.length === 1 ? '' : 's'}</span>
+            </div>
           </div>
         </div>
         {months.map((m) => {
@@ -129,29 +146,24 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
           );
         })}
       </div>
-      {expanded && custProjects.map((p) => (
-        <ProjectHeatmapRow key={p.id} project={p} customer={customer} months={months} includePotential={includePotential}
-          teamResourceIds={teamResourceIds} actuals={actuals} accent={accent} />
+      {/* The drill follows the logged hours, not the plan: Jira epics →
+          tasks → the people who logged them. The plan lives in the planner
+          (the "plan →" link above). */}
+      {expanded && (custHasActuals ? (
+        <EpicDrillRows
+          load={() => (actuals?.window?.from && actuals?.window?.to
+            ? api.getCustomerEpicActuals(customer.id, actuals.window.from, actuals.window.to, teamId)
+            : Promise.resolve([]))}
+          loadKey={`${customer.id}:${actuals?.window?.from}:${actuals?.window?.to}:${teamId || ''}`}
+          months={months} cur={cur}
+          color={WORK_TYPE_COLORS.client} accent={accent}
+          tipPrefix={customer.name}
+        />
+      ) : (
+        <div className="flex items-center border-b border-border-light/50 bg-[#F6F9FC] pl-[68px] py-1.5 text-[10px] text-text-light">
+          No logged hours for this customer in the window — the plan lives under “plan →”.
+        </div>
       ))}
-      {/* The Jira epics behind this customer's logged hours (→ issues). Hours
-          only — no plan exists at that depth — so they sit under a divider to
-          separate them from the plan-vs-actual project rows above. */}
-      {expanded && custHasActuals && (
-        <>
-          <div className="flex items-center border-b border-border-light/50 bg-[#F6F9FC] pl-[46px] py-1 text-[8.5px] font-bold uppercase tracking-wider text-text-light">
-            Logged hours · Jira epics
-          </div>
-          <EpicDrillRows
-            load={() => (actuals?.window?.from && actuals?.window?.to
-              ? api.getCustomerEpicActuals(customer.id, actuals.window.from, actuals.window.to, teamId)
-              : Promise.resolve([]))}
-            loadKey={`${customer.id}:${actuals?.window?.from}:${actuals?.window?.to}:${teamId || ''}`}
-            months={months} cur={cur}
-            color={WORK_TYPE_COLORS.client} accent={accent}
-            tipPrefix={customer.name}
-          />
-        </>
-      )}
     </>
   );
 }

@@ -190,16 +190,25 @@ type EpicDrillWorklog = {
   seconds: number;
   description: string | null;
   workDate: string;
+  resourceId?: string | null;
 };
 
 // Group worklog rows by Jira epic → issue with per-month hour sums — the
 // shared core of the person- and customer-scoped drill endpoints. Epics are
 // named from the pulled JiraWorkItem rows; worklogs without an epic land
 // under "(no epic)", without an issue key under "(no issue)". Each issue
-// carries the most recent worklog note as a description hint. Both levels
-// sort by total hours, largest first.
-async function groupWorklogsByEpic(orgId: string, rows: EpicDrillWorklog[]) {
-  type IssueAgg = { seconds: Record<string, number>; total: number; description: string | null; descDate: string };
+// carries the most recent worklog note as a description hint. With
+// `people`, each issue also lists who logged it ({ resourceId, name,
+// months }, restricted to visibleResourceIds unless null = everyone) —
+// hours of unmatched Jira accounts stay in the issue totals but get no
+// person row. Every level sorts by total hours, largest first.
+async function groupWorklogsByEpic(
+  orgId: string,
+  rows: EpicDrillWorklog[],
+  people?: { visibleResourceIds: string[] | null }
+) {
+  type PersonAgg = { seconds: Record<string, number>; total: number };
+  type IssueAgg = { seconds: Record<string, number>; total: number; description: string | null; descDate: string; people: Map<string, PersonAgg> };
   type EpicAgg = { seconds: Record<string, number>; total: number; issues: Map<string, IssueAgg> };
   const epics = new Map<string, EpicAgg>();
   for (const w of rows) {
@@ -208,12 +217,18 @@ async function groupWorklogsByEpic(orgId: string, rows: EpicDrillWorklog[]) {
     const epic = epics.get(epicKey) || { seconds: {}, total: 0, issues: new Map<string, IssueAgg>() };
     epic.seconds[w.month] = (epic.seconds[w.month] || 0) + w.seconds;
     epic.total += w.seconds;
-    const issue = epic.issues.get(issueKey) || { seconds: {}, total: 0, description: null, descDate: '' };
+    const issue = epic.issues.get(issueKey) || { seconds: {}, total: 0, description: null, descDate: '', people: new Map<string, PersonAgg>() };
     issue.seconds[w.month] = (issue.seconds[w.month] || 0) + w.seconds;
     issue.total += w.seconds;
     if (w.description && w.workDate >= issue.descDate) {
       issue.description = w.description;
       issue.descDate = w.workDate;
+    }
+    if (people && w.resourceId && (!people.visibleResourceIds || people.visibleResourceIds.includes(w.resourceId))) {
+      const person = issue.people.get(w.resourceId) || { seconds: {}, total: 0 };
+      person.seconds[w.month] = (person.seconds[w.month] || 0) + w.seconds;
+      person.total += w.seconds;
+      issue.people.set(w.resourceId, person);
     }
     epic.issues.set(issueKey, issue);
     epics.set(epicKey, epic);
@@ -225,6 +240,12 @@ async function groupWorklogsByEpic(orgId: string, rows: EpicDrillWorklog[]) {
     select: { externalKey: true, name: true },
   });
   const nameByKey = new Map(named.map((n) => [n.externalKey, n.name]));
+  const personIds = people
+    ? [...new Set([...epics.values()].flatMap((e) => [...e.issues.values()].flatMap((i) => [...i.people.keys()])))]
+    : [];
+  const personName = personIds.length
+    ? new Map((await prisma.resource.findMany({ where: { orgId, id: { in: personIds } }, select: { id: true, name: true } })).map((r) => [r.id, r.name]))
+    : new Map<string, string>();
   const toHours = (secs: Record<string, number>) =>
     Object.fromEntries(Object.entries(secs).map(([m, s]) => [m, Math.round((s / 3600) * 10) / 10]));
 
@@ -236,7 +257,18 @@ async function groupWorklogsByEpic(orgId: string, rows: EpicDrillWorklog[]) {
       months: toHours(e.seconds),
       issues: [...e.issues.entries()]
         .sort((a, b) => b[1].total - a[1].total)
-        .map(([ikey, i]) => ({ key: ikey, description: i.description, months: toHours(i.seconds) })),
+        .map(([ikey, i]) => ({
+          key: ikey,
+          description: i.description,
+          months: toHours(i.seconds),
+          ...(people
+            ? {
+                people: [...i.people.entries()]
+                  .sort((a, b) => b[1].total - a[1].total)
+                  .map(([rid, p]) => ({ resourceId: rid, name: personName.get(rid) || 'Unknown person', months: toHours(p.seconds) })),
+              }
+            : {}),
+        })),
     }));
 }
 
@@ -796,25 +828,28 @@ export const integrationService = {
   },
 
   /**
-   * A customer's logged hours grouped by Jira epic → issue — the Client-
-   * Staffing drill. Covers everything attributed to the customer (directly or
-   * via a project mapping); optionally narrowed to one team's people via
-   * resourceIds. Actual hours only — no plan exists at this depth.
+   * A customer's logged hours grouped by Jira epic → issue → person — the
+   * Client-Staffing drill. Covers everything attributed to the customer
+   * (directly or via a project mapping); optionally narrowed to one team's
+   * people via resourceIds. The person level only names people in
+   * visibleResourceIds (null = everyone). Actual hours only — no plan exists
+   * at this depth.
    */
   async actualsForCustomerEpics(
     orgId: string,
     customerId: string,
     fromMonth: string,
     toMonth: string,
-    resourceIds: string[] | null = null
+    resourceIds: string[] | null = null,
+    visibleResourceIds: string[] | null = null
   ) {
     const where: any = { orgId, customerId, month: { gte: fromMonth, lte: toMonth } };
     if (resourceIds) where.resourceId = { in: resourceIds };
     const rows = await prisma.worklog.findMany({
       where,
-      select: { jiraEpicKey: true, jiraIssueKey: true, month: true, seconds: true, description: true, workDate: true },
+      select: { jiraEpicKey: true, jiraIssueKey: true, month: true, seconds: true, description: true, workDate: true, resourceId: true },
     });
-    return groupWorklogsByEpic(orgId, rows);
+    return groupWorklogsByEpic(orgId, rows, { visibleResourceIds });
   },
 
   /**

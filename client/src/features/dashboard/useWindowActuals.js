@@ -2,15 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { currentMonth } from '../../lib/dateUtils';
 
-const EMPTY = { byResource: {}, byResourceType: {}, byCustomer: {}, byProject: {} };
+const EMPTY = { byResource: {}, byResourceType: {}, byCustomer: {} };
 
 /**
- * Synced Tempo actuals for the Insights window, keyed four ways:
+ * Synced Tempo actuals for the Insights window, keyed three ways:
  *  byResource      { [resourceId]: { "YYYY-MM": hours } }   — worked time (absences excluded server-side)
  *  byResourceType  { [resourceId]: { "YYYY-MM": { client|internal|absence: hours } } } — unfiltered
- *  byCustomer / byProject — client-work hours per entity; team-scoped when a
- *  team lens is on (only that team's people's hours), so the client table can
- *  keep its actual layer under a team filter.
+ *  byCustomer      — client-work hours per customer; team-scoped when a team
+ *  lens is on (only that team's people's hours), so the client table can keep
+ *  its actual layer under a team filter.
  * Worklogs only exist up to the current month, so the fetch is clamped there —
  * a window entirely in the future skips the requests. `hasActuals` is true when
  * any hours came back org-wide; without it the tables hide their actual layer.
@@ -40,18 +40,15 @@ export function useWindowActuals(months, teamId = '') {
     return () => { dead = true; };
   }, [from, to]);
 
-  // Entity hours follow the team lens.
+  // Customer hours follow the team lens.
   useEffect(() => {
     if (!from || !to || from > to) return;
     let dead = false;
-    Promise.all([
-      api.getMonthlyActualsByCustomer(from, to, teamId).catch(() => ({})),
-      api.getMonthlyActualsByProject(from, to, teamId).catch(() => ({})),
-    ]).then(([byCustomer, byProject]) => {
-      if (!dead) {
-        setData((prev) => ({ ...prev, byCustomer: byCustomer || {}, byProject: byProject || {} }));
-      }
-    });
+    api.getMonthlyActualsByCustomer(from, to, teamId)
+      .catch(() => ({}))
+      .then((byCustomer) => {
+        if (!dead) setData((prev) => ({ ...prev, byCustomer: byCustomer || {} }));
+      });
     return () => { dead = true; };
   }, [from, to, teamId]);
 

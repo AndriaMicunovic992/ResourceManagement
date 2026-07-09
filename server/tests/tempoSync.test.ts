@@ -192,6 +192,15 @@ describe.skipIf(!HAS_DB)('Tempo sync', () => {
     const custEpics = await integrationService.actualsForCustomerEpics(orgId, customerId, '2026-04', '2026-05');
     expect(custEpics.map((e) => e.key)).toEqual(['CLI-100', '(no epic)']);
     expect(custEpics[0].name).toBe('Checkout revamp');
+    // The deepest level: who logged each issue, names resolved.
+    expect(custEpics[0].issues[0].people).toEqual([
+      { resourceId: personId, name: 'Matched Person', months: { '2026-05': 2 } },
+    ]);
+    // A requester who can't see the person still gets the issue totals, but
+    // no person rows.
+    const hidden = await integrationService.actualsForCustomerEpics(orgId, customerId, '2026-04', '2026-05', null, []);
+    expect(hidden[0].issues[0].months).toEqual({ '2026-05': 2 });
+    expect(hidden[0].issues[0].people).toEqual([]);
     // Narrowed to a people list that excludes the author → nothing left.
     expect(await integrationService.actualsForCustomerEpics(orgId, customerId, '2026-04', '2026-05', [])).toEqual([]);
 
