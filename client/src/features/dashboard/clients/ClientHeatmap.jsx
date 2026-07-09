@@ -29,7 +29,9 @@ export default function ClientHeatmap({ months, includePotential, teamId, actual
   );
 
   const cur = currentMonth();
-  const showActuals = !!actuals?.hasActuals && !teamId; // hours aren't team-attributable
+  // With a team lens on, actuals?.byCustomer/byProject are already scoped to
+  // that team's people (useWindowActuals refetches them with teamId).
+  const showActuals = !!actuals?.hasActuals;
 
   // Totals: sum filled FTE per month across all visible customers
   const totals = useMemo(() => {
@@ -92,13 +94,13 @@ export default function ClientHeatmap({ months, includePotential, teamId, actual
     <div className="bg-white rounded-2xl border border-border-light shadow-card overflow-auto">
       <h3 className="text-[13px] font-bold text-text px-5 pt-4 pb-2">
         Client Staffing{' '}
-        <InfoDot text="Each month is a small bullet: the soft track is the planned (filled) FTE with a tick at its target, the solid bar is the FTE actually logged in Tempo, and the label underneath reads actual/planned. The Δ and its on/under/over verdict compare against the expected FTE — absences eat each assignee's free capacity first, so the plan only shrinks (pro-rata) once someone's total plan no longer fits their remaining hours; the tooltip shows the expected value whenever it differs. A red tick means the month is understaffed (planned < needed); an amber bar over a dashed baseline is unplanned work; a grey bar is the current month, still being logged. Bar lengths compare within a row. Project rows only show hours mapped to that project, so the customer row is the authoritative total. Logged hours can’t be split by team, so the actual layer hides while a team filter is on. Realised-only unless Include potential is on." />
+        <InfoDot text="Each month is a small bullet: the soft track is the planned (filled) FTE with a tick at its target, the solid bar is the FTE actually logged in Tempo, and the label underneath reads actual/planned. The Δ and its on/under/over verdict compare against the expected FTE — absences eat each assignee's free capacity first, so the plan only shrinks (pro-rata) once someone's total plan no longer fits their remaining hours; the tooltip shows the expected value whenever it differs. A red tick means the month is understaffed (planned < needed); an amber bar over a dashed baseline is unplanned work; a grey bar is the current month, still being logged. Bar lengths compare within a row. Project rows only show hours mapped to that project, so the customer row is the authoritative total. Expanding a customer also lists the Jira epics behind its logged hours — click an epic for its issues (actual hours only, on their own hour scale). With a team selected, plan and logged hours both count only that team’s people (hours of people not matched to a Jira account can’t be attributed and drop out). Realised-only unless Include potential is on." />
         <ActualsLegend showAct={showActuals} />
       </h3>
       <ClientHeatmapHeader months={months} />
       {filtered.map((c, i) => (
         <CustomerHeatmapRow key={c.id} customer={c} index={i} months={months} includePotential={includePotential}
-          teamResourceIds={teamResourceIds} actuals={showActuals ? actuals : null} />
+          teamResourceIds={teamResourceIds} teamId={teamId} actuals={showActuals ? actuals : null} />
       ))}
       {/* Totals row — same bullet language as the rows above */}
       <div className="flex items-center border-t-2 border-border bg-[#F7FAFC] sticky bottom-0">

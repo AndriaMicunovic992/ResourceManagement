@@ -183,6 +183,63 @@ function issueProjectKey(issueKey: string | null): string | null {
   return i > 0 ? issueKey.slice(0, i) : null;
 }
 
+type EpicDrillWorklog = {
+  jiraEpicKey: string | null;
+  jiraIssueKey: string | null;
+  month: string;
+  seconds: number;
+  description: string | null;
+  workDate: string;
+};
+
+// Group worklog rows by Jira epic → issue with per-month hour sums — the
+// shared core of the person- and customer-scoped drill endpoints. Epics are
+// named from the pulled JiraWorkItem rows; worklogs without an epic land
+// under "(no epic)", without an issue key under "(no issue)". Each issue
+// carries the most recent worklog note as a description hint. Both levels
+// sort by total hours, largest first.
+async function groupWorklogsByEpic(orgId: string, rows: EpicDrillWorklog[]) {
+  type IssueAgg = { seconds: Record<string, number>; total: number; description: string | null; descDate: string };
+  type EpicAgg = { seconds: Record<string, number>; total: number; issues: Map<string, IssueAgg> };
+  const epics = new Map<string, EpicAgg>();
+  for (const w of rows) {
+    const epicKey = w.jiraEpicKey || '(no epic)';
+    const issueKey = w.jiraIssueKey || '(no issue)';
+    const epic = epics.get(epicKey) || { seconds: {}, total: 0, issues: new Map<string, IssueAgg>() };
+    epic.seconds[w.month] = (epic.seconds[w.month] || 0) + w.seconds;
+    epic.total += w.seconds;
+    const issue = epic.issues.get(issueKey) || { seconds: {}, total: 0, description: null, descDate: '' };
+    issue.seconds[w.month] = (issue.seconds[w.month] || 0) + w.seconds;
+    issue.total += w.seconds;
+    if (w.description && w.workDate >= issue.descDate) {
+      issue.description = w.description;
+      issue.descDate = w.workDate;
+    }
+    epic.issues.set(issueKey, issue);
+    epics.set(epicKey, epic);
+  }
+  if (epics.size === 0) return [];
+
+  const named = await prisma.jiraWorkItem.findMany({
+    where: { orgId, externalKey: { in: [...epics.keys()].filter((k) => k !== '(no epic)') } },
+    select: { externalKey: true, name: true },
+  });
+  const nameByKey = new Map(named.map((n) => [n.externalKey, n.name]));
+  const toHours = (secs: Record<string, number>) =>
+    Object.fromEntries(Object.entries(secs).map(([m, s]) => [m, Math.round((s / 3600) * 10) / 10]));
+
+  return [...epics.entries()]
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([key, e]) => ({
+      key,
+      name: nameByKey.get(key) || key,
+      months: toHours(e.seconds),
+      issues: [...e.issues.entries()]
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([ikey, i]) => ({ key: ikey, description: i.description, months: toHours(i.seconds) })),
+    }));
+}
+
 /**
  * Re-resolve every stored worklog through the current mappings and rewrite the
  * rows whose target changed. The sync stamps rows as it pulls them, but a
@@ -574,9 +631,12 @@ export const integrationService = {
    * given customer ids (caller's visible customers); null = all (admin).
    * Returned as { [customerId]: { [month]: hours } }.
    */
-  async actualsByCustomer(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null) {
+  async actualsByCustomer(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null, resourceIds: string[] | null = null) {
     const where: any = { orgId, month: { gte: fromMonth, lte: toMonth }, customerId: { not: null } };
     if (visibleIds) where.customerId = { in: visibleIds };
+    // Team lens: count only these people's hours (worklogs of unmatched Jira
+    // accounts have no resourceId and drop out — they can't be attributed).
+    if (resourceIds) where.resourceId = { in: resourceIds };
     const rows = await prisma.worklog.groupBy({
       by: ['customerId', 'month'],
       where,
@@ -597,9 +657,12 @@ export const integrationService = {
    * aggregation is the authoritative total.
    * Returned as { [projectId]: { [month]: hours } }.
    */
-  async actualsByProject(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null) {
+  async actualsByProject(orgId: string, fromMonth: string, toMonth: string, visibleIds: string[] | null, resourceIds: string[] | null = null) {
     const where: any = { orgId, month: { gte: fromMonth, lte: toMonth }, projectId: { not: null } };
     if (visibleIds) where.projectId = { in: visibleIds };
+    // Team lens: count only these people's hours (worklogs of unmatched Jira
+    // accounts have no resourceId and drop out — they can't be attributed).
+    if (resourceIds) where.resourceId = { in: resourceIds };
     const rows = await prisma.worklog.groupBy({
       by: ['projectId', 'month'],
       where,
@@ -697,11 +760,7 @@ export const integrationService = {
    *   { bucket: 'internal' | 'absence' }   — the org-level buckets
    *   { bucket: 'unmapped', projectKey? }  — client hours with no customer/
    *     project, optionally narrowed to one Jira project (issue-key prefix)
-   * Epics are named from the pulled JiraWorkItem rows; worklogs without an
-   * epic land under "(no epic)", without an issue key under "(no issue)".
-   * Each issue carries the most recent worklog note as a description hint.
-   * Returned as [{ key, name, months, issues: [{ key, description, months }] }],
-   * both levels sorted by total hours, largest first.
+   * Grouping semantics live in groupWorklogsByEpic.
    */
   async actualsForResourceEpics(
     orgId: string,
@@ -716,52 +775,46 @@ export const integrationService = {
     else if (scope.bucket === 'unmapped') Object.assign(where, { workType: 'client', customerId: null, projectId: null });
     else throw new BadRequestError('Provide customerId or bucket');
 
+    let rows = await prisma.worklog.findMany({
+      where,
+      select: { jiraEpicKey: true, jiraIssueKey: true, month: true, seconds: true, description: true, workDate: true },
+    });
+    // The unmapped drill is per Jira project — keep only that project's issues.
+    if (scope.bucket === 'unmapped' && scope.projectKey) {
+      rows = rows.filter((w) => issueProjectKey(w.jiraIssueKey) === scope.projectKey);
+    }
+    return groupWorklogsByEpic(orgId, rows);
+  },
+
+  /** A team's people ids — the team lens the actuals endpoints filter by. */
+  async resourceIdsForTeam(orgId: string, teamId: string) {
+    const rows = await prisma.resource.findMany({
+      where: { orgId, teams: { some: { id: teamId } } },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  },
+
+  /**
+   * A customer's logged hours grouped by Jira epic → issue — the Client-
+   * Staffing drill. Covers everything attributed to the customer (directly or
+   * via a project mapping); optionally narrowed to one team's people via
+   * resourceIds. Actual hours only — no plan exists at this depth.
+   */
+  async actualsForCustomerEpics(
+    orgId: string,
+    customerId: string,
+    fromMonth: string,
+    toMonth: string,
+    resourceIds: string[] | null = null
+  ) {
+    const where: any = { orgId, customerId, month: { gte: fromMonth, lte: toMonth } };
+    if (resourceIds) where.resourceId = { in: resourceIds };
     const rows = await prisma.worklog.findMany({
       where,
       select: { jiraEpicKey: true, jiraIssueKey: true, month: true, seconds: true, description: true, workDate: true },
     });
-
-    type IssueAgg = { seconds: Record<string, number>; total: number; description: string | null; descDate: string };
-    type EpicAgg = { seconds: Record<string, number>; total: number; issues: Map<string, IssueAgg> };
-    const epics = new Map<string, EpicAgg>();
-    for (const w of rows) {
-      // The unmapped drill is per Jira project — keep only that project's issues.
-      if (scope.bucket === 'unmapped' && scope.projectKey && issueProjectKey(w.jiraIssueKey) !== scope.projectKey) continue;
-      const epicKey = w.jiraEpicKey || '(no epic)';
-      const issueKey = w.jiraIssueKey || '(no issue)';
-      const epic = epics.get(epicKey) || { seconds: {}, total: 0, issues: new Map<string, IssueAgg>() };
-      epic.seconds[w.month] = (epic.seconds[w.month] || 0) + w.seconds;
-      epic.total += w.seconds;
-      const issue = epic.issues.get(issueKey) || { seconds: {}, total: 0, description: null, descDate: '' };
-      issue.seconds[w.month] = (issue.seconds[w.month] || 0) + w.seconds;
-      issue.total += w.seconds;
-      if (w.description && w.workDate >= issue.descDate) {
-        issue.description = w.description;
-        issue.descDate = w.workDate;
-      }
-      epic.issues.set(issueKey, issue);
-      epics.set(epicKey, epic);
-    }
-    if (epics.size === 0) return [];
-
-    const named = await prisma.jiraWorkItem.findMany({
-      where: { orgId, externalKey: { in: [...epics.keys()].filter((k) => k !== '(no epic)') } },
-      select: { externalKey: true, name: true },
-    });
-    const nameByKey = new Map(named.map((n) => [n.externalKey, n.name]));
-    const toHours = (secs: Record<string, number>) =>
-      Object.fromEntries(Object.entries(secs).map(([m, s]) => [m, Math.round((s / 3600) * 10) / 10]));
-
-    return [...epics.entries()]
-      .sort((a, b) => b[1].total - a[1].total)
-      .map(([key, e]) => ({
-        key,
-        name: nameByKey.get(key) || key,
-        months: toHours(e.seconds),
-        issues: [...e.issues.entries()]
-          .sort((a, b) => b[1].total - a[1].total)
-          .map(([ikey, i]) => ({ key: ikey, description: i.description, months: toHours(i.seconds) })),
-      }));
+    return groupWorklogsByEpic(orgId, rows);
   },
 
   /**

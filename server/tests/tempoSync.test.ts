@@ -186,4 +186,21 @@ describe.skipIf(!HAS_DB)('Tempo sync', () => {
     expect(unmapped).toHaveLength(1);
     expect(unmapped[0].issues[0]).toMatchObject({ key: 'ZZZ-9', months: { '2026-03': 1.5 } });
   });
+
+  it('customer-scoped epic drill and the team lens on by-customer actuals', async () => {
+    // Over the rows the previous test created (e1–e4 on the mapped customer).
+    const custEpics = await integrationService.actualsForCustomerEpics(orgId, customerId, '2026-04', '2026-05');
+    expect(custEpics.map((e) => e.key)).toEqual(['CLI-100', '(no epic)']);
+    expect(custEpics[0].name).toBe('Checkout revamp');
+    // Narrowed to a people list that excludes the author → nothing left.
+    expect(await integrationService.actualsForCustomerEpics(orgId, customerId, '2026-04', '2026-05', [])).toEqual([]);
+
+    // The by-customer aggregation honors the same lens: 1h + 0.5h + 2.5h in April.
+    const all = await integrationService.actualsByCustomer(orgId, '2026-04', '2026-05', null);
+    expect(all[customerId]?.['2026-04']).toBe(4);
+    const mine = await integrationService.actualsByCustomer(orgId, '2026-04', '2026-05', null, [personId]);
+    expect(mine[customerId]?.['2026-04']).toBe(4);
+    const none = await integrationService.actualsByCustomer(orgId, '2026-04', '2026-05', null, []);
+    expect(none[customerId]).toBeUndefined();
+  });
 });
