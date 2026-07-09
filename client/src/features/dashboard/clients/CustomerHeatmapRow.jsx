@@ -106,18 +106,18 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
                     e.stopPropagation();
                     navigate(`/customers/${customer.id}`);
                   }}
-                  className="text-[13px] font-bold text-text truncate bg-transparent border-0 p-0 cursor-pointer hover:text-primary hover:underline text-left"
+                  className="text-[14px] font-bold text-text truncate bg-transparent border-0 p-0 cursor-pointer hover:text-primary hover:underline text-left"
                 >
                   {customer.name}
                 </button>
               ) : (
-                <span className="text-[13px] font-bold text-text truncate">{customer.name}</span>
+                <span className="text-[14px] font-bold text-text truncate">{customer.name}</span>
               )}
               <StatusBadge status={customer.status} />
             </div>
             {/* The plan (needs/projects) is no longer a drill level here —
                 jump to it instead; profile mirrors the name click. */}
-            <div className="flex items-center gap-2 text-[10px]">
+            <div className="flex items-center gap-2 text-[11px]">
               <button
                 onClick={(e) => { e.stopPropagation(); navigate(`/planner?customerId=${customer.id}`); }}
                 className="text-primary font-semibold bg-transparent border-0 p-0 cursor-pointer hover:underline"

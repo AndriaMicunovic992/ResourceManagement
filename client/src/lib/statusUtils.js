@@ -6,6 +6,17 @@ export function utilColor(pct) {
   return '#A0BCC9';
 }
 
+// The plan marker hue for the plan-vs-actual bullet/stacked bars — the vertical
+// tick on the bar AND the "Planned" swatch in the hover tooltip. Kept in one
+// place so the legend dot always matches the line it describes: a darkened
+// accent normally, red when the plan needs attention (over capacity /
+// understaffed), grey for a potential-only row.
+export function planTickColor(accent = '#6366f1', { alert = false, muted = false } = {}) {
+  if (alert) return '#E8636F';
+  if (muted) return '#9CA3AF';
+  return `color-mix(in srgb, ${accent} 82%, black)`;
+}
+
 export function utilBg(pct) {
   if (pct > 100) return '#FDE8EA';
   if (pct >= 80) return '#EAFAF0';

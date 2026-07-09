@@ -73,12 +73,12 @@ export default function ResourceHeatmapRow({ resource, months, onOpen, includePo
           <div className="flex-1 min-w-0">
             <button
               onClick={(e) => { e.stopPropagation(); onOpen(); }}
-              className="block text-xs font-semibold text-text truncate bg-transparent border-0 p-0 cursor-pointer hover:text-primary hover:underline text-left"
+              className="block text-[13px] font-semibold text-text truncate bg-transparent border-0 p-0 cursor-pointer hover:text-primary hover:underline text-left"
               title="Open profile"
             >
               {resource.name}
             </button>
-            <div className="text-[10px] font-mono" style={{ color: avgColor }}>
+            <div className="text-[11px] font-mono" style={{ color: avgColor }}>
               {avgPct}% avg
               {actAvgPct != null && <span className="text-text-light"> · act {actAvgPct}%</span>}
             </div>

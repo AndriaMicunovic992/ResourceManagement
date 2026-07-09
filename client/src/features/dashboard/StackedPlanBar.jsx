@@ -6,6 +6,8 @@
  * anything beyond clamps at the edge. Without `max` the bar fits plan/stack.
  * Units are the caller's business (hours or FTE); everything just scales.
  */
+import { planTickColor } from '../../lib/statusUtils';
+
 export default function StackedPlanBar({ plan = 0, segments = [], max = null, accent = '#6366f1', className = '' }) {
   const stack = segments.reduce((s, x) => s + (x.value || 0), 0);
   const scale = max != null ? Math.max(max, 0.0001) : Math.max(plan, stack, 0.0001);
@@ -43,7 +45,7 @@ export default function StackedPlanBar({ plan = 0, segments = [], max = null, ac
       {plan > 0.0001 && (
         <span
           className="absolute rounded-sm"
-          style={{ left: `calc(${pct(plan)}% - 2px)`, top: 0, bottom: 0, width: 3, background: `color-mix(in srgb, ${accent} 82%, black)` }}
+          style={{ left: `calc(${pct(plan)}% - 2px)`, top: 0, bottom: 0, width: 3, background: planTickColor(accent) }}
         />
       )}
     </div>

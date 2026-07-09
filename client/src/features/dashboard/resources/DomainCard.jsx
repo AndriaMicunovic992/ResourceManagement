@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { domainColor } from '../../../lib/taxonomy';
-import { utilColor } from '../../../lib/statusUtils';
+import { utilColor, planTickColor } from '../../../lib/statusUtils';
 import { MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS, WORK_TYPE_LABELS } from '../../../lib/constants';
 import { currentMonth, formatMonth } from '../../../lib/dateUtils';
 import { useData } from '../../../contexts/DataContext';
@@ -91,7 +91,7 @@ export default function DomainCard({ domain, months, includePotential, teamId, a
     <>
       <b className="text-[11px]">{name} · {formatMonth(months[0])} – {formatMonth(months[months.length - 1])}</b>
       <TipRow label="Capacity" value={`${fmt(totalFte)} FTE = 100%`} />
-      <TipRow swatch={accent} label="Planned" value={`${fmt(usedFte)} FTE (${utilPct}%)`} />
+      <TipRow swatch={planTickColor(accent)} label="Planned" value={`${fmt(usedFte)} FTE (${utilPct}%)`} />
       {hasAct && (
         <>
           <TipRow swatch="#34C98E" label="Actual" value={`${fmt(workedAvgFte)} FTE (${actPct}%)`} />
