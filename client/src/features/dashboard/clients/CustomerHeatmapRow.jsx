@@ -142,7 +142,8 @@ export default function CustomerHeatmapRow({ customer, index, months, includePot
           return (
             <HeatmapCell key={m} title={`${customer.name} · ${formatMonth(m)}`}
               plan={d.totalFilled} expected={d.totalExpected} needed={d.totalNeeded} act={act} max={rowMax} accent={accent}
-              isPotential={d.isPotential && includePotential} actualPartial={m === cur} />
+              isPotential={d.isPotential && includePotential} actualPartial={m === cur}
+              inHours={!!actuals} />
           );
         })}
       </div>
