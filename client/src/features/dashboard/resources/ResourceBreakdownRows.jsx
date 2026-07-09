@@ -13,6 +13,10 @@ import { availableHours, deliverableRatio, verdictWord } from '../../../lib/avai
  * can be inspected down to where the time actually went. Per-customer hours
  * are lazy-loaded on expand; the buckets come from the already-loaded
  * per-type breakdown.
+ *
+ * Each row with logged hours drills two levels further: row → Jira epics →
+ * issues (lazy-loaded per row). No plan exists at that depth — those rows
+ * carry actual hours only, on the same shared hour scale.
  */
 export default function ResourceBreakdownRows({ resource, months, typedHours, window: win, accent }) {
   const { customers, needs, projects, assignments } = useData();
@@ -86,6 +90,7 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
         key: id,
         name: custName.get(id) || 'Unknown customer',
         color: WORK_TYPE_COLORS.client,
+        scope: { customerId: id },
         plan: (m) => plannedByCustomer[id]?.[m] || 0,
         act: (m) => (m <= cur ? byCustomer[id]?.[m] || 0 : null),
       }))
@@ -98,7 +103,7 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
       { key: 'absence', name: WORK_TYPE_LABELS.absence, color: WORK_TYPE_COLORS.absence, hours: (m) => typeSum(m, 'absence') },
     ]
       .filter((b) => months.some((m) => m <= cur && b.hours(m) > 0.05))
-      .map((b) => ({ key: b.key, name: b.name, color: b.color, plan: () => 0, act: (m) => (m <= cur ? b.hours(m) : null) }));
+      .map((b) => ({ key: b.key, name: b.name, color: b.color, scope: { bucket: b.key }, plan: () => 0, act: (m) => (m <= cur ? b.hours(m) : null) }));
 
     // Client hours that resolve to no customer, one row per Jira project —
     // flagged so it's obvious this time was neither planned nor mapped, but
@@ -115,6 +120,7 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
         note: u.stale
           ? `Jira ${u.key} is mapped, but these hours were synced before that — run “Re-apply mappings” under Settings → Integrations to move them.`
           : `Jira ${u.key} isn’t mapped to a customer — map or classify it under Settings → Integrations.`,
+        scope: { bucket: 'unmapped', projectKey: u.key },
         plan: () => 0,
         act: (m) => (m <= cur ? u.months?.[m] || 0 : null),
       }));
@@ -145,13 +151,32 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
     );
   }
 
+  return rows.map((row) => (
+    <BreakdownRow key={row.key} row={row} resource={resource} months={months} cur={cur}
+      typedHours={typedHours} totalPlannedByMonth={totalPlannedByMonth}
+      scaleMax={scaleMax} accent={accent} win={win} />
+  ));
+}
+
+/* One customer/bucket/unmapped row — expands into its Jira epics. */
+function BreakdownRow({ row, resource, months, cur, typedHours, totalPlannedByMonth, scaleMax, accent, win }) {
+  const [expanded, setExpanded] = useState(false);
+  const totalAct = months.reduce((s, m) => s + (row.act(m) || 0), 0);
+  // Only logged hours can be drilled — a plan-only row has no worklogs behind it.
+  const canDrill = totalAct > 0.5;
   const fmtH = (v) => `${Math.round(v)}`;
 
-  return rows.map((row) => {
-    const totalAct = months.reduce((s, m) => s + (row.act(m) || 0), 0);
-    return (
-      <div key={row.key} className="flex items-center border-b border-border-light/60 bg-[#FAFBFD]">
+  return (
+    <>
+      <div
+        className={`flex items-center border-b border-border-light/60 bg-[#FAFBFD] ${canDrill ? 'cursor-pointer hover:bg-[#F4F7FB]' : ''}`}
+        onClick={canDrill ? () => setExpanded((v) => !v) : undefined}
+      >
         <div className="w-[270px] shrink-0 pl-12 pr-3 py-1 flex items-center gap-2 min-w-0">
+          <span
+            className={`text-[9px] w-2.5 shrink-0 transition-transform ${canDrill ? 'text-text-light' : 'text-transparent'}`}
+            style={{ transform: expanded ? 'rotate(90deg)' : 'none' }}
+          >▶</span>
           <span className="w-2 h-2 rounded-[3px] shrink-0" style={{ background: row.color }} />
           <span className="text-[11px] font-semibold text-text-mid truncate" title={row.name}>{row.name}</span>
           {row.badge && (
@@ -211,6 +236,125 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
           );
         })}
       </div>
+      {expanded && (
+        <EpicRows resource={resource} months={months} cur={cur} scope={row.scope}
+          color={row.color} scaleMax={scaleMax} accent={accent} win={win} />
+      )}
+    </>
+  );
+}
+
+/* The Jira epics behind one breakdown row, lazy-loaded on expand. */
+function EpicRows({ resource, months, cur, scope, color, scaleMax, accent, win }) {
+  const [epics, setEpics] = useState(null);
+  const scopeKey = JSON.stringify(scope);
+  useEffect(() => {
+    if (!win?.from || !win?.to) { setEpics([]); return; }
+    let dead = false;
+    api.getResourceEpicActuals(resource.id, win.from, win.to, scope)
+      .then((d) => { if (!dead) setEpics(Array.isArray(d) ? d : []); })
+      .catch(() => { if (!dead) setEpics([]); });
+    return () => { dead = true; };
+  }, [resource.id, win?.from, win?.to, scopeKey]);
+
+  if (epics == null) {
+    return (
+      <div className="flex items-center border-b border-border-light/50 bg-[#F6F9FC] pl-[80px] py-1.5 text-[10px] text-text-light">
+        Loading epics…
+      </div>
     );
-  });
+  }
+  if (epics.length === 0) {
+    return (
+      <div className="flex items-center border-b border-border-light/50 bg-[#F6F9FC] pl-[80px] py-1.5 text-[10px] text-text-light">
+        No logged hours in this window.
+      </div>
+    );
+  }
+  return epics.map((e) => (
+    <EpicRow key={e.key} epic={e} resource={resource} months={months} cur={cur}
+      color={color} scaleMax={scaleMax} accent={accent} />
+  ));
+}
+
+/* One epic — expands into its issues (already in the fetched data). */
+function EpicRow({ epic, resource, months, cur, color, scaleMax, accent }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ActRow
+        level={2}
+        name={epic.name}
+        titleText={epic.name === epic.key ? epic.name : `${epic.name} (${epic.key})`}
+        caret={epic.issues.length > 0}
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        months={months} cur={cur}
+        hoursByMonth={epic.months || {}}
+        color={color} scaleMax={scaleMax} accent={accent}
+        tipTitle={(m) => `${resource.name} · ${epic.name} · ${formatMonth(m)}`}
+      />
+      {open && epic.issues.map((i) => (
+        <ActRow key={i.key}
+          level={3}
+          name={i.key}
+          desc={i.description}
+          titleText={i.description ? `${i.key} · ${i.description}` : i.key}
+          months={months} cur={cur}
+          hoursByMonth={i.months || {}}
+          color={color} scaleMax={scaleMax} accent={accent}
+          tipTitle={(m) => `${i.key} · ${formatMonth(m)}`}
+        />
+      ))}
+    </>
+  );
+}
+
+/* An actuals-only drill row (epic or issue): no plan track at this depth,
+   just the logged bar on the breakdown's shared hour scale. */
+function ActRow({ level, name, desc, titleText, caret = false, open = false, onToggle, months, cur, hoursByMonth, color, scaleMax, accent, tipTitle }) {
+  const indent = level === 3 ? 'pl-[88px]' : 'pl-[68px]';
+  const bg = level === 3 ? 'bg-[#F2F6FA]' : 'bg-[#F6F9FC]';
+  const total = months.reduce((s, m) => s + (hoursByMonth[m] || 0), 0);
+  return (
+    <div
+      className={`flex items-center border-b border-border-light/50 ${bg} ${caret ? 'cursor-pointer hover:bg-[#EFF4F9]' : ''}`}
+      onClick={caret ? onToggle : undefined}
+    >
+      <div className={`w-[270px] shrink-0 ${indent} pr-3 py-1 flex items-center gap-1.5 min-w-0`}>
+        <span
+          className={`text-[9px] w-2.5 shrink-0 transition-transform ${caret ? 'text-text-light' : 'text-transparent'}`}
+          style={{ transform: open ? 'rotate(90deg)' : 'none' }}
+        >▶</span>
+        <span className="w-1.5 h-1.5 rounded-[2px] shrink-0" style={{ background: color }} />
+        <span className="text-[10.5px] font-medium text-text-mid truncate shrink-0 max-w-[60%]" title={titleText}>{name}</span>
+        {desc && <span className="text-[9.5px] text-text-light truncate" title={desc}>{desc}</span>}
+        <span className="text-[9px] font-mono text-text-light ml-auto shrink-0">Σ {Math.round(total)}h</span>
+      </div>
+      {months.map((m) => {
+        const act = m <= cur ? hoursByMonth[m] || 0 : null;
+        const partial = m === cur;
+        const tip = (act || 0) > 0 ? (
+          <>
+            <b className="text-[11px]">{tipTitle(m)}</b>
+            <TipRow swatch={color} label="Logged" value={`${Math.round(act * 10) / 10}h${partial ? ' so far' : ''}`} />
+            {desc && <div className="opacity-80 mt-0.5 max-w-[210px]">{desc}</div>}
+            {partial && <div className="opacity-80">month in progress</div>}
+          </>
+        ) : null;
+        return (
+          <BulletCell key={m}
+            plan={0}
+            act={act}
+            actSegments={act != null && act > 0 ? [{ value: act, color }] : null}
+            max={scaleMax}
+            accent={accent}
+            inProgress={act != null && partial}
+            labelAct={act != null && act > 0 ? `${Math.round(act)}h` : null}
+            tip={tip}
+          />
+        );
+      })}
+    </div>
+  );
 }

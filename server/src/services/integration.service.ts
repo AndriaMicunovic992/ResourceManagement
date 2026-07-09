@@ -690,6 +690,81 @@ export const integrationService = {
   },
 
   /**
+   * A person's logged hours grouped by Jira epic → issue, for one drill-down
+   * row of the people heatmap. No plan exists at this depth — actual hours
+   * only. Scope is exactly one of:
+   *   { customerId }                       — hours attributed to that customer
+   *   { bucket: 'internal' | 'absence' }   — the org-level buckets
+   *   { bucket: 'unmapped', projectKey? }  — client hours with no customer/
+   *     project, optionally narrowed to one Jira project (issue-key prefix)
+   * Epics are named from the pulled JiraWorkItem rows; worklogs without an
+   * epic land under "(no epic)", without an issue key under "(no issue)".
+   * Each issue carries the most recent worklog note as a description hint.
+   * Returned as [{ key, name, months, issues: [{ key, description, months }] }],
+   * both levels sorted by total hours, largest first.
+   */
+  async actualsForResourceEpics(
+    orgId: string,
+    resourceId: string,
+    fromMonth: string,
+    toMonth: string,
+    scope: { customerId?: string; bucket?: 'internal' | 'absence' | 'unmapped'; projectKey?: string }
+  ) {
+    const where: any = { orgId, resourceId, month: { gte: fromMonth, lte: toMonth } };
+    if (scope.customerId) where.customerId = scope.customerId;
+    else if (scope.bucket === 'internal' || scope.bucket === 'absence') where.workType = scope.bucket;
+    else if (scope.bucket === 'unmapped') Object.assign(where, { workType: 'client', customerId: null, projectId: null });
+    else throw new BadRequestError('Provide customerId or bucket');
+
+    const rows = await prisma.worklog.findMany({
+      where,
+      select: { jiraEpicKey: true, jiraIssueKey: true, month: true, seconds: true, description: true, workDate: true },
+    });
+
+    type IssueAgg = { seconds: Record<string, number>; total: number; description: string | null; descDate: string };
+    type EpicAgg = { seconds: Record<string, number>; total: number; issues: Map<string, IssueAgg> };
+    const epics = new Map<string, EpicAgg>();
+    for (const w of rows) {
+      // The unmapped drill is per Jira project — keep only that project's issues.
+      if (scope.bucket === 'unmapped' && scope.projectKey && issueProjectKey(w.jiraIssueKey) !== scope.projectKey) continue;
+      const epicKey = w.jiraEpicKey || '(no epic)';
+      const issueKey = w.jiraIssueKey || '(no issue)';
+      const epic = epics.get(epicKey) || { seconds: {}, total: 0, issues: new Map<string, IssueAgg>() };
+      epic.seconds[w.month] = (epic.seconds[w.month] || 0) + w.seconds;
+      epic.total += w.seconds;
+      const issue = epic.issues.get(issueKey) || { seconds: {}, total: 0, description: null, descDate: '' };
+      issue.seconds[w.month] = (issue.seconds[w.month] || 0) + w.seconds;
+      issue.total += w.seconds;
+      if (w.description && w.workDate >= issue.descDate) {
+        issue.description = w.description;
+        issue.descDate = w.workDate;
+      }
+      epic.issues.set(issueKey, issue);
+      epics.set(epicKey, epic);
+    }
+    if (epics.size === 0) return [];
+
+    const named = await prisma.jiraWorkItem.findMany({
+      where: { orgId, externalKey: { in: [...epics.keys()].filter((k) => k !== '(no epic)') } },
+      select: { externalKey: true, name: true },
+    });
+    const nameByKey = new Map(named.map((n) => [n.externalKey, n.name]));
+    const toHours = (secs: Record<string, number>) =>
+      Object.fromEntries(Object.entries(secs).map(([m, s]) => [m, Math.round((s / 3600) * 10) / 10]));
+
+    return [...epics.entries()]
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([key, e]) => ({
+        key,
+        name: nameByKey.get(key) || key,
+        months: toHours(e.seconds),
+        issues: [...e.issues.entries()]
+          .sort((a, b) => b[1].total - a[1].total)
+          .map(([ikey, i]) => ({ key: ikey, description: i.description, months: toHours(i.seconds) })),
+      }));
+  },
+
+  /**
    * Actual hours for one customer, broken down by person + month. Feeds the
    * PM-review chart when a person is focused.
    * Returned as { [resourceId]: { [month]: hours } }.

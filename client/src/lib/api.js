@@ -159,6 +159,14 @@ export const api = {
   getMonthlyWorkBuckets: (from, to) => apiFetch(`/integration/tempo/actuals/monthly-work-buckets?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getResourceActualsByCustomer: (resourceId, from, to) => apiFetch(`/integration/tempo/actuals/resource-by-customer?resourceId=${encodeURIComponent(resourceId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getResourceUnmappedActuals: (resourceId, from, to) => apiFetch(`/integration/tempo/actuals/resource-unmapped?resourceId=${encodeURIComponent(resourceId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  // scope: { customerId } | { bucket: 'internal'|'absence' } | { bucket: 'unmapped', projectKey }
+  getResourceEpicActuals: (resourceId, from, to, scope = {}) => {
+    const params = new URLSearchParams({ resourceId, from, to });
+    if (scope.customerId) params.set('customerId', scope.customerId);
+    if (scope.bucket) params.set('bucket', scope.bucket);
+    if (scope.projectKey) params.set('projectKey', scope.projectKey);
+    return apiFetch(`/integration/tempo/actuals/resource-epics?${params.toString()}`);
+  },
   getCustomerActualsByResource: (customerId, from, to) => apiFetch(`/integration/tempo/actuals/customer-by-resource?customerId=${encodeURIComponent(customerId)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   getJiraWorkItems: () => apiFetch('/integration/jira/work-items'),
   restampWorklogs: () => apiFetch('/integration/jira/restamp', { method: 'POST', body: '{}' }),
