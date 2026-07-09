@@ -1,18 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOrg } from '../../contexts/OrgContext';
 import { useVisibility } from '../../contexts/VisibilityContext';
 import { useData } from '../../contexts/DataContext';
 import { useComputed } from '../../hooks/useComputed';
 import { api } from '../../lib/api';
 import Avatar from '../../components/ui/Avatar';
 import InfoDot from '../../components/ui/InfoDot';
+import Skeleton from '../../components/ui/Skeleton';
 import { MONTHS, MONTHLY_HOURS_PER_FTE, WORK_TYPE_COLORS } from '../../lib/constants';
 import { seniorityShort } from '../../lib/taxonomy';
 import { currentMonth, addMonths, monthRange, formatMonth } from '../../lib/dateUtils';
 import { firstName, resourcePrimaryDomain, domainColor } from '../../lib/resourceUtils';
 import { utilColor, utilBg, scoreColor, scoreBg } from '../../lib/statusUtils';
 import NotificationBell from './NotificationBell';
+
+// Last-fetched Tempo hours per user+org+window. Home unmounts on every route
+// change, so without this each visit would repay the fetch round-trip before
+// the chart can commit to its bars-vs-fallback mode. Seeding from the cache
+// lets repeat visits paint the final chart immediately (a background refetch
+// still refreshes the numbers). Org switches and impersonation hard-reload
+// the page, but the key includes user+org anyway.
+const hoursCache = new Map();
 
 /* ---------- svg helpers ---------- */
 
@@ -82,6 +92,20 @@ function Kpi({ label, chip, chipBg, chipColor, children, spark, sparkColor, donu
   );
 }
 
+// Placeholder for the utilization KPI while the hour feeds decide which of
+// the two cards (actual-vs-potential / realised) this slot becomes.
+function KpiSkeleton() {
+  return (
+    <div className="relative overflow-hidden bg-white border border-border-light rounded-2xl px-4 pt-3.5 pb-9 shadow-card">
+      <div className="flex items-center gap-2">
+        <Skeleton className="w-6 h-6 rounded-lg" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+      <Skeleton className="mt-3 h-5 w-14" />
+    </div>
+  );
+}
+
 /* ---------- right-rail list (people / customers share one structure) ---------- */
 
 function RailSection({ title, linkTo, linkLabel, children }) {
@@ -121,8 +145,9 @@ function RailRow({ to, avatar, title, meta, chip, hot }) {
 
 export default function HomeDashboard() {
   const { user } = useAuth();
+  const { currentOrg } = useOrg();
   const { managedPersonIds, isAdmin, selfResourceId } = useVisibility();
-  const { customers, projects, resources, needs, assignments, teams } = useData();
+  const { customers, projects, resources, needs, assignments, teams, loading: dataLoading } = useData();
   const { rU, rURealised } = useComputed();
   const navigate = useNavigate();
 
@@ -152,11 +177,25 @@ export default function HomeDashboard() {
 
   // Actual hours (Tempo) over the whole year window, per person → used both in
   // the rail (this month) and the utilization chart (actual line per month).
-  const [actuals, setActuals] = useState({});
+  // null = not fetched yet: the chart holds a skeleton instead of committing
+  // to the no-actuals fallback and visibly flipping once the hours arrive.
+  const cacheKey = `${user?.id}:${currentOrg?.id}:${windowMonths[0]}:${windowMonths[windowMonths.length - 1]}`;
+  const [actualsRaw, setActuals] = useState(() => hoursCache.get(cacheKey)?.actuals ?? null);
   useEffect(() => {
     if (!windowMonths.length) return;
-    api.getMonthlyActuals(windowMonths[0], windowMonths[windowMonths.length - 1]).then(setActuals).catch(() => setActuals({}));
-  }, [windowMonths]);
+    let dead = false;
+    api.getMonthlyActuals(windowMonths[0], windowMonths[windowMonths.length - 1])
+      .then((d) => {
+        if (dead) return;
+        hoursCache.set(cacheKey, { ...hoursCache.get(cacheKey), actuals: d || {} });
+        setActuals(d || {});
+      })
+      // On error keep whatever we had (cache seed) rather than blanking it;
+      // settle on {} only if there was nothing, so the fallback mode renders.
+      .catch(() => { if (!dead) setActuals((prev) => prev ?? {}); });
+    return () => { dead = true; };
+  }, [windowMonths, cacheKey]);
+  const actuals = actualsRaw || {};
 
   /* ----- per-month series over the year ----- */
   const series = useMemo(() => {
@@ -278,13 +317,24 @@ export default function HomeDashboard() {
 
   // Logged hours per month split into the four buckets the chart stacks:
   // client / unmapped / internal / absences (matched people only).
-  const [buckets, setBuckets] = useState({});
+  const [bucketsRaw, setBuckets] = useState(() => hoursCache.get(cacheKey)?.buckets ?? null);
   useEffect(() => {
     if (!windowMonths.length) return;
+    let dead = false;
     api.getMonthlyWorkBuckets(windowMonths[0], windowMonths[windowMonths.length - 1])
-      .then((d) => setBuckets(d || {}))
-      .catch(() => setBuckets({}));
-  }, [windowMonths]);
+      .then((d) => {
+        if (dead) return;
+        hoursCache.set(cacheKey, { ...hoursCache.get(cacheKey), buckets: d || {} });
+        setBuckets(d || {});
+      })
+      .catch(() => { if (!dead) setBuckets((prev) => prev ?? {}); });
+    return () => { dead = true; };
+  }, [windowMonths, cacheKey]);
+  const buckets = bucketsRaw || {};
+  // Everything the chart's mode decision needs: both hour feeds plus the core
+  // collections (matchedCapacity comes from resources). Until then the chart
+  // and the utilization KPI render as skeletons — never the wrong mode.
+  const hoursReady = !dataLoading && actualsRaw !== null && bucketsRaw !== null;
   // The bucket endpoint is org-wide; per-person-per-type hours let the bars
   // follow the team filter. Loaded once, on the first team selection. The
   // unmapped split isn't person-attributable, so team bars fold it into Client.
@@ -543,7 +593,9 @@ export default function HomeDashboard() {
               info="Projects active now (status “realised”), out of all projects. Sparkline: per month this year, the realised projects that have any staffing need that month. Always org-wide — projects aren’t team-scoped.">
               {activeProjects} <span className="text-[11px] font-medium text-text-light">of {projects.length}</span>
             </Kpi>
-            {showActualKpi ? (
+            {!hoursReady ? (
+              <KpiSkeleton />
+            ) : showActualKpi ? (
               <Kpi label="Actual vs potential" chip="◔" chipBg="#EAFAF0" chipColor="#34C98E" spark={actualPct} sparkColor="#34C98E"
                 info="Actual utilization of matched people this month: logged Tempo hours ÷ 173.33 (hours per FTE) ÷ the capacity of people linked to a Jira account. The chip compares actual vs their planned (potential) utilization.">
                 {Math.round(actualNow)}<span className="text-[11px] font-medium text-text-light">%</span>
@@ -587,7 +639,9 @@ export default function HomeDashboard() {
           <div className="relative bg-white border border-border-light rounded-2xl shadow-card p-4 mb-5">
             <div className="flex items-baseline gap-2 mb-2">
               <h3 className="text-[13px] font-bold text-text m-0">Utilization</h3>
-              {hasBuckets ? (
+              {!hoursReady ? (
+                <Skeleton className="h-3 w-44 self-center" />
+              ) : hasBuckets ? (
                 <>
                   <InfoDot text="Teal line = realised planned allocation of matched people (linked to Jira) ÷ their capacity. Each month's bar stacks what they actually logged in Tempo — client work, unmapped hours (no customer mapping yet), internal work, and absences — on the same % scale, so the bar meeting the line means the logged time accounts for the plan. The dashed grey line marks the group's full capacity (100%). The tooltip shows hours and the % side by side. With a team selected, the bars sum that team's people and unmapped hours count inside Client (they can't be split per person)." />
                   <span className="inline-flex items-center gap-2 text-[10px] text-text-light">
@@ -628,7 +682,18 @@ export default function HomeDashboard() {
               ))}
               {/* full capacity of the scoped people = 100% on this scale */}
               <line x1="0" y1={y(100)} x2={W} y2={y(100)} stroke="#A6B3C0" strokeWidth="1.5" strokeDasharray="7 5" opacity="0.8" />
-              {hasBuckets ? (
+              {!hoursReady ? (
+                /* ghost bars while the hour feeds resolve (heights are just a
+                   deterministic pattern — no data behind them) */
+                <g className="animate-pulse">
+                  {windowMonths.map((m, i) => {
+                    const bw = 22;
+                    const bx = Math.max(1, Math.min(W - bw - 1, x(i) - bw / 2));
+                    const bh = 26 + ((i * 29) % 47);
+                    return <rect key={m} x={bx} y={H - 8 - bh} width={bw} height={bh} rx="2" fill="#EDF2F7" />;
+                  })}
+                </g>
+              ) : hasBuckets ? (
                 <>
                   {/* one stacked bar per month: client / unmapped / internal / absences */}
                   {windowMonths.map((m, i) => {
@@ -670,6 +735,7 @@ export default function HomeDashboard() {
             </span>
             </div>
             {/* dark tooltip */}
+            {hoursReady && (
             <div
               className="absolute pointer-events-none bg-[#16323C] text-white rounded-xl px-3 py-2 shadow-lg"
               style={{ left: `clamp(8px, ${8 + (tipIdx / 11) * 84}%, calc(100% - 190px))`, top: 44, width: 180 }}
@@ -715,6 +781,7 @@ export default function HomeDashboard() {
                 </>
               )}
             </div>
+            )}
             <div className="flex justify-between mt-1 px-0.5 text-[9.5px] font-mono text-text-light">
               {windowMonths.map((m, i) => (
                 <span key={m} className={i === m0idx ? 'text-primary font-bold' : ''}>{MONTHS[i]}</span>
