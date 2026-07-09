@@ -54,7 +54,7 @@ export default function BulletCell({
 
   if (empty) {
     return (
-      <Tip content={tip} className="w-[82px] shrink-0 flex items-center justify-center h-[44px]">
+      <Tip content={tip} className="w-[82px] shrink-0 flex items-center justify-center h-[56px]">
         <span className="text-[13px] font-mono text-text-light">—</span>
       </Tip>
     );
@@ -70,7 +70,7 @@ export default function BulletCell({
   const fillShadow = inProgress ? 'none' : hasBooking ? '0 3px 7px -2px #34C98E80' : '0 3px 7px -2px #F5A62380';
 
   return (
-    <Tip content={tip} className="w-[82px] shrink-0 h-[44px] flex flex-col items-stretch justify-center">
+    <Tip content={tip} className="w-[82px] shrink-0 h-[56px] flex flex-col items-stretch justify-center">
       <div className="relative h-[24px]">
         {/* plan track (+ faint potential extension) */}
         {hasPlan && (
