@@ -149,4 +149,41 @@ describe.skipIf(!HAS_DB)('Tempo sync', () => {
     const bucketsRes = await integrationService.actualsWorkBuckets(orgId, '2026-03', '2026-03', null);
     expect(bucketsRes['2026-03']).toEqual({ client: 0.5, unmapped: 1.5, internal: 0, absence: 1 });
   });
+
+  it('groups a drill-down row by epic → issue with names, sorting and description hints', async () => {
+    await prisma.jiraWorkItem.create({ data: { orgId, kind: 'epic', externalKey: 'CLI-100', name: 'Checkout revamp' } });
+    const base = { orgId, accountId: 'acc-1', resourceId: personId, workType: 'client' };
+    await prisma.worklog.createMany({
+      data: [
+        // Epic CLI-100, issue CLI-5 twice — the description hint must come from
+        // the most recent note, the hours from both.
+        { ...base, tempoWorklogId: 'e1', customerId, jiraEpicKey: 'CLI-100', jiraIssueKey: 'CLI-5', workDate: '2026-04-10', month: '2026-04', seconds: 3600, description: 'build cart' },
+        { ...base, tempoWorklogId: 'e2', customerId, jiraEpicKey: 'CLI-100', jiraIssueKey: 'CLI-5', workDate: '2026-04-12', month: '2026-04', seconds: 1800, description: 'fix cart bug' },
+        { ...base, tempoWorklogId: 'e3', customerId, jiraEpicKey: 'CLI-100', jiraIssueKey: 'CLI-6', workDate: '2026-05-03', month: '2026-05', seconds: 7200, description: null },
+        // No epic → the "(no epic)" bucket.
+        { ...base, tempoWorklogId: 'e4', customerId, jiraEpicKey: null, jiraIssueKey: 'CLI-7', workDate: '2026-04-20', month: '2026-04', seconds: 9000, description: null },
+        // Internal hours — a different scope, must not leak into the customer's.
+        { ...base, tempoWorklogId: 'e5', workType: 'internal', jiraEpicKey: null, jiraIssueKey: 'INT-1', workDate: '2026-04-21', month: '2026-04', seconds: 3600, description: null },
+      ],
+    });
+
+    const epics = await integrationService.actualsForResourceEpics(orgId, personId, '2026-04', '2026-05', { customerId });
+    expect(epics.map((e) => e.key)).toEqual(['CLI-100', '(no epic)']); // by total hours
+    expect(epics[0]).toMatchObject({ name: 'Checkout revamp', months: { '2026-04': 1.5, '2026-05': 2 } });
+    // Issues sorted by total; the repeated issue sums and keeps the latest note.
+    expect(epics[0].issues.map((i) => i.key)).toEqual(['CLI-6', 'CLI-5']);
+    expect(epics[0].issues[1]).toMatchObject({ description: 'fix cart bug', months: { '2026-04': 1.5 } });
+    expect(epics[1].issues).toEqual([{ key: 'CLI-7', description: null, months: { '2026-04': 2.5 } }]);
+
+    const internal = await integrationService.actualsForResourceEpics(orgId, personId, '2026-04', '2026-05', { bucket: 'internal' });
+    expect(internal).toHaveLength(1);
+    expect(internal[0].key).toBe('(no epic)');
+    expect(internal[0].issues).toEqual([{ key: 'INT-1', description: null, months: { '2026-04': 1 } }]);
+
+    // The unmapped scope narrows to one Jira project via the issue-key prefix
+    // (the ZZZ worklog synced in the previous test).
+    const unmapped = await integrationService.actualsForResourceEpics(orgId, personId, '2026-03', '2026-03', { bucket: 'unmapped', projectKey: 'ZZZ' });
+    expect(unmapped).toHaveLength(1);
+    expect(unmapped[0].issues[0]).toMatchObject({ key: 'ZZZ-9', months: { '2026-03': 1.5 } });
+  });
 });

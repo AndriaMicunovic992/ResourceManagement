@@ -161,6 +161,29 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
     return integrationService.actualsForResourceUnmapped(req.orgId, q.resourceId, from, to);
   });
 
+  // A person's hours for one drill-down row (a customer, the internal/absence
+  // buckets, or one unmapped Jira project) grouped by Jira epic → issue — the
+  // heatmap's deeper drill levels. Actual hours only; no plan exists at this
+  // depth. Person-visibility gated; a customer scope is additionally gated by
+  // customer visibility.
+  app.get('/integration/tempo/actuals/resource-epics', async (req) => {
+    const q = req.query as { resourceId?: string; from?: string; to?: string; customerId?: string; bucket?: string; projectKey?: string };
+    if (!q.resourceId) throw new BadRequestError('resourceId is required');
+    assertCanViewPerson(req.visibility, q.resourceId);
+    if (q.customerId) {
+      assertCanViewCustomer(req.visibility, q.customerId);
+    } else if (q.bucket !== 'internal' && q.bucket !== 'absence' && q.bucket !== 'unmapped') {
+      throw new BadRequestError('Provide customerId or bucket=internal|absence|unmapped');
+    }
+    const cur = new Date().toISOString().slice(0, 7);
+    const from = /^\d{4}-\d{2}$/.test(q.from || '') ? q.from! : cur;
+    const to = /^\d{4}-\d{2}$/.test(q.to || '') ? q.to! : cur;
+    const scope = q.customerId
+      ? { customerId: q.customerId }
+      : { bucket: q.bucket as 'internal' | 'absence' | 'unmapped', projectKey: q.projectKey };
+    return integrationService.actualsForResourceEpics(req.orgId, q.resourceId, from, to, scope);
+  });
+
   // Actual hours for one customer, broken down by person + month. Feeds the
   // PM-review chart when a person is focused.
   app.get('/integration/tempo/actuals/customer-by-resource', async (req) => {
