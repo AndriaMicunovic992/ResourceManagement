@@ -154,52 +154,144 @@ export async function fetchAccounts(conn: JiraConn): Promise<JiraAccountRow[]> {
   return out;
 }
 
-export interface JiraIssueRef { id: string; key: string; projectKey: string | null; epicKey: string | null }
+export interface JiraIssueRef {
+  id: string;
+  key: string;
+  projectKey: string | null;
+  epicKey: string | null;
+  // The customer-field value: null when no field was requested, "" when the
+  // issue has none.
+  customerOrg: string | null;
+}
 
 type IssueDetail = {
   id: string;
   key: string;
-  fields?: { project?: { key?: string }; issuetype?: { name?: string }; parent?: { key?: string; fields?: { issuetype?: { name?: string } } } };
+  fields?: { project?: { key?: string }; issuetype?: { name?: string }; parent?: { key?: string; fields?: { issuetype?: { name?: string } } } } & Record<string, unknown>;
 };
 
-function toIssueRef(i: IssueDetail): JiraIssueRef {
+/**
+ * The display labels of a Jira field value, whatever its shape: plain text,
+ * a select option ({ value }), a Service Management organization or user
+ * ({ name } / { displayName }), or an array of any of those (multi-selects,
+ * the JSM "Organizations" field). Unreadable shapes (rich text) yield none.
+ */
+export function fieldLabels(v: unknown): string[] {
+  if (v == null) return [];
+  if (typeof v === 'string') return v.trim() ? [v.trim()] : [];
+  if (typeof v === 'number') return [String(v)];
+  if (Array.isArray(v)) return v.flatMap(fieldLabels);
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    for (const k of ['name', 'value', 'displayName']) {
+      if (typeof o[k] === 'string' && (o[k] as string).trim()) return [(o[k] as string).trim()];
+    }
+  }
+  return [];
+}
+
+// One value per issue: the first label (a request rarely belongs to several
+// organizations; when it does, the first one listed wins).
+export const customerOrgOf = (v: unknown): string => fieldLabels(v)[0] ?? '';
+
+function toIssueRef(i: IssueDetail, customerFieldId?: string | null): JiraIssueRef {
   const itype = i.fields?.issuetype?.name;
   const parent = i.fields?.parent;
   const parentIsEpic = parent?.fields?.issuetype?.name === 'Epic';
   // The epic a worklog rolls up to: the issue itself if it's an epic, else its
   // parent epic (one level up). Deeper nesting falls back to project level.
   const epicKey = itype === 'Epic' ? i.key : parentIsEpic ? parent?.key ?? null : null;
-  return { id: String(i.id), key: i.key, projectKey: i.fields?.project?.key ?? null, epicKey };
+  return {
+    id: String(i.id),
+    key: i.key,
+    projectKey: i.fields?.project?.key ?? null,
+    epicKey,
+    customerOrg: customerFieldId ? customerOrgOf(i.fields?.[customerFieldId]) : null,
+  };
 }
 
-/** Resolve a set of Jira issue ids to their project + epic (for Tempo rollup). */
-export async function fetchIssues(conn: JiraConn, issueIds: string[]): Promise<JiraIssueRef[]> {
+// Page a JQL search (Cloud /search/jql, falling back to the classic search on
+// Data Center) and hand each page's issues to `onIssues`.
+async function searchIssues(conn: JiraConn, jql: string, fields: string, onIssues: (issues: IssueDetail[]) => void) {
+  let nextPageToken: string | undefined;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const q: Record<string, string | number> = { jql, fields, maxResults: 100 };
+    if (nextPageToken) q.nextPageToken = nextPageToken;
+    let data: { issues?: IssueDetail[]; nextPageToken?: string; isLast?: boolean };
+    try {
+      data = await jiraGet(conn, '/rest/api/3/search/jql', q);
+    } catch (e) {
+      if (e instanceof JiraError && e.status === 404) {
+        // Data Center: classic search.
+        const legacy = await jiraGet<{ issues?: IssueDetail[] }>(conn, '/rest/api/3/search', { jql, fields, startAt: 0, maxResults: 100 });
+        onIssues(legacy.issues || []);
+        return;
+      }
+      throw e;
+    }
+    onIssues(data.issues || []);
+    if (data.isLast || !data.nextPageToken || !(data.issues || []).length) break;
+    nextPageToken = data.nextPageToken;
+  }
+}
+
+/**
+ * Resolve a set of Jira issue ids to their project + epic (for Tempo rollup),
+ * plus the customer-field value when a field id is given.
+ */
+export async function fetchIssues(conn: JiraConn, issueIds: string[], customerFieldId?: string | null): Promise<JiraIssueRef[]> {
   const ids = [...new Set(issueIds.filter(Boolean))];
+  const fields = ['project', 'issuetype', 'parent', ...(customerFieldId ? [customerFieldId] : [])].join(',');
   const out: JiraIssueRef[] = [];
   for (let i = 0; i < ids.length; i += 50) {
     const jql = `id in (${ids.slice(i, i + 50).join(',')})`;
-    let nextPageToken: string | undefined;
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const q: Record<string, string | number> = { jql, fields: 'project,issuetype,parent', maxResults: 100 };
-      if (nextPageToken) q.nextPageToken = nextPageToken;
-      let data: { issues?: IssueDetail[]; nextPageToken?: string; isLast?: boolean };
-      try {
-        data = await jiraGet(conn, '/rest/api/3/search/jql', q);
-      } catch (e) {
-        if (e instanceof JiraError && e.status === 404) {
-          // Data Center: classic search.
-          const legacy = await jiraGet<{ issues?: IssueDetail[] }>(conn, '/rest/api/3/search', { jql, fields: 'project,issuetype,parent', startAt: 0, maxResults: 100 });
-          for (const it of legacy.issues || []) out.push(toIssueRef(it));
-          break;
-        }
-        throw e;
-      }
-      for (const it of data.issues || []) out.push(toIssueRef(it));
-      if (data.isLast || !data.nextPageToken || !(data.issues || []).length) break;
-      nextPageToken = data.nextPageToken;
-    }
+    await searchIssues(conn, jql, fields, (issues) => { for (const it of issues) out.push(toIssueRef(it, customerFieldId)); });
   }
   return out;
 }
 
-export const jiraClient = { testConnection, fetchProjects, fetchEpics, fetchAccounts, fetchIssues };
+/**
+ * The customer-field value of each given issue key ("" when empty) — the
+ * backfill for worklogs synced before the field was configured. A batch
+ * naming a deleted issue fails JQL as a whole (400), so that batch falls back
+ * to one lookup per issue; a missing issue reads as empty.
+ */
+export async function fetchIssueFieldValues(conn: JiraConn, issueKeys: string[], fieldId: string): Promise<Map<string, string>> {
+  const keys = [...new Set(issueKeys.filter(Boolean))];
+  const out = new Map<string, string>();
+  for (let i = 0; i < keys.length; i += 50) {
+    const batch = keys.slice(i, i + 50);
+    try {
+      await searchIssues(conn, `key in (${batch.join(',')})`, fieldId, (issues) => {
+        for (const it of issues) out.set(it.key, customerOrgOf(it.fields?.[fieldId]));
+      });
+    } catch (e) {
+      if (!(e instanceof JiraError) || e.status !== 400) throw e;
+      for (const key of batch) {
+        try {
+          const it = await jiraGet<IssueDetail>(conn, `/rest/api/3/issue/${encodeURIComponent(key)}`, { fields: fieldId });
+          out.set(key, customerOrgOf(it.fields?.[fieldId]));
+        } catch (e2) {
+          if (!(e2 instanceof JiraError) || e2.status !== 404) throw e2;
+        }
+      }
+    }
+    // Keys Jira didn't return (deleted, no access) read as empty so they
+    // aren't looked up again on every sync.
+    for (const key of batch) if (!out.has(key)) out.set(key, '');
+  }
+  return out;
+}
+
+export interface JiraField { id: string; name: string }
+
+/** Custom issue fields — the picker for the customer field. */
+export async function fetchFields(conn: JiraConn): Promise<JiraField[]> {
+  const data = await jiraGet<{ id: string; name: string; custom?: boolean }[]>(conn, '/rest/api/3/field');
+  return (Array.isArray(data) ? data : [])
+    .filter((f) => f.custom)
+    .map((f) => ({ id: f.id, name: f.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export const jiraClient = { testConnection, fetchProjects, fetchEpics, fetchAccounts, fetchIssues, fetchIssueFieldValues, fetchFields };

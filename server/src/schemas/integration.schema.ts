@@ -31,7 +31,7 @@ export const saveTeamsConnectionSchema = z.object({
   botAppPassword: z.string().max(2000).nullable().optional(),
 });
 
-const kind = z.enum(['project', 'epic', 'issue', 'other']);
+const kind = z.enum(['project', 'epic', 'issue', 'org', 'other']);
 // What hours under this item mean — client work (maps to a customer/project),
 // internal work, or absences. Non-client items never carry a customer/project.
 const workType = z.enum(['client', 'internal', 'absence']);
@@ -49,11 +49,19 @@ export const createWorkItemSchema = z.object({
 export const updateWorkItemSchema = z.object({
   kind: kind.optional(),
   workType: workType.optional(),
+  // Shared delivery space: take each issue's customer from the customer field.
+  customerFromField: z.boolean().optional(),
   externalKey: z.string().min(1).max(100).optional(),
   name: z.string().min(1).max(200).optional(),
   parentId: z.string().nullable().optional(),
   customerId: z.string().nullable().optional(),
   projectId: z.string().nullable().optional(),
+});
+
+// The Jira issue field naming the client on shared delivery spaces; null clears.
+export const customerFieldSchema = z.object({
+  fieldId: z.string().max(100).nullable(),
+  fieldName: z.string().max(200).nullable().optional(),
 });
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');

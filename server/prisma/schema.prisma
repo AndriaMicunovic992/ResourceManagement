@@ -854,6 +854,12 @@ model JiraConnection {
   lastAutoSyncAt    DateTime?
   lastAutoSyncStatus String?  // "ok" | "error"
   lastAutoSyncError String?
+  // The Jira issue field naming the client on shared delivery spaces (e.g. a
+  // "Customer Organization" field filled from the service desk). Read on
+  // every synced issue; only Jira projects flagged customerFromField use it
+  // for attribution. Name cached for display.
+  customerFieldId   String?
+  customerFieldName String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -862,11 +868,13 @@ model JiraConnection {
 // Jira granularity isn't 1:1 with ours — a Jira project may be our Customer,
 // while its epics map to individual Projects — so items form a tree (parentId)
 // and each can map to a Customer OR a Project.
+// kind "org" items are values of the connection's customer field (externalKey
+// "org:<value>"), discovered from synced issues and mapped like any other item.
 model JiraWorkItem {
   id          String   @id @default(cuid())
   orgId       String
   org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  kind        String   @default("project") // project | epic | issue | other
+  kind        String   @default("project") // project | epic | issue | org | other
   externalKey String   // Jira key/id, e.g. ACME or ACME-1234
   name        String
   parentId    String?
@@ -877,6 +885,10 @@ model JiraWorkItem {
   // tracking). Non-client items are org-level buckets and never carry a
   // customer/project (enforced in the service).
   workType    String   @default("client") // client | internal | absence
+  // A shared delivery space (Jira projects only): each issue's customer comes
+  // from the connection's customer field (an "org" item); issues whose value
+  // isn't mapped fall back to this item's own epic/project mapping.
+  customerFromField Boolean @default(false)
   // Maps to at most one of our entities (enforced in the service).
   customerId  String?
   customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -928,6 +940,9 @@ model Worklog {
   project        Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   jiraIssueKey   String?
   jiraEpicKey    String?
+  // The issue's customer-field value at sync time: null = never looked up,
+  // "" = looked up and empty. Kept so restamps re-resolve without Jira.
+  jiraCustomerOrg String?
   // Copied from the resolving JiraWorkItem at sync time. Absence hours are
   // excluded from utilization actuals; internal hours count as worked time
   // but never roll into a customer.

@@ -114,14 +114,20 @@ export default function ResourceBreakdownRows({ resource, months, typedHours, wi
       .filter((u) => Object.entries(u.months || {}).some(([m, v]) => monthSet.has(m) && v > 0.05))
       .map((u) => ({
         key: `jira:${u.key}`,
-        name: u.name === u.key ? u.key : `${u.name} (${u.key})`,
+        // A customer organization from a shared delivery space reads by its
+        // own name, with the space it was logged in.
+        name: u.org ? `${u.name} (${u.projectKey || 'Jira'})` : u.name === u.key ? u.key : `${u.name} (${u.key})`,
         // "stale mapping" = the Jira project IS mapped/classified, but these
         // hours were attributed before that — Re-apply mappings moves them.
         badge: u.stale ? 'stale mapping' : 'not mapped',
         color: '#F5A623',
-        note: u.stale
-          ? `Jira ${u.key} is mapped, but these hours were synced before that — run “Re-apply mappings” under Settings → Integrations to move them.`
-          : `Jira ${u.key} isn’t mapped to a customer — map or classify it under Settings → Integrations.`,
+        note: u.org
+          ? (u.stale
+            ? `Customer organization “${u.name}” is mapped, but these hours were synced before that — run “Re-apply mappings” under Settings → Integrations to move them.`
+            : `Customer organization “${u.name}” in Jira ${u.projectKey || ''} isn’t mapped to a customer — map it under Settings → Integrations → Delivery spaces.`)
+          : u.stale
+            ? `Jira ${u.key} is mapped, but these hours were synced before that — run “Re-apply mappings” under Settings → Integrations to move them.`
+            : `Jira ${u.key} isn’t mapped to a customer — map or classify it under Settings → Integrations.`,
         scope: { bucket: 'unmapped', projectKey: u.key },
         plan: () => 0,
         act: (m) => (m <= cur ? u.months?.[m] || 0 : null),
