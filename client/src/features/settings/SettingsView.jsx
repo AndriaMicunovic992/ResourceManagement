@@ -574,6 +574,7 @@ export default function SettingsView() {
             { id: 'integrations-connection', label: 'Connection' },
             { id: 'integrations-people', label: 'People mapping' },
             { id: 'integrations-mapping', label: 'Customer & project mapping' },
+            { id: 'integrations-delivery', label: 'Delivery spaces' },
           ],
         },
       ],

@@ -110,6 +110,8 @@ function maskConnection(c: {
   lastAutoSyncAt?: Date | null;
   lastAutoSyncStatus?: string | null;
   lastAutoSyncError?: string | null;
+  customerFieldId?: string | null;
+  customerFieldName?: string | null;
 } | null) {
   return {
     baseUrl: c?.baseUrl ?? '',
@@ -122,6 +124,8 @@ function maskConnection(c: {
     lastAutoSyncAt: c?.lastAutoSyncAt ? c.lastAutoSyncAt.toISOString() : null,
     lastAutoSyncStatus: c?.lastAutoSyncStatus ?? null,
     lastAutoSyncError: c?.lastAutoSyncError ?? null,
+    customerFieldId: c?.customerFieldId ?? null,
+    customerFieldName: c?.customerFieldName ?? null,
   };
 }
 
@@ -149,23 +153,39 @@ type ResolvedTarget = { customerId: string | null; projectId: string | null; wor
 type MappingLookup = {
   workItemByKey: Map<string, { customerId: string | null; projectId: string | null; workType: string }>;
   customerByProject: Map<string, string | null>;
+  // Jira project keys of shared delivery spaces (customer from the field).
+  fieldModeProjects: Set<string>;
 };
+
+// Customer-field values live in the work-item table as kind "org" items. The
+// prefix keeps them apart from Jira keys, which never contain a colon.
+export const orgItemKey = (value: string) => `org:${value}`;
 
 async function loadMappingLookup(orgId: string): Promise<MappingLookup> {
   const [workItems, projectRows] = await Promise.all([
-    prisma.jiraWorkItem.findMany({ where: { orgId }, select: { externalKey: true, customerId: true, projectId: true, workType: true } }),
+    prisma.jiraWorkItem.findMany({ where: { orgId }, select: { externalKey: true, customerId: true, projectId: true, workType: true, customerFromField: true } }),
     prisma.project.findMany({ where: { orgId }, select: { id: true, customerId: true } }),
   ]);
   return {
     workItemByKey: new Map(workItems.map((w) => [w.externalKey, w])),
     customerByProject: new Map(projectRows.map((p) => [p.id, p.customerId])),
+    fieldModeProjects: new Set(workItems.filter((w) => w.customerFromField).map((w) => w.externalKey)),
   };
 }
 
-// Resolve to our entity, most-specific (epic) first, then the Jira project.
+// The customer-field item key a worklog resolves through first, if any: only
+// in a shared delivery space, and only when the issue carries a value.
+function orgKeyFor(fieldModeProjects: Set<string>, projectKey: string | null, customerOrg: string | null | undefined): string | null {
+  return customerOrg && projectKey && fieldModeProjects.has(projectKey) ? orgItemKey(customerOrg) : null;
+}
+
+// Resolve to our entity, most-specific first: the issue's customer-field value
+// (shared delivery spaces only), then its epic, then the Jira project. An
+// unmapped level falls through to the next, so a delivery space's own mapping
+// (e.g. Internal work) catches issues whose organization isn't mapped yet.
 // Internal/absence buckets classify the hours without a customer/project.
-function resolveByKeys(lookup: MappingLookup, epicKey: string | null, projectKey: string | null): ResolvedTarget {
-  for (const key of [epicKey, projectKey]) {
+function resolveByKeys(lookup: MappingLookup, epicKey: string | null, projectKey: string | null, customerOrg: string | null = null): ResolvedTarget {
+  for (const key of [orgKeyFor(lookup.fieldModeProjects, projectKey, customerOrg), epicKey, projectKey]) {
     if (!key) continue;
     const wi = lookup.workItemByKey.get(key);
     if (!wi) continue;
@@ -181,6 +201,88 @@ function issueProjectKey(issueKey: string | null): string | null {
   if (!issueKey) return null;
   const i = issueKey.lastIndexOf('-');
   return i > 0 ? issueKey.slice(0, i) : null;
+}
+
+const normName = (n: string) => n.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/**
+ * Create the "org" work items for customer-field values not seen before. A
+ * new value whose name matches exactly one customer (case/space-insensitive)
+ * starts mapped to it; everything else starts unmapped. Existing items are
+ * never touched, so a mapping the admin changed stays changed.
+ */
+async function ensureOrgItems(orgId: string, values: Iterable<string>): Promise<number> {
+  const wanted = [...new Set([...values].filter(Boolean))];
+  if (wanted.length === 0) return 0;
+  const existing = new Set(
+    (await prisma.jiraWorkItem.findMany({ where: { orgId, externalKey: { in: wanted.map(orgItemKey) } }, select: { externalKey: true } }))
+      .map((e) => e.externalKey)
+  );
+  const missing = wanted.filter((v) => !existing.has(orgItemKey(v)));
+  if (missing.length === 0) return 0;
+  const customers = await prisma.customer.findMany({ where: { orgId }, select: { id: true, name: true } });
+  const byName = new Map<string, string | null>();
+  for (const c of customers) {
+    const k = normName(c.name);
+    byName.set(k, byName.has(k) ? null : c.id); // ambiguous name → no guess
+  }
+  await prisma.jiraWorkItem.createMany({
+    data: missing.map((v) => ({ orgId, kind: 'org', externalKey: orgItemKey(v), name: v, customerId: byName.get(normName(v)) ?? null })),
+    skipDuplicates: true,
+  });
+  return missing.length;
+}
+
+// Look up the customer-field value of at most this many issues per pass —
+// bounds a first backfill of a large delivery space; the rest follow on the
+// next sync.
+const ORG_BACKFILL_CAP = 2000;
+
+/**
+ * Fill in the customer-field value on stored worklogs of shared delivery
+ * spaces that were synced before the field (or the space's flag) was set up —
+ * a delta sync never re-pulls them. Creates the "org" items for the values it
+ * finds. Restamping is left to the caller. Returns how many issues it read.
+ */
+async function backfillCustomerOrgs(orgId: string, conn: { baseUrl: string | null; jiraEmail: string | null; jiraApiToken: string | null; customerFieldId: string | null }) {
+  if (!conn.customerFieldId) return 0;
+  const modeProjects = await prisma.jiraWorkItem.findMany({ where: { orgId, customerFromField: true }, select: { externalKey: true } });
+  if (modeProjects.length === 0) return 0;
+  const pending = await prisma.worklog.findMany({
+    where: {
+      orgId,
+      jiraCustomerOrg: null,
+      OR: modeProjects.map((p) => ({ jiraIssueKey: { startsWith: `${p.externalKey}-` } })),
+    },
+    distinct: ['jiraIssueKey'],
+    select: { jiraIssueKey: true },
+    take: ORG_BACKFILL_CAP,
+  });
+  const keys = pending.map((w) => w.jiraIssueKey).filter((k): k is string => !!k);
+  if (keys.length === 0) return 0;
+  const values = await callJira(() => jiraClient.fetchIssueFieldValues(conn, keys, conn.customerFieldId!));
+  const keysByValue = new Map<string, string[]>();
+  for (const [key, value] of values) keysByValue.set(value, [...(keysByValue.get(value) || []), key]);
+  for (const [value, ks] of keysByValue) {
+    for (let i = 0; i < ks.length; i += 5000) {
+      await prisma.worklog.updateMany({ where: { orgId, jiraIssueKey: { in: ks.slice(i, i + 5000) }, jiraCustomerOrg: null }, data: { jiraCustomerOrg: value } });
+    }
+  }
+  await ensureOrgItems(orgId, keysByValue.keys());
+  return keys.length;
+}
+
+// How an unmapped client worklog is grouped in the people drill-down: by its
+// customer-field value inside a shared delivery space (so each unmapped client
+// shows by name), else by Jira project.
+function unmappedGroupKey(fieldModeProjects: Set<string>, w: { jiraIssueKey: string | null; jiraCustomerOrg: string | null }): string {
+  const projectKey = issueProjectKey(w.jiraIssueKey);
+  return orgKeyFor(fieldModeProjects, projectKey, w.jiraCustomerOrg) || projectKey || '(no Jira issue)';
+}
+
+async function loadFieldModeProjects(orgId: string): Promise<Set<string>> {
+  const rows = await prisma.jiraWorkItem.findMany({ where: { orgId, customerFromField: true }, select: { externalKey: true } });
+  return new Set(rows.map((r) => r.externalKey));
 }
 
 type EpicDrillWorklog = {
@@ -288,10 +390,10 @@ async function restampWorklogs(orgId: string): Promise<number> {
   const PAGE = 5000;
   let cursor: string | undefined;
   for (;;) {
-    const page: { id: string; jiraIssueKey: string | null; jiraEpicKey: string | null; customerId: string | null; projectId: string | null; workType: string }[] =
+    const page: { id: string; jiraIssueKey: string | null; jiraEpicKey: string | null; jiraCustomerOrg: string | null; customerId: string | null; projectId: string | null; workType: string }[] =
       await prisma.worklog.findMany({
         where: { orgId },
-        select: { id: true, jiraIssueKey: true, jiraEpicKey: true, customerId: true, projectId: true, workType: true },
+        select: { id: true, jiraIssueKey: true, jiraEpicKey: true, jiraCustomerOrg: true, customerId: true, projectId: true, workType: true },
         orderBy: { id: 'asc' },
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         take: PAGE,
@@ -300,7 +402,7 @@ async function restampWorklogs(orgId: string): Promise<number> {
     for (const w of page) {
       const projectKey = issueProjectKey(w.jiraIssueKey);
       if (!w.jiraEpicKey && !projectKey) continue;
-      const next = resolveByKeys(lookup, w.jiraEpicKey, projectKey);
+      const next = resolveByKeys(lookup, w.jiraEpicKey, projectKey, w.jiraCustomerOrg);
       if (next.customerId === w.customerId && next.projectId === w.projectId && next.workType === w.workType) continue;
       const key = `${next.customerId}|${next.projectId}|${next.workType}`;
       const bucket = changedByTarget.get(key) || { target: next, ids: [] };
@@ -355,6 +457,7 @@ export const integrationService = {
       enabled: c.enabled,
       jiraApiToken: decryptSecret(c.jiraApiToken),
       tempoApiToken: decryptSecret(c.tempoApiToken),
+      customerFieldId: c.customerFieldId,
     };
   },
 
@@ -377,7 +480,12 @@ export const integrationService = {
         jiraClient.fetchAccounts(conn!),
       ])
     );
-    return applyPulled(orgId, { projects, epics, accounts });
+    const counts = await applyPulled(orgId, { projects, epics, accounts });
+    // Also read the customer field on already-synced delivery-space hours, so
+    // their organizations show up for mapping without waiting for a sync.
+    const customerOrgIssues = await backfillCustomerOrgs(orgId, conn!);
+    if (customerOrgIssues > 0) await restampWorklogs(orgId);
+    return { ...counts, customerOrgIssues };
   },
 
   /**
@@ -402,8 +510,13 @@ export const integrationService = {
 
     // Resolve the worklogs' Jira issues → project/epic keys.
     const issueIds = [...new Set(worklogs.map((w) => w.issueId).filter(Boolean))];
-    const issues = issueIds.length ? await callJira(() => jiraClient.fetchIssues(conn, issueIds)) : [];
+    const issues = issueIds.length ? await callJira(() => jiraClient.fetchIssues(conn, issueIds, conn.customerFieldId)) : [];
     const issueById = new Map(issues.map((i) => [i.id, i]));
+
+    // New customer-field values in shared delivery spaces become mappable
+    // "org" items (auto-matched by customer name) before resolving.
+    const modeProjects = await loadFieldModeProjects(orgId);
+    await ensureOrgItems(orgId, issues.filter((i) => i.projectKey && modeProjects.has(i.projectKey)).map((i) => i.customerOrg || ''));
 
     // Mapping lookups.
     const [lookup, mappedResources] = await Promise.all([
@@ -411,7 +524,7 @@ export const integrationService = {
       prisma.resource.findMany({ where: { orgId, externalWorkId: { not: null } }, select: { id: true, externalWorkId: true } }),
     ]);
     const resourceByAccount = new Map(mappedResources.map((r) => [r.externalWorkId as string, r.id]));
-    const resolveEntity = (epicKey: string | null, projectKey: string | null) => resolveByKeys(lookup, epicKey, projectKey);
+    const resolveEntity = (epicKey: string | null, projectKey: string | null, customerOrg: string | null) => resolveByKeys(lookup, epicKey, projectKey, customerOrg);
 
     let totalSeconds = 0;
     let mapped = 0;
@@ -428,7 +541,7 @@ export const integrationService = {
     const rows: {
       tempoWorklogId: string; accountId: string; resourceId: string | null;
       customerId: string | null; projectId: string | null; workType: string;
-      jiraIssueKey: string | null; jiraEpicKey: string | null;
+      jiraIssueKey: string | null; jiraEpicKey: string | null; jiraCustomerOrg: string | null;
       workDate: string; month: string; seconds: number; description: string | null;
     }[] = [];
     for (const w of worklogs) {
@@ -438,7 +551,8 @@ export const integrationService = {
       else if (w.accountId) unmatchedAccounts.add(w.accountId);
 
       const ref = issueById.get(w.issueId) || null;
-      const { customerId, projectId, workType } = resolveEntity(ref?.epicKey ?? null, ref?.projectKey ?? null);
+      const customerOrg = ref?.customerOrg ?? null;
+      const { customerId, projectId, workType } = resolveEntity(ref?.epicKey ?? null, ref?.projectKey ?? null, customerOrg);
       if (customerId || projectId || workType !== 'client') mapped += 1;
       if (customerId) secondsByCustomer.set(customerId, (secondsByCustomer.get(customerId) || 0) + w.seconds);
       totalSeconds += w.seconds;
@@ -446,7 +560,7 @@ export const integrationService = {
       rows.push({
         tempoWorklogId: w.tempoWorklogId, accountId: w.accountId, resourceId,
         customerId, projectId, workType, jiraIssueKey: ref?.key ?? null, jiraEpicKey: ref?.epicKey ?? null,
-        workDate: w.date, month: (w.date || '').slice(0, 7), seconds: w.seconds, description: w.description,
+        jiraCustomerOrg: customerOrg, workDate: w.date, month: (w.date || '').slice(0, 7), seconds: w.seconds, description: w.description,
       });
     }
 
@@ -509,6 +623,10 @@ export const integrationService = {
       deleted = res.count;
     }
 
+    // Older delivery-space rows synced before the customer field was set up
+    // get their value read now, so the restamp below can attribute them.
+    const customerOrgIssues = await backfillCustomerOrgs(orgId, conn);
+
     // Heal older rows the delta didn't re-pull: mappings may have changed since
     // they were stamped (a Jira project reclassified as absences, a remapped
     // customer). The rows written above already match, so this only touches
@@ -533,6 +651,7 @@ export const integrationService = {
       createdWorklogs: toCreate.length,
       updatedWorklogs: toUpdate.length,
       restampedWorklogs: restamped,
+      customerOrgIssues,
       hours: Math.round((totalSeconds / 3600) * 10) / 10,
       matchedPeople: matchedResourceIds.size,
       unmatchedAccounts: unmatchedAccounts.size,
@@ -745,16 +864,21 @@ export const integrationService = {
    * Returned as [{ key, name, months: { [month]: hours } }], largest first.
    */
   async actualsForResourceUnmapped(orgId: string, resourceId: string, fromMonth: string, toMonth: string) {
-    const rows = await prisma.worklog.findMany({
-      where: {
-        orgId, resourceId, month: { gte: fromMonth, lte: toMonth },
-        workType: 'client', customerId: null, projectId: null,
-      },
-      select: { jiraIssueKey: true, month: true, seconds: true },
-    });
+    const [rows, fieldMode] = await Promise.all([
+      prisma.worklog.findMany({
+        where: {
+          orgId, resourceId, month: { gte: fromMonth, lte: toMonth },
+          workType: 'client', customerId: null, projectId: null,
+        },
+        select: { jiraIssueKey: true, jiraCustomerOrg: true, month: true, seconds: true },
+      }),
+      loadFieldModeProjects(orgId),
+    ]);
     const byKey = new Map<string, Record<string, number>>();
+    const projectOfKey = new Map<string, string | null>();
     for (const w of rows) {
-      const key = issueProjectKey(w.jiraIssueKey) || '(no Jira issue)';
+      const key = unmappedGroupKey(fieldMode, w);
+      projectOfKey.set(key, issueProjectKey(w.jiraIssueKey));
       const months = byKey.get(key) || {};
       months[w.month] = (months[w.month] || 0) + w.seconds;
       byKey.set(key, months);
@@ -762,7 +886,7 @@ export const integrationService = {
     if (byKey.size === 0) return [];
     const items = await prisma.jiraWorkItem.findMany({
       where: { orgId, externalKey: { in: [...byKey.keys()] } },
-      select: { externalKey: true, name: true, customerId: true, projectId: true, workType: true },
+      select: { externalKey: true, name: true, kind: true, customerId: true, projectId: true, workType: true },
     });
     const itemByKey = new Map(items.map((n) => [n.externalKey, n]));
     const total = (months: Record<string, number>) => Object.values(months).reduce((s, v) => s + v, 0);
@@ -773,9 +897,13 @@ export const integrationService = {
         // The Jira project IS mapped/classified but these hours predate it —
         // the stale-attribution case a "Re-apply mappings" run fixes.
         const stale = !!wi && (!!wi.customerId || !!wi.projectId || wi.workType !== 'client');
+        const isOrg = key.startsWith('org:');
         return {
           key,
-          name: wi?.name || key,
+          name: wi?.name || (isOrg ? key.slice(4) : key),
+          // A customer-field value inside a shared delivery space (projectKey
+          // = that space) rather than a whole Jira project.
+          ...(isOrg ? { org: true, projectKey: projectOfKey.get(key) ?? null } : {}),
           stale,
           months: Object.fromEntries(
             Object.entries(secondsByMonth).map(([m, s]) => [m, Math.round((s / 3600) * 10) / 10])
@@ -809,11 +937,13 @@ export const integrationService = {
 
     let rows = await prisma.worklog.findMany({
       where,
-      select: { jiraEpicKey: true, jiraIssueKey: true, month: true, seconds: true, description: true, workDate: true },
+      select: { jiraEpicKey: true, jiraIssueKey: true, jiraCustomerOrg: true, month: true, seconds: true, description: true, workDate: true },
     });
-    // The unmapped drill is per Jira project — keep only that project's issues.
+    // The unmapped drill is per Jira project (or per customer-field value in a
+    // shared delivery space) — keep only that group's issues.
     if (scope.bucket === 'unmapped' && scope.projectKey) {
-      rows = rows.filter((w) => issueProjectKey(w.jiraIssueKey) === scope.projectKey);
+      const fieldMode = await loadFieldModeProjects(orgId);
+      rows = rows.filter((w) => unmappedGroupKey(fieldMode, w) === scope.projectKey);
     }
     return groupWorklogsByEpic(orgId, rows);
   },
@@ -935,7 +1065,7 @@ export const integrationService = {
       where: { orgId },
       orderBy: [{ kind: 'asc' }, { externalKey: 'asc' }],
       select: {
-        id: true, kind: true, workType: true, externalKey: true, name: true, parentId: true,
+        id: true, kind: true, workType: true, customerFromField: true, externalKey: true, name: true, parentId: true,
         customerId: true, projectId: true,
         customer: { select: { id: true, name: true } },
         project: { select: { id: true, name: true } },
@@ -983,10 +1113,13 @@ export const integrationService = {
   async updateWorkItem(
     orgId: string,
     id: string,
-    data: { kind?: string; workType?: string; externalKey?: string; name?: string; parentId?: string | null; customerId?: string | null; projectId?: string | null }
+    data: { kind?: string; workType?: string; customerFromField?: boolean; externalKey?: string; name?: string; parentId?: string | null; customerId?: string | null; projectId?: string | null }
   ) {
     const item = await prisma.jiraWorkItem.findFirst({ where: { id, orgId } });
     if (!item) throw new NotFoundError('Work item not found');
+    if (data.customerFromField && (data.kind ?? item.kind) !== 'project') {
+      throw new BadRequestError('Only a Jira project can take its customer from the customer field');
+    }
 
     // Resolve the effective state so the invariants hold on partial updates too:
     // at most one of customer/project, and never a customer/project on an
@@ -1014,6 +1147,7 @@ export const integrationService = {
         data: {
           kind: data.kind ?? undefined,
           workType: effectiveWorkType,
+          customerFromField: data.customerFromField ?? undefined,
           externalKey: data.externalKey?.trim() ?? undefined,
           name: data.name?.trim() ?? undefined,
           parentId: data.parentId !== undefined ? data.parentId : undefined,
@@ -1024,11 +1158,54 @@ export const integrationService = {
     } catch (e) {
       throw new ConflictError('A work item with that key already exists');
     }
+    // Newly flagged delivery space: read the customer field on its synced
+    // hours now. Best effort — if Jira is unreachable the next sync does it.
+    if (data.customerFromField && !item.customerFromField) {
+      const conn = await this.getSecrets(orgId);
+      if (conn?.customerFieldId && conn.jiraApiToken) {
+        try { await backfillCustomerOrgs(orgId, conn); } catch { /* next sync */ }
+      }
+    }
     // Apply the new mapping/classification to already-synced hours immediately
     // — a delta sync would never re-pull them, so the stamped attribution
     // would otherwise stay stale forever.
     await restampWorklogs(orgId);
     return this.listWorkItems(orgId);
+  },
+
+  // --- Customer field (shared delivery spaces) ---
+
+  /** Custom Jira issue fields, for picking the customer field. */
+  async listJiraFields(orgId: string) {
+    const conn = await this.getSecrets(orgId);
+    assertJiraReady(conn);
+    return callJira(() => jiraClient.fetchFields(conn!));
+  },
+
+  /**
+   * Set (or clear, with a null id) the Jira field that names the client on
+   * shared delivery spaces. A different field makes every stored value stale,
+   * so they're dropped and re-read right away (best effort — the next sync
+   * finishes the job if Jira is unreachable), then history is restamped.
+   */
+  async setCustomerField(orgId: string, data: { fieldId: string | null; fieldName?: string | null }) {
+    const existing = await prisma.jiraConnection.findUnique({ where: { orgId }, select: { customerFieldId: true } });
+    if (!existing) throw new BadRequestError('Save the Jira connection first');
+    const fieldId = data.fieldId?.trim() || null;
+    await prisma.jiraConnection.update({
+      where: { orgId },
+      data: { customerFieldId: fieldId, customerFieldName: fieldId ? data.fieldName?.trim() || fieldId : null },
+    });
+    let backfillError: string | null = null;
+    if (fieldId !== existing.customerFieldId) {
+      await prisma.worklog.updateMany({ where: { orgId, jiraCustomerOrg: { not: null } }, data: { jiraCustomerOrg: null } });
+      const conn = await this.getSecrets(orgId);
+      if (fieldId && conn?.jiraApiToken) {
+        try { await backfillCustomerOrgs(orgId, conn); } catch (e) { backfillError = (e as Error).message || 'Jira lookup failed'; }
+      }
+      await restampWorklogs(orgId);
+    }
+    return { ...(await this.getConnection(orgId)), backfillError };
   },
 
   async deleteWorkItem(orgId: string, id: string) {

@@ -8,6 +8,7 @@ const inputCls = 'px-2 py-1.5 border border-border rounded-lg text-xs text-text 
 // A dropdown you can tick multiple Jira items in. Jira projects are expandable
 // to reveal their epics (nested by parentId). Items already mapped to another
 // customer/project show their owner and are locked to avoid moving them.
+// Customer-field values ("org" items from delivery spaces) list by name.
 function JiraMultiSelect({ items, selectedIds, onToggle, ownerName }) {
   const [open, setOpen] = useState(false);
   const [openProjects, setOpenProjects] = useState(() => new Set());
@@ -27,10 +28,11 @@ function JiraMultiSelect({ items, selectedIds, onToggle, ownerName }) {
     (epicsByParent[k] = epicsByParent[k] || []).push(e);
   }
   const looseEpics = epicsByParent.__loose__ || [];
-  const others = items.filter((i) => i.kind !== 'project' && i.kind !== 'epic');
+  const orgs = items.filter((i) => i.kind === 'org');
+  const others = items.filter((i) => i.kind !== 'project' && i.kind !== 'epic' && i.kind !== 'org');
 
   const selected = items.filter((i) => selectedIds.has(i.id));
-  const summary = selected.length ? selected.map((i) => i.externalKey).join(', ') : 'Select Jira…';
+  const summary = selected.length ? selected.map((i) => (i.kind === 'org' ? i.name : i.externalKey)).join(', ') : 'Select Jira…';
   const toggleProject = (id) => setOpenProjects((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const checkRow = (item, indent = 0) => {
@@ -40,7 +42,7 @@ function JiraMultiSelect({ items, selectedIds, onToggle, ownerName }) {
     return (
       <label className={`flex items-center gap-2 py-1 pr-2 rounded ${locked ? 'opacity-60' : 'hover:bg-primary-bg/40 cursor-pointer'}`} style={{ paddingLeft: 8 + indent }}>
         <input type="checkbox" checked={checked} disabled={locked} onChange={() => onToggle(item, !checked)} />
-        <span className="font-mono text-[10px] text-text-mid shrink-0">{item.externalKey}</span>
+        {item.kind !== 'org' && <span className="font-mono text-[10px] text-text-mid shrink-0">{item.externalKey}</span>}
         <span className="text-[11px] text-text truncate">{item.name}</span>
         {locked && <span className="text-[9px] text-text-light ml-auto shrink-0 whitespace-nowrap">→ {owner}</span>}
       </label>
@@ -77,6 +79,12 @@ function JiraMultiSelect({ items, selectedIds, onToggle, ownerName }) {
             <div>
               <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wide text-text-light">Epics</div>
               {looseEpics.map((e) => <div key={e.id}>{checkRow(e)}</div>)}
+            </div>
+          )}
+          {orgs.length > 0 && (
+            <div>
+              <div className="px-2 pt-1.5 pb-0.5 text-[9px] font-bold uppercase tracking-wide text-text-light">Customer organizations</div>
+              {orgs.map((o) => <div key={o.id}>{checkRow(o)}</div>)}
             </div>
           )}
           {others.map((e) => <div key={e.id}>{checkRow(e)}</div>)}
@@ -139,7 +147,7 @@ export default function IntegrationsSection() {
     try {
       await persist();
       const c = await api.refreshJira();
-      setStatus(`Pulled ${c.projects} projects, ${c.epics} epics, ${c.accounts} accounts from Jira.`);
+      setStatus(`Pulled ${c.projects} projects, ${c.epics} epics, ${c.accounts} accounts from Jira.${c.customerOrgIssues ? ` Read the customer field on ${c.customerOrgIssues} delivery-space issues.` : ''}`);
       await loadRefs();
     } finally { setBusy(''); }
   })();
@@ -206,6 +214,60 @@ export default function IntegrationsSection() {
 
   const [expanded, setExpanded] = useState(() => new Set());
   const toggle = (id) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  // ---- Delivery spaces: Jira projects whose issues name their customer in a
+  // field (e.g. "Customer Organization", filled from the service desk) ----
+  const [fields, setFields] = useState(null); // null = not loaded yet
+  const loadFields = () => {
+    if (fields !== null || !conn?.jiraApiTokenSet) return;
+    setFields([]);
+    api.getJiraFields().then(setFields).catch((e) => { setFields(null); setError(e.message || 'Could not load Jira fields'); });
+  };
+  const fieldOptions = useMemo(() => {
+    const opts = fields || [];
+    if (conn?.customerFieldId && !opts.some((f) => f.id === conn.customerFieldId)) {
+      return [{ id: conn.customerFieldId, name: conn.customerFieldName || conn.customerFieldId }, ...opts];
+    }
+    return opts;
+  }, [fields, conn?.customerFieldId, conn?.customerFieldName]);
+  const setCustomerField = (fieldId) => run(async () => {
+    setBusy('field'); setStatus('');
+    try {
+      const f = fieldOptions.find((o) => o.id === fieldId);
+      const r = await api.setJiraCustomerField(fieldId || null, f?.name || null);
+      setStatus(r.backfillError
+        ? `Customer field saved, but reading it from Jira failed (${r.backfillError}) — the next sync retries.`
+        : fieldId ? `Customer field set to “${f?.name || fieldId}”.` : 'Customer field cleared.');
+      await loadConn(); await loadRefs();
+    } finally { setBusy(''); }
+  })();
+  const jiraProjects = useMemo(() => items.filter((i) => i.kind === 'project'), [items]);
+  const deliverySel = useMemo(() => new Set(jiraProjects.filter((i) => i.customerFromField).map((i) => i.id)), [jiraProjects]);
+  const setDeliverySpace = (workItemId, on) => run(async () => {
+    setBusy('delivery'); setStatus('');
+    try { await api.updateJiraWorkItem(workItemId, { customerFromField: on }); await loadRefs(); }
+    finally { setBusy(''); }
+  })();
+  // One mapping select per customer organization. Values: '' = not mapped,
+  // 'internal' / 'absence' = the org-level buckets, 'c:<id>' / 'p:<id>'.
+  const [orgFilter, setOrgFilter] = useState('');
+  const orgItems = useMemo(() => items
+    .filter((i) => i.kind === 'org')
+    .sort((a, b) => {
+      const ua = !a.customerId && !a.projectId && a.workType === 'client';
+      const ub = !b.customerId && !b.projectId && b.workType === 'client';
+      return ua === ub ? a.name.localeCompare(b.name) : ua ? -1 : 1;
+    }), [items]);
+  const unmappedOrgCount = orgItems.filter((i) => !i.customerId && !i.projectId && i.workType === 'client').length;
+  const orgTarget = (i) => (i.workType !== 'client' ? i.workType : i.projectId ? `p:${i.projectId}` : i.customerId ? `c:${i.customerId}` : '');
+  const setOrgTarget = (workItemId, v) => run(async () => {
+    const patch = v === 'internal' || v === 'absence'
+      ? { workType: v }
+      : { workType: 'client', customerId: v.startsWith('c:') ? v.slice(2) : null, projectId: v.startsWith('p:') ? v.slice(2) : null };
+    await api.updateJiraWorkItem(workItemId, patch);
+    await loadRefs();
+  })();
+  const sortedCustomers = useMemo(() => [...customers].sort((a, b) => a.name.localeCompare(b.name)), [customers]);
 
   // ---- Tempo hours sync (by created/updated date — supports nightly deltas) ----
   const [updatedFrom, setUpdatedFrom] = useState(() => new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10));
@@ -429,6 +491,79 @@ export default function IntegrationsSection() {
             );
           })}
           {customers.length === 0 && <p className="text-xs text-text-light py-2">No customers yet.</p>}
+        </div>
+      </div>
+
+      {/* Delivery spaces — shared Jira projects attributed per issue by a customer field */}
+      <div id="integrations-delivery" className="scroll-mt-4 bg-white rounded-2xl border border-border-light shadow-card p-5 mb-4">
+        <h3 className="text-sm font-bold text-text mb-1">Delivery spaces</h3>
+        <p className="text-[10px] text-text-light mb-3">
+          For Jira projects shared by many clients (e.g. a delivery space fed by a service desk), each issue&apos;s client comes from a field such as <b>Customer Organization</b> instead of the project mapping above. Standalone projects keep working as before. Issues whose organization isn&apos;t mapped yet fall back to the space&apos;s own mapping above — leave the space unmapped to see them flagged as “not mapped” in Insights, or put it under <b>Internal work</b> to count them as internal until mapped.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="block text-[10px] font-semibold text-text-mid mb-1">Customer field</span>
+            <select
+              value={conn?.customerFieldId || ''}
+              onFocus={loadFields} onMouseDown={loadFields}
+              onChange={(e) => setCustomerField(e.target.value)}
+              disabled={busy === 'field' || !conn?.jiraApiTokenSet}
+              className={`w-full ${inputCls}`}
+            >
+              <option value="">— none —</option>
+              {fields !== null && fields.length === 0 && !conn?.customerFieldId && <option disabled>Loading fields…</option>}
+              {fieldOptions.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.id})</option>)}
+            </select>
+            {!conn?.jiraApiTokenSet && <span className="block text-[10px] text-warning mt-1">Save the Jira connection first.</span>}
+          </label>
+          <div className="block">
+            <span className="block text-[10px] font-semibold text-text-mid mb-1">Jira projects that use it</span>
+            <JiraMultiSelect items={jiraProjects} selectedIds={deliverySel} ownerName={() => null}
+              onToggle={(o, checked) => setDeliverySpace(o.id, checked)} />
+            {busy === 'delivery' && <span className="block text-[10px] text-text-light mt-1">Reading the field on synced hours…</span>}
+          </div>
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-border-light">
+          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+            <div className="text-xs font-semibold text-text">
+              Customer organizations
+              {unmappedOrgCount > 0 && <span className="ml-2 text-[10px] font-semibold text-warning">{unmappedOrgCount} not mapped</span>}
+            </div>
+            {orgItems.length > 8 && (
+              <input value={orgFilter} onChange={(e) => setOrgFilter(e.target.value)} placeholder="Filter…" className={`${inputCls} w-48`} />
+            )}
+          </div>
+          {orgItems.length === 0 ? (
+            <p className="text-[10px] text-text-light">
+              {conn?.customerFieldId && deliverySel.size > 0
+                ? 'No organizations found yet — they appear here as hours are synced (or on Refresh from Jira).'
+                : 'Pick the customer field and the Jira projects that use it. The organizations on their synced hours then show up here; ones whose name matches a customer are mapped automatically.'}
+            </p>
+          ) : (
+            <div className="divide-y divide-border-light/60">
+              {orgItems
+                .filter((i) => !orgFilter.trim() || i.name.toLowerCase().includes(orgFilter.trim().toLowerCase()))
+                .map((i) => {
+                  const v = orgTarget(i);
+                  const proj = i.projectId && projects.find((p) => p.id === i.projectId);
+                  return (
+                    <div key={i.id} className={`${COLS} items-center px-2 py-1`}>
+                      <span className="text-xs text-text truncate">{i.name}</span>
+                      <select value={v} onChange={(e) => setOrgTarget(i.id, e.target.value)} className={`${inputCls} min-w-0 ${v ? '' : 'border-warning'}`}>
+                        <option value="">— not mapped —</option>
+                        <option value="internal">Internal work</option>
+                        <option value="absence">Absences</option>
+                        {proj && <option value={`p:${proj.id}`}>{custName.get(proj.customerId) || '?'} › {proj.name}</option>}
+                        <optgroup label="Customers">
+                          {sortedCustomers.map((c) => <option key={c.id} value={`c:${c.id}`}>{c.name}</option>)}
+                        </optgroup>
+                      </select>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       </div>
     </div>

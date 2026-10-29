@@ -10,6 +10,7 @@ import {
   createWorkItemSchema,
   updateWorkItemSchema,
   syncHoursSchema,
+  customerFieldSchema,
 } from '../schemas/integration.schema.js';
 
 // All integration settings are admin-only. The connection endpoint never
@@ -32,6 +33,18 @@ export const integrationRoutes: FastifyPluginAsync = async (app) => {
   // Pull projects / epics / accounts from Jira into the local cache.
   app.post('/integration/jira/refresh', { preHandler: requireRole('admin') }, async (req) => {
     return integrationService.refreshFromJira(req.orgId);
+  });
+
+  // Custom Jira issue fields — the picker for the customer field.
+  app.get('/integration/jira/fields', { preHandler: requireRole('admin') }, async (req) => {
+    return integrationService.listJiraFields(req.orgId);
+  });
+
+  // The field that names the client on shared delivery spaces (service-desk
+  // fed). Changing it re-reads the values on synced hours and restamps them.
+  app.put('/integration/jira/customer-field', { preHandler: requireRole('admin') }, async (req) => {
+    const data = customerFieldSchema.parse(req.body);
+    return integrationService.setCustomerField(req.orgId, data);
   });
 
   // Pulled Jira accounts (the People-mapping "Account" dropdown).
