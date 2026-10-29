@@ -5,11 +5,13 @@ import { formatMonth } from '../../lib/dateUtils';
 
 /**
  * The two deepest drill levels shared by the Insights tables: the Jira epics
- * behind one row's logged hours, each expanding into its issues. No plan
+ * behind one row's logged hours, each expanding into its issues. In a shared
+ * delivery space the first level is the customer organization instead
+ * (`org: true`), since delivery tickets rarely sit under an epic. No plan
  * exists at this depth — rows carry actual hours only, on a shared hour scale
  * (the caller's, or one computed from the loaded epics).
  *
- *  load     () => Promise<[{ key, name, months, issues: [{ key, description, months }] }]>
+ *  load     () => Promise<[{ key, name, org?, months, issues: [{ key, description, months }] }]>
  *  loadKey  reruns the fetch when it changes (the load closure itself is
  *           recreated every render, so it can't be the dependency)
  *  tipPrefix  leads every tooltip title (person or customer name)
@@ -38,7 +40,7 @@ export default function EpicDrillRows({ load, loadKey, months, cur, color, scale
   if (epics == null) {
     return (
       <div className="flex items-center border-b border-border-light/50 bg-[#F6F9FC] pl-[80px] py-1.5 text-[10px] text-text-light">
-        Loading epics…
+        Loading…
       </div>
     );
   }
@@ -63,7 +65,8 @@ function EpicRow({ epic, months, cur, color, scaleMax, accent, tipPrefix }) {
       <ActRow
         level={2}
         name={epic.name}
-        titleText={epic.name === epic.key ? epic.name : `${epic.name} (${epic.key})`}
+        desc={epic.org ? 'organization' : null}
+        titleText={epic.org ? `${epic.name} · customer organization` : epic.name === epic.key ? epic.name : `${epic.name} (${epic.key})`}
         caret={epic.issues.length > 0}
         open={open}
         onToggle={() => setOpen((v) => !v)}

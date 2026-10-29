@@ -288,6 +288,7 @@ async function loadFieldModeProjects(orgId: string): Promise<Set<string>> {
 type EpicDrillWorklog = {
   jiraEpicKey: string | null;
   jiraIssueKey: string | null;
+  jiraCustomerOrg?: string | null;
   month: string;
   seconds: number;
   description: string | null;
@@ -304,6 +305,10 @@ type EpicDrillWorklog = {
 // months }, restricted to visibleResourceIds unless null = everyone) —
 // hours of unmatched Jira accounts stay in the issue totals but get no
 // person row. Every level sorts by total hours, largest first.
+// Inside a shared delivery space the first level is the issue's customer
+// organization instead of its epic (delivery tickets rarely sit under epics,
+// and the organization is what the hours are about); those groups carry
+// `org: true` and the "org:<value>" key of their work item.
 async function groupWorklogsByEpic(
   orgId: string,
   rows: EpicDrillWorklog[],
@@ -313,8 +318,9 @@ async function groupWorklogsByEpic(
   type IssueAgg = { seconds: Record<string, number>; total: number; description: string | null; descDate: string; people: Map<string, PersonAgg> };
   type EpicAgg = { seconds: Record<string, number>; total: number; issues: Map<string, IssueAgg> };
   const epics = new Map<string, EpicAgg>();
+  const fieldMode = rows.some((w) => w.jiraCustomerOrg) ? await loadFieldModeProjects(orgId) : new Set<string>();
   for (const w of rows) {
-    const epicKey = w.jiraEpicKey || '(no epic)';
+    const epicKey = orgKeyFor(fieldMode, issueProjectKey(w.jiraIssueKey), w.jiraCustomerOrg) || w.jiraEpicKey || '(no epic)';
     const issueKey = w.jiraIssueKey || '(no issue)';
     const epic = epics.get(epicKey) || { seconds: {}, total: 0, issues: new Map<string, IssueAgg>() };
     epic.seconds[w.month] = (epic.seconds[w.month] || 0) + w.seconds;
@@ -355,7 +361,8 @@ async function groupWorklogsByEpic(
     .sort((a, b) => b[1].total - a[1].total)
     .map(([key, e]) => ({
       key,
-      name: nameByKey.get(key) || key,
+      name: nameByKey.get(key) || (key.startsWith('org:') ? key.slice(4) : key),
+      ...(key.startsWith('org:') ? { org: true } : {}),
       months: toHours(e.seconds),
       issues: [...e.issues.entries()]
         .sort((a, b) => b[1].total - a[1].total)
@@ -977,7 +984,7 @@ export const integrationService = {
     if (resourceIds) where.resourceId = { in: resourceIds };
     const rows = await prisma.worklog.findMany({
       where,
-      select: { jiraEpicKey: true, jiraIssueKey: true, month: true, seconds: true, description: true, workDate: true, resourceId: true },
+      select: { jiraEpicKey: true, jiraIssueKey: true, jiraCustomerOrg: true, month: true, seconds: true, description: true, workDate: true, resourceId: true },
     });
     return groupWorklogsByEpic(orgId, rows, { visibleResourceIds });
   },

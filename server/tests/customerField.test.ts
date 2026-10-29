@@ -135,6 +135,26 @@ describe.skipIf(!HAS_DB)('Customer field attribution (shared delivery spaces)', 
     expect(byCustomer[standaloneId]?.['2026-06']).toBe(1.5);
   });
 
+  it('the drills group delivery-space hours by organization instead of epic', async () => {
+    // Both organizations planned under one customer (the SME maintenance case).
+    const berg = await prisma.jiraWorkItem.findFirstOrThrow({ where: { orgId, externalKey: 'org:Berg GmbH' } });
+    await integrationService.updateWorkItem(orgId, berg.id, { customerId: alpineId });
+
+    const custDrill = await integrationService.actualsForCustomerEpics(orgId, alpineId, '2026-06', '2026-06');
+    expect(custDrill.map((e) => [e.key, e.name, e.org])).toEqual([
+      ['org:Berg GmbH', 'Berg GmbH', true],
+      ['org:Alpine AG', 'Alpine AG', true],
+    ]);
+    expect(custDrill[0].issues[0]).toMatchObject({ key: 'DEL-2', people: [{ resourceId: personId, months: { '2026-06': 2 } }] });
+    const personDrill = await integrationService.actualsForResourceEpics(orgId, personId, '2026-06', '2026-06', { customerId: alpineId });
+    expect(personDrill.map((e) => e.key)).toEqual(['org:Berg GmbH', 'org:Alpine AG']);
+    // A standalone project's hours keep their epic grouping.
+    const sta = await integrationService.actualsForCustomerEpics(orgId, standaloneId, '2026-06', '2026-06');
+    expect(sta.map((e) => [e.key, e.org])).toEqual([['(no epic)', undefined]]);
+
+    await integrationService.updateWorkItem(orgId, berg.id, { customerId: bergId });
+  });
+
   it('with the space unclassified, unmapped organizations show by name in the drill-down', async () => {
     await integrationService.updateWorkItem(orgId, delId, { workType: 'client' });
     (jiraClient.fetchIssues as any).mockResolvedValue([issue('5', 'DEL-5', 'Cima SA')]);
